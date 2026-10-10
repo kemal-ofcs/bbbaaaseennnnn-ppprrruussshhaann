@@ -1,0 +1,80 @@
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+const desktopDir = join(__dirname, "../../web-desktop/src-tauri/src/desktop");
+const mobileDir = join(__dirname, "../src-tauri/src/mobile");
+
+const filesToSync = [
+  "sync.rs",
+  "operational.rs",
+  "administration.rs",
+  "scanner.rs",
+  "commands.rs",
+  // Tarif default payroll: satu sumber untuk SQLite lokal dan Turso cloud, di
+  // kedua workspace. Perbedaan sekecil apa pun di sini membuat baris seed lokal
+  // terdorong ke cloud dan menggandakan bracket pajak.
+  "payroll_seed.rs",
+  // Klien Turso: DDL cloud, seed katalog permission, dan guard prioritas
+  // absensi. Dulu berkas ini dipelihara terpisah dan sudah drift dua arah —
+  // seed permission Mobile ketinggalan lima permission payroll dan menanam dua
+  // permission yang tidak ada di `catalog.ts`, sementara hanya Mobile yang
+  // menanam shift default. Karena keduanya membangun database Turso yang sama,
+  // berkas ini WAJIB identik.
+  "turso.rs",
+  // Seam transport SQL. Wajib ikut: ia memuat dekoder sel Hrana yang dipakai
+  // jalur cloud DAN jalur SQLite lokal, sehingga bentuk nilai hasil query di
+  // kedua platform tidak boleh berbeda satu tipe pun.
+  "sql_backend.rs",
+  // Ekspor/impor berkas hub. Ikut disinkronkan supaya aturan validasi cadangan
+  // — versi skema, integritas, dan penolakan database asing — tidak pernah
+  // berbeda antara Desktop dan Mobile.
+  "portability.rs",
+  // Sumber kebenaran tunggal untuk timestamp absensi: penentuan tanggal kerja,
+  // jendela scan pulang, deteksi shift fleksibel, dan cutoff Generate Alfa.
+  // Berkas ini dulu dipelihara terpisah di kedua workspace tanpa alat apa pun
+  // yang menjaganya tetap sama — persis kelas drift yang membuat aturan shift
+  // berbeda antar platform.
+  "time_policy.rs",
+  // Lisensi offline Ed25519: pemeriksa yang sama persis di Desktop dan Mobile,
+  // karena keduanya membaca `app_license` yang sama lewat sync.
+  "license.rs",
+];
+
+/** Sesuaikan tipe & jalur modul Desktop ke padanan Mobile. */
+function adaptToMobile(content: string) {
+  return content
+    .replaceAll("DesktopState", "MobileState")
+    .replaceAll("DesktopSyncStatus", "MobileSyncStatus")
+    .replaceAll("DesktopLoginResult", "MobileLoginResult")
+    .replaceAll("DesktopRuntimeStatus", "MobileRuntimeStatus")
+    .replaceAll("DesktopSession", "MobileSession")
+    .replaceAll("desktop-security.db", "mobile-security.db")
+    .replaceAll("crate::desktop::", "crate::mobile::")
+    .replaceAll("use crate::desktop", "use crate::mobile")
+    .replaceAll("super::super::desktop", "super::super::mobile");
+}
+
+for (const file of filesToSync) {
+  const srcPath = join(desktopDir, file);
+  const content = adaptToMobile(readFileSync(srcPath, "utf-8"));
+  const destPath = join(mobileDir, file);
+  writeFileSync(destPath, content, "utf-8");
+  console.log(`Synced ${file} to ${destPath}`);
+}
+
+// Administrasi payroll (konfigurasi gaji, aturan pajak/BPJS/lembur, payroll
+// run). Menyangkut UANG, jadi satu implementasi saja: modul Desktop disalin
+// apa adanya, tidak pernah ditulis ulang di Mobile. Tujuannya `payroll_admin/`
+// karena `mobile/payroll.rs` sudah dipakai command baca-saja `mobile_*`
+// (slip & estimasi karyawan). Command-nya tetap bernama `desktop_*` supaya
+// gateway `payroll.ts` yang sama dipakai kedua build tanpa cabang baru.
+const payrollAdminFiles = ["mod.rs", "commands.rs", "engine.rs", "models.rs"];
+const payrollAdminDest = join(mobileDir, "payroll_admin");
+mkdirSync(payrollAdminDest, { recursive: true });
+for (const file of payrollAdminFiles) {
+  const srcPath = join(desktopDir, "payroll", file);
+  const content = adaptToMobile(readFileSync(srcPath, "utf-8"));
+  const destPath = join(payrollAdminDest, file);
+  writeFileSync(destPath, content, "utf-8");
+  console.log(`Synced payroll/${file} to ${destPath}`);
+}

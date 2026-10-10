@@ -1,0 +1,2073 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Buku Panduan Lengkap Aplikasi Absensi SPPG</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 18mm 16mm 18mm 16mm;
+      @bottom-right {
+        content: counter(page);
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 8pt;
+        color: #94a3b8;
+      }
+      @bottom-left {
+        content: "Absensi SPPG · Manual Operasional Sistem";
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 8pt;
+        color: #94a3b8;
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 10pt;
+      line-height: 1.6;
+      color: #334155;
+      background-color: #ffffff;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    /* Cover Page */
+    .cover-page {
+      page-break-after: always;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 250mm;
+      padding: 10mm 5mm 5mm 5mm;
+      position: relative;
+    }
+
+    .cover-top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 5mm;
+    }
+
+    .cover-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .cover-logo-badge {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, #0f172a 0%, #1e40af 100%);
+      color: #ffffff;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 800;
+      box-shadow: 0 4px 10px rgba(30, 58, 138, 0.25);
+    }
+
+    .cover-brand-title {
+      font-size: 13pt;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      color: #0f172a;
+      line-height: 1.2;
+    }
+
+    .cover-brand-tag {
+      font-size: 8pt;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .cover-doc-badge {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1d4ed8;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 8pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .cover-hero {
+      margin-top: 25mm;
+      margin-bottom: 25mm;
+    }
+
+    .cover-tagline {
+      display: inline-block;
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px solid #fde68a;
+      padding: 4px 14px;
+      border-radius: 6px;
+      font-size: 8.5pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6mm;
+    }
+
+    .cover-main-title {
+      font-size: 26pt;
+      font-weight: 800;
+      color: #0f172a;
+      line-height: 1.15;
+      letter-spacing: -0.5px;
+      margin-bottom: 4mm;
+    }
+
+    .cover-main-title span {
+      background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: #1e40af;
+    }
+
+    .cover-subtitle {
+      font-size: 12pt;
+      font-weight: 500;
+      color: #475569;
+      line-height: 1.5;
+      margin-bottom: 10mm;
+    }
+
+    .cover-ecosystem-pills {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .eco-pill {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 8.5pt;
+      font-weight: 600;
+      color: #1e293b;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .cover-metadata-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-left: 4px solid #1e40af;
+      border-radius: 10px;
+      padding: 6mm 8mm;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .meta-label {
+      font-size: 7.5pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #64748b;
+    }
+
+    .meta-val {
+      font-size: 9.5pt;
+      font-weight: 700;
+      color: #0f172a;
+      margin-top: 2px;
+    }
+
+    .cover-bottom {
+      border-top: 1px solid #e2e8f0;
+      padding-top: 4mm;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 8pt;
+      color: #64748b;
+    }
+
+    /* Chapters & Headings */
+    .chapter-break {
+      page-break-before: always;
+      height: 0;
+    }
+
+    .chapter-header {
+      margin-top: 5mm;
+      margin-bottom: 6mm;
+      padding-bottom: 4mm;
+      border-bottom: 2px solid #e2e8f0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      page-break-after: avoid;
+    }
+
+    .chapter-badge {
+      display: inline-block;
+      align-self: flex-start;
+      background: #0f172a;
+      color: #ffffff;
+      font-size: 7.5pt;
+      font-weight: 800;
+      letter-spacing: 1px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+
+    .chapter-title {
+      font-size: 16pt;
+      font-weight: 800;
+      color: #0f172a;
+      line-height: 1.25;
+      letter-spacing: -0.3px;
+    }
+
+    .section-title {
+      font-size: 13pt;
+      font-weight: 700;
+      color: #0f172a;
+      margin-top: 7mm;
+      margin-bottom: 3mm;
+      border-bottom: 1px solid #f1f5f9;
+      padding-bottom: 2mm;
+      page-break-after: avoid;
+    }
+
+    .subsection-title {
+      font-size: 11pt;
+      font-weight: 700;
+      color: #1e293b;
+      margin-top: 5mm;
+      margin-bottom: 2.5mm;
+      page-break-after: avoid;
+    }
+
+    .minor-title {
+      font-size: 10pt;
+      font-weight: 700;
+      color: #334155;
+      margin-top: 4mm;
+      margin-bottom: 2mm;
+      page-break-after: avoid;
+    }
+
+    .doc-para {
+      margin-bottom: 3mm;
+      text-align: justify;
+    }
+
+    hr, .divider {
+      border: 0;
+      height: 1px;
+      background: #e2e8f0;
+      margin: 6mm 0;
+    }
+
+    /* Table of Contents */
+    .toc-container {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 6mm 8mm;
+      margin-top: 4mm;
+      margin-bottom: 8mm;
+      page-break-after: always;
+    }
+
+    .toc-title {
+      font-size: 13pt;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 4mm;
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 2mm;
+      letter-spacing: 0.5px;
+    }
+
+    .toc-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .toc-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      padding: 8px 14px;
+      border-radius: 8px;
+      text-decoration: none;
+      color: #0f172a;
+      font-weight: 600;
+      font-size: 9.5pt;
+    }
+
+    .toc-num {
+      background: #e2e8f0;
+      color: #0f172a;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 8pt;
+      font-weight: 700;
+      margin-right: 10px;
+    }
+
+    .toc-text {
+      flex: 1;
+    }
+
+    .toc-arrow {
+      color: #94a3b8;
+      font-size: 9pt;
+    }
+
+    /* Lists */
+    ol, ul {
+      margin-left: 6mm;
+      margin-bottom: 4mm;
+    }
+
+    li {
+      margin-bottom: 1.8mm;
+      padding-left: 1mm;
+    }
+
+    /* Code Blocks */
+    .code-block-wrapper {
+      background: #0f172a;
+      border-radius: 8px;
+      margin: 3mm 0 4mm 0;
+      overflow: hidden;
+      border: 1px solid #1e293b;
+      page-break-inside: avoid;
+    }
+
+    .code-lang-tag {
+      background: #1e293b;
+      color: #94a3b8;
+      font-size: 7pt;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      padding: 3px 10px;
+      font-family: 'JetBrains Mono', monospace;
+      border-bottom: 1px solid #334155;
+    }
+
+    pre {
+      padding: 8px 12px;
+      margin: 0;
+      overflow-x: auto;
+    }
+
+    code {
+      font-family: 'JetBrains Mono', Consolas, Monaco, monospace;
+      font-size: 8.5pt;
+      color: #f1f5f9;
+      line-height: 1.45;
+    }
+
+    p code, li code, td code {
+      background: #f1f5f9;
+      color: #0f172a;
+      border: 1px solid #e2e8f0;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 8.5pt;
+      font-weight: 600;
+    }
+
+    /* Tables */
+    .table-container {
+      margin: 4mm 0 5mm 0;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #cbd5e1;
+      page-break-inside: avoid;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 8.5pt;
+      text-align: left;
+    }
+
+    thead th {
+      background: #0f172a;
+      color: #ffffff;
+      font-weight: 700;
+      padding: 8px 10px;
+      border: 1px solid #1e293b;
+      font-size: 8.5pt;
+    }
+
+    tbody td {
+      padding: 7px 10px;
+      border: 1px solid #e2e8f0;
+      vertical-align: middle;
+    }
+
+    tbody tr:nth-child(even) {
+      background: #f8fafc;
+    }
+
+    /* Status Badges */
+    .badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 7.5pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .badge-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .badge-warning { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+    .badge-orange  { background: #ffedd5; color: #9a3412; border: 1px solid #fed7aa; }
+    .badge-danger  { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+    .badge-info    { background: #e0f2fe; color: #075985; border: 1px solid #bae6fd; }
+    .badge-blue    { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
+    .badge-purple  { background: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; }
+
+    /* Visual Components */
+    .pipeline-wrapper {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 5mm 6mm;
+      margin: 4mm 0 5mm 0;
+      page-break-inside: avoid;
+    }
+
+    .pipeline-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4mm;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 3mm;
+    }
+
+    .pipeline-badge {
+      background: #2563eb;
+      color: #ffffff;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 7.5pt;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+
+    .pipeline-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .step-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 10px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .step-number {
+      width: 26px;
+      height: 26px;
+      background: #0f172a;
+      color: #ffffff;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 9pt;
+      flex-shrink: 0;
+    }
+
+    .step-title {
+      font-weight: 700;
+      font-size: 8.5pt;
+      color: #0f172a;
+    }
+
+    .step-desc {
+      font-size: 7.5pt;
+      color: #64748b;
+      margin-top: 1px;
+    }
+
+    /* Architecture Box */
+    .diagram-box {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 5mm 6mm;
+      margin: 4mm 0 5mm 0;
+      page-break-inside: avoid;
+    }
+
+    .diagram-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4mm;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 2.5mm;
+    }
+
+    .diagram-pill {
+      background: #0f172a;
+      color: #ffffff;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 7.5pt;
+      font-weight: 800;
+    }
+
+    .diagram-sub {
+      font-size: 7.5pt;
+      font-weight: 600;
+      color: #64748b;
+    }
+
+    .arch-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .cloud-node {
+      background: #ffffff;
+      border: 2px solid #2563eb;
+      border-radius: 8px;
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .node-icon {
+      font-size: 18pt;
+    }
+
+    .node-title {
+      font-size: 9.5pt;
+      font-weight: 800;
+      color: #0f172a;
+    }
+
+    .node-sub {
+      font-size: 7.5pt;
+      color: #475569;
+      margin-top: 2px;
+    }
+
+    .arch-sync-line {
+      text-align: center;
+      padding: 2px 0;
+    }
+
+    .sync-badge {
+      display: inline-block;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1d4ed8;
+      font-size: 7.5pt;
+      font-weight: 700;
+      padding: 2px 12px;
+      border-radius: 20px;
+    }
+
+    .arch-clients-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    .client-node {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+
+    .node-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+      border-bottom: 1px solid #f1f5f9;
+      padding-bottom: 4px;
+    }
+
+    .node-features {
+      list-style: none;
+      font-size: 7.5pt;
+      color: #475569;
+      line-height: 1.5;
+      margin-left: 0;
+    }
+
+    .node-features li::before {
+      content: "• ";
+      color: #2563eb;
+      font-weight: bold;
+    }
+
+    /* Setup Flow Card */
+    .setup-flow-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 5mm 6mm;
+      margin: 4mm 0 5mm 0;
+      page-break-inside: avoid;
+    }
+
+    .setup-flow-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 3.5mm;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 2.5mm;
+    }
+
+    .setup-flow-badge {
+      background: #0f172a;
+      color: #ffffff;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 7.5pt;
+      font-weight: 800;
+    }
+
+    .setup-flow-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+    }
+
+    .setup-flow-item {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 6px 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .setup-flow-num {
+      width: 20px;
+      height: 20px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1d4ed8;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 7.5pt;
+      flex-shrink: 0;
+    }
+
+    .setup-flow-text {
+      font-size: 8pt;
+      font-weight: 600;
+      color: #1e293b;
+    }
+
+    /* Matrix Scanner Card */
+    .matrix-card {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 5mm 6mm;
+      margin: 4mm 0 5mm 0;
+      page-break-inside: avoid;
+    }
+
+    .matrix-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 3.5mm;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 2.5mm;
+    }
+
+    .matrix-badge {
+      background: #0f172a;
+      color: #ffffff;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 7.5pt;
+      font-weight: 800;
+    }
+
+    .matrix-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .matrix-col {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 8px;
+    }
+
+    .matrix-col-header {
+      font-size: 8pt;
+      font-weight: 800;
+      padding: 4px 6px;
+      border-radius: 4px;
+      margin-bottom: 6px;
+      text-align: center;
+    }
+
+    .web-col { background: #eff6ff; color: #1e40af; }
+    .desktop-col { background: #f1f5f9; color: #0f172a; }
+    .mobile-col { background: #f0fdf4; color: #166534; }
+
+    .matrix-list {
+      list-style: none;
+      font-size: 7.5pt;
+      color: #334155;
+      line-height: 1.5;
+      margin-left: 0;
+    }
+
+    .matrix-list li::before {
+      content: "✔ ";
+      color: #16a34a;
+      font-weight: bold;
+    }
+
+    /* Studio Card */
+    .studio-card {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 5mm 6mm;
+      margin: 4mm 0 5mm 0;
+      page-break-inside: avoid;
+    }
+
+    .studio-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 3.5mm;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 2.5mm;
+    }
+
+    .studio-badge {
+      background: #7c3aed;
+      color: #ffffff;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 7.5pt;
+      font-weight: 800;
+    }
+
+    .studio-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .studio-spec-item {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 6px 10px;
+    }
+
+    .spec-label {
+      font-size: 7pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #64748b;
+    }
+
+    .spec-value {
+      font-size: 8pt;
+      font-weight: 700;
+      color: #0f172a;
+      margin-top: 1px;
+    }
+
+    /* SOP Card */
+    .sop-card {
+      background: #fffbeb;
+      border: 1px solid #fef3c7;
+      border-left: 4px solid #d97706;
+      border-radius: 10px;
+      padding: 5mm 6mm;
+      margin: 4mm 0 5mm 0;
+      page-break-inside: avoid;
+    }
+
+    .sop-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 3.5mm;
+      border-bottom: 1px solid #fde68a;
+      padding-bottom: 2.5mm;
+    }
+
+    .sop-badge {
+      background: #d97706;
+      color: #ffffff;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 7.5pt;
+      font-weight: 800;
+    }
+
+    .sop-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .sop-item {
+      background: #ffffff;
+      border: 1px solid #fde68a;
+      border-radius: 6px;
+      padding: 6px 10px;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .sop-icon {
+      font-size: 12pt;
+    }
+
+    .sop-info strong {
+      font-size: 8pt;
+      color: #0f172a;
+    }
+
+    .sop-info div {
+      font-size: 7.5pt;
+      color: #475569;
+      margin-top: 1px;
+    }
+
+    /* Provisioning Card */
+    .provisioning-card {
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+      border-left: 4px solid #0284c7;
+      border-radius: 10px;
+      padding: 5mm 6mm;
+      margin: 4mm 0 5mm 0;
+      page-break-inside: avoid;
+    }
+
+    .provisioning-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 3.5mm;
+      border-bottom: 1px solid #bae6fd;
+      padding-bottom: 2.5mm;
+    }
+
+    .provisioning-badge {
+      background: #0284c7;
+      color: #ffffff;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 7.5pt;
+      font-weight: 800;
+    }
+
+    .provisioning-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+
+    .prov-item {
+      background: #ffffff;
+      border: 1px solid #bae6fd;
+      border-radius: 6px;
+      padding: 6px 10px;
+    }
+
+    .prov-label {
+      font-size: 7.5pt;
+      font-weight: 800;
+      color: #0369a1;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .prov-desc {
+      font-size: 7.5pt;
+      color: #334155;
+      margin-top: 2px;
+    }
+
+    .prov-footer {
+      margin-top: 3.5mm;
+      padding-top: 2.5mm;
+      border-top: 1px dashed #bae6fd;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 7.5pt;
+      color: #0369a1;
+    }
+
+    .prov-lock-icon {
+      font-size: 10pt;
+    }
+
+    /* Math Block */
+    .math-block {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-left: 4px solid #2563eb;
+      border-radius: 8px;
+      padding: 10px 16px;
+      margin: 3mm 0 4mm 0;
+      text-align: center;
+      page-break-inside: avoid;
+    }
+
+    .math-formula {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10pt;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    /* FAQ */
+    .faq-question {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-left: 3px solid #2563eb;
+      border-radius: 6px 6px 0 0;
+      padding: 6px 10px;
+      margin-top: 4mm;
+      font-size: 9pt;
+      color: #0f172a;
+      page-break-inside: avoid;
+      page-break-after: avoid;
+    }
+
+    .faq-q-badge {
+      background: #2563eb;
+      color: #ffffff;
+      font-size: 7pt;
+      font-weight: 800;
+      padding: 1px 6px;
+      border-radius: 3px;
+      margin-right: 6px;
+    }
+
+    .faq-answer {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-top: 0;
+      border-radius: 0 0 6px 6px;
+      padding: 8px 12px;
+      margin-bottom: 4mm;
+      font-size: 8.5pt;
+      color: #334155;
+      page-break-inside: avoid;
+    }
+
+    .doc-footer-notice {
+      margin-top: 8mm;
+      padding-top: 4mm;
+      border-top: 1px solid #e2e8f0;
+      font-size: 8pt;
+      color: #64748b;
+      text-align: center;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Cover Page -->
+  <div class="cover-page">
+    <div class="cover-top-bar">
+      <div class="cover-brand">
+        <div class="cover-logo-badge">SP</div>
+        <div>
+          <div class="cover-brand-title">ABSENSI SPPG</div>
+          <div class="cover-brand-tag">Enterprise Attendance Suite</div>
+        </div>
+      </div>
+      <div class="cover-doc-badge">DOKUMEN RESMI</div>
+    </div>
+
+    <div class="cover-hero">
+      <div class="cover-tagline">Panduan Pengembang & Manual Operasional</div>
+      <h1 class="cover-main-title">Buku Panduan Lengkap<br><span>Aplikasi Absensi SPPG</span></h1>
+      <p class="cover-subtitle">Manual Konfigurasi Cloud Server, Desktop Client, dan Mobile Android APK dengan Arsitektur Local-First, Offline Vault Security, & Dynamic ID Card Studio.</p>
+
+      <div class="cover-ecosystem-pills">
+        <div class="eco-pill">🌐 Web Admin Cloud (Next.js 16)</div>
+        <div class="eco-pill">🖥️ Desktop Client (Tauri v2)</div>
+        <div class="eco-pill">📱 Mobile Android APK (Tauri v2)</div>
+        <div class="eco-pill">⚡ LibSQL & Rusqlite WAL</div>
+      </div>
+    </div>
+
+    <div class="cover-metadata-card">
+      <div class="meta-item">
+        <span class="meta-label">Versi Dokumen & Sistem</span>
+        <span class="meta-val">v0.1.0 Production Ready (2026)</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Target Pengguna</span>
+        <span class="meta-val">Developer, Superadmin, Operator</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Standar Arsitektur</span>
+        <span class="meta-val">Local-First (Zero Data Loss)</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Tingkat Keamanan Vault</span>
+        <span class="meta-val">AES-256-GCM + Argon2id</span>
+      </div>
+    </div>
+
+    <div class="cover-bottom">
+      <div>PT Makmur Sentosa Abadi · SPPG Attendance Ecosystem</div>
+      <div>Klasifikasi: Terbatas (Internal Operasional)</div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <h3 class="subsection-title">(Web Admin Cloud, Desktop Local-First Client, &amp; Mobile Android APK)</h3><hr>
+
+        
+      <div class="toc-container">
+        <div class="toc-header">
+          <h2 class="toc-title">DAFTAR ISI</h2>
+        </div>
+        <div class="toc-grid">
+          
+
+        <a href="#bab-1-ikhtisar-arsitektur--keunggulan-sistem" class="toc-item">
+          <span class="toc-num">BAB 1</span>
+          <span class="toc-text">Ikhtisar Arsitektur &amp; Keunggulan Sistem</span>
+          <span class="toc-arrow">➔</span>
+        </a>
+      
+
+        <a href="#bab-2-panduan-step-by-step-developer-sebelum-menyerahkan-aplikasi-ke-customer" class="toc-item">
+          <span class="toc-num">BAB 2</span>
+          <span class="toc-text">Panduan Step-by-Step Developer Sebelum Menyerahkan Aplikasi ke Customer</span>
+          <span class="toc-arrow">➔</span>
+        </a>
+      
+
+        <a href="#bab-3-panduan-setup-awal--onboarding-customer-administrator-guide" class="toc-item">
+          <span class="toc-num">BAB 3</span>
+          <span class="toc-text">Panduan Setup Awal &amp; Onboarding Customer (Administrator Guide)</span>
+          <span class="toc-arrow">➔</span>
+        </a>
+      
+
+        <a href="#bab-4-panduan-pemakaian--fitur-aplikasi-web-desktop--mobile" class="toc-item">
+          <span class="toc-num">BAB 4</span>
+          <span class="toc-text">Panduan Pemakaian &amp; Fitur Aplikasi (Web, Desktop, &amp; Mobile)</span>
+          <span class="toc-arrow">➔</span>
+        </a>
+      
+
+        <a href="#bab-5-panduan-dynamic-id-card-studio--desain-kartu-karyawan" class="toc-item">
+          <span class="toc-num">BAB 5</span>
+          <span class="toc-text">Panduan Dynamic ID Card Studio &amp; Desain Kartu Karyawan</span>
+          <span class="toc-arrow">➔</span>
+        </a>
+      
+
+        <a href="#bab-6-standar-operasional-prosedur-sop--aturan-scanner-qr" class="toc-item">
+          <span class="toc-num">BAB 6</span>
+          <span class="toc-text">Standar Operasional Prosedur (SOP) &amp; Aturan Scanner QR</span>
+          <span class="toc-arrow">➔</span>
+        </a>
+      
+
+        <a href="#bab-7-aturan-bisnis-time-policy-guard--logika-kalkulasi-kehadiran" class="toc-item">
+          <span class="toc-num">BAB 7</span>
+          <span class="toc-text">Aturan Bisnis, Time Policy Guard, &amp; Logika Kalkulasi Kehadiran</span>
+          <span class="toc-arrow">➔</span>
+        </a>
+      
+
+        <a href="#bab-8-panduan-pemeliharaan-backup--troubleshooting-mandiri-faq" class="toc-item">
+          <span class="toc-num">BAB 8</span>
+          <span class="toc-text">Panduan Pemeliharaan, Backup, &amp; Troubleshooting Mandiri (FAQ)</span>
+          <span class="toc-arrow">➔</span>
+        </a>
+      
+
+        </div>
+      </div>
+    
+<hr>
+
+        <div class="chapter-break"></div>
+        <div class="chapter-header" id="bab-1-ikhtisar-arsitektur-keunggulan-sistem">
+          <div class="chapter-badge">BAB 1</div>
+          <h2 class="chapter-title">Ikhtisar Arsitektur & Keunggulan Sistem</h2>
+        </div>
+      <p class="doc-para">Aplikasi <strong>Absensi SPPG</strong> adalah platform manajemen presensi modern berbasis <strong>Multi-Client &amp; Local-First Architecture</strong>, yang dirancang untuk kehandalan 100% tanpa takut gangguan jaringan internet (zero-downtime offline operational).</p>
+    <div class="diagram-box">
+      <div class="diagram-header">
+        <span class="diagram-pill">ARSITEKTUR MULTI-CLIENT & LOCAL-FIRST</span>
+        <span class="diagram-sub">Ecosystem Absensi SPPG (Zero-Downtime Offline First)</span>
+      </div>
+      
+      <div class="arch-container">
+        <!-- Cloud Server -->
+        <div class="arch-node cloud-node">
+          <div class="node-icon">☁️</div>
+          <div class="node-body">
+            <div class="node-title">CLOUD SERVER & DATABASE (TURSO LIBSQL)</div>
+            <div class="node-sub">Next.js 16 Backend API · Web Admin Portal · Master Authority Synchronization</div>
+          </div>
+        </div>
+
+        <div class="arch-sync-line">
+          <div class="sync-badge">⇄ Bi-directional Outbox Sync (Zero Schema Drift) ⇄</div>
+        </div>
+
+        <div class="arch-clients-grid">
+          <!-- Desktop Client -->
+          <div class="arch-node client-node">
+            <div class="node-header">
+              <div class="node-icon">🖥️</div>
+              <div class="node-title">DESKTOP CLIENT (TAURI v2)</div>
+            </div>
+            <ul class="node-features">
+              <li>Front Desk & Pos Keamanan PC</li>
+              <li>USB Barcode Scanner & Webcam</li>
+              <li>Local SQLite (rusqlite WAL Mode)</li>
+              <li>Full Offline Bi-directional Sync</li>
+              <li>Offline Vault (AES-256-GCM + Argon2id)</li>
+            </ul>
+          </div>
+
+          <!-- Mobile Client -->
+          <div class="arch-node client-node">
+            <div class="node-header">
+              <div class="node-icon">📱</div>
+              <div class="node-title">MOBILE ANDROID (TAURI v2)</div>
+            </div>
+            <ul class="node-features">
+              <li>Smartphone Android & Tablet Portable</li>
+              <li>Kamera Belakang ZXing + Flash/Torch</li>
+              <li>Background GPS Geofencing Real-time</li>
+              <li>Haptic Vibration & TTS Voice Synthesizer</li>
+              <li>Local SQLite & Sub-second Response</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  <h3 class="subsection-title">Keunggulan Utama Aplikasi:</h3><ol>
+<li><strong>Local-First &amp; Offline Resilience</strong>: Transaksi absensi disimpan instan di SQLite lokal berformat WAL dalam hitungan milidetik. Antrean <em>Outbox Pattern</em> akan otomatis mengirimkan data ke Cloud saat koneksi internet pulih tanpa terjadi data hilang (<em>zero data loss</em>).</li>
+<li><strong>Zero-Default Credentials &amp; Provisioning Satu Kali</strong>: Tidak ada akun bawaan default (<em>zero default password</em>) seperti <code>admin/123456</code>. Aplikasi pertama kali mengharuskan pembuatan akun Superadmin mandiri melalui formulir <em>Provisioning Satu Kali</em> dengan standar password kuat min 12 karakter.</li>
+<li><strong>Offline Security Vault</strong>: Mengamankan kredensial operator lokal dan token database dengan enkripsi standar militer <strong>AES-256-GCM</strong> yang diturunkan dari algoritma hashing <strong>Argon2id</strong>. Operator dapat login tanpa internet selama batas waktu yang ditentukan.</li>
+<li><strong>Dynamic ID Card Studio &amp; Designer (Baru)</strong>: Fitur perancang tata letak kartu identitas standar CR80 (Depan &amp; Belakang) visual interaktif (WYSIWYG) dengan penyesuaian logo, background kustom, QR code, tanda tangan digital, stempel resmi, dan cetak lembar grid A4 massal.</li>
+<li><strong>Company Profile &amp; Identitas Terpadu (Baru)</strong>: Pengaturan profil instansi (Nama, Alamat, Kontak, Logo, Tanda Tangan Direktur, Stempel) yang otomatis terintegrasi ke kartu ID Card dan laporan kehadiran.</li>
+<li><strong>Time Policy Guard (Anti-Manipulasi Jam)</strong>: Menolak kecurangan manipulasi jam di perangkat pengguna menggunakan validasi <em>Monotonic Hardware Clock</em> backend Rust dan referensi server cloud.</li>
+<li><strong>GPS Geofencing Real-Time</strong>: Memvalidasi radius lokasi fisik scan terhadap koordinat kantor/lokasi kerja yang ditentukan.</li>
+<li><strong>Dukungan Multi-Shift &amp; Shift Malam (Night Shift)</strong>: Perhitungan jam kerja lintas hari (misal masuk 22:00, pulang 06:00 subuh) dengan toleransi keterlambatan, istirahat, dan lembur.</li>
+<li><strong>Otomasi Generate Alfa Harian</strong>: Sistem secara cerdas menandai karyawan yang tidak hadir setelah batas waktu shift berakhir, dan otomatis mengabaikannya pada hari libur nasional/khusus.</li>
+<li><strong>Role-Based Access Control (RBAC)</strong>: Pembagian wewenang ketat antara <em>Superadmin</em>, <em>Admin</em>, <em>Manajer</em>, dan <em>Petugas Operator Scanner</em>.</li>
+</ol>
+<hr>
+
+        <div class="chapter-break"></div>
+        <div class="chapter-header" id="bab-2-panduan-step-by-step-developer-sebelum-menyerahkan-aplikasi-ke-customer">
+          <div class="chapter-badge">BAB 2</div>
+          <h2 class="chapter-title">Panduan Step-by-Step Developer Sebelum Menyerahkan Aplikasi ke Customer</h2>
+        </div>
+      <p class="doc-para">Sebagai pengembang/penjual aplikasi, ikuti <strong>Checklist 8 Langkah Wajib</strong> berikut sebelum menyerahkan aplikasi ke pembeli:</p>
+    <div class="pipeline-wrapper">
+      <div class="pipeline-header">
+        <span class="pipeline-badge">WORKFLOW DEVELOPER</span>
+        <strong>Checklist 8 Tahap Rilis & Serah Terima Aplikasi</strong>
+      </div>
+      <div class="pipeline-grid">
+        
+    <div class="step-card">
+      <div class="step-number">1</div>
+      <div class="step-content">
+        <div class="step-title">Buat DB Turso</div>
+        <div class="step-desc">Database tenant mandiri & auth token isolasi</div>
+      </div>
+    </div>
+  
+    <div class="step-card">
+      <div class="step-number">2</div>
+      <div class="step-content">
+        <div class="step-title">Deploy Web Server</div>
+        <div class="step-desc">Next.js 16 API ke Vercel/VPS + Custom Domain</div>
+      </div>
+    </div>
+  
+    <div class="step-card">
+      <div class="step-number">3</div>
+      <div class="step-content">
+        <div class="step-title">Provisioning Superadmin</div>
+        <div class="step-desc">Inisialisasi schema & akun SPD001 pertama</div>
+      </div>
+    </div>
+  
+    <div class="step-card">
+      <div class="step-number">4</div>
+      <div class="step-content">
+        <div class="step-title">Uji Web Admin Portal</div>
+        <div class="step-desc">Verifikasi login & modul dashboard operational</div>
+      </div>
+    </div>
+  
+    <div class="step-card">
+      <div class="step-number">5</div>
+      <div class="step-content">
+        <div class="step-title">Compile Desktop Setup</div>
+        <div class="step-desc">Build release NSIS Installer (.exe/.msi)</div>
+      </div>
+    </div>
+  
+    <div class="step-card">
+      <div class="step-number">6</div>
+      <div class="step-content">
+        <div class="step-title">Compile Mobile APK</div>
+        <div class="step-desc">Build release APK Android ARM64/Split</div>
+      </div>
+    </div>
+  
+    <div class="step-card">
+      <div class="step-number">7</div>
+      <div class="step-content">
+        <div class="step-title">Uji Offline & Sync</div>
+        <div class="step-desc">Verifikasi Outbox SQLite & Push Cloud</div>
+      </div>
+    </div>
+  
+    <div class="step-card">
+      <div class="step-number">8</div>
+      <div class="step-content">
+        <div class="step-title">Serah Terima Customer</div>
+        <div class="step-desc">Penyerahan kredensial, APK, Desktop, & Manual</div>
+      </div>
+    </div>
+  
+      </div>
+    </div>
+  <h3 class="subsection-title">Langkah 1: Buat Database Cloud Turso Khusus Customer</h3><p class="doc-para">Setiap customer wajib memiliki database mandiri (<em>isolated tenant</em>).</p><ol>
+<li>Buka terminal developer dan login ke Turso:
+    <div class="code-block-wrapper">
+      <div class="code-lang-tag">POWERSHELL</div>
+      <pre><code class="language-powershell">turso auth login</code></pre>
+    </div>
+  </li>
+<li>Buat database baru khusus customer (contoh: <code>sppg-pt-makmur</code>):
+    <div class="code-block-wrapper">
+      <div class="code-lang-tag">POWERSHELL</div>
+      <pre><code class="language-powershell">turso db create sppg-pt-makmur --location sin</code></pre>
+    </div>
+  </li>
+<li>Catat URL database:
+    <div class="code-block-wrapper">
+      <div class="code-lang-tag">POWERSHELL</div>
+      <pre><code class="language-powershell">turso db show sppg-pt-makmur --url
+# Contoh: libsql://sppg-pt-makmur-username.turso.io</code></pre>
+    </div>
+  </li>
+<li>Buat Token Autentikasi Server:
+    <div class="code-block-wrapper">
+      <div class="code-lang-tag">POWERSHELL</div>
+      <pre><code class="language-powershell">turso db tokens create sppg-pt-makmur</code></pre>
+    </div>
+  </li>
+<li>Simpan URL dan Token ini di Password Manager Anda. <strong>JANGAN PERNAH</strong> memberikan token ini kepada pihak tidak berwenang atau menanamnya secara hardcoded di binary release.</li>
+</ol>
+<hr>
+<h3 class="subsection-title">Langkah 2: Deploy Backend Server Web ke Vercel atau VPS</h3><ol>
+<li>Buat project baru di Vercel atau VPS yang mengarah ke direktori <code>web-desktop</code>.</li>
+<li>Masukkan Environment Variables <strong>(Server-Side Only, tanpa prefix NEXT_PUBLIC_)</strong>:<ul>
+<li><code>TURSO_DATABASE_URL</code> = <code>libsql://sppg-pt-makmur-username.turso.io</code></li>
+<li><code>TURSO_AUTH_TOKEN</code> = <code>&lt;token-server-turso&gt;</code></li>
+<li><code>NODE_ENV</code> = <code>production</code></li>
+</ul>
+</li>
+<li>Deploy project dan hubungkan domain resmi customer (contoh: <code>https://absensi.ptmakmur.co.id</code> atau subdomain <code>https://sppg-pt-makmur.vercel.app</code>).</li>
+<li>Pastikan SSL/HTTPS aktif dengan sempurna.</li>
+</ol>
+<hr>
+<h3 class="subsection-title">Langkah 3: Inisialisasi Skema &amp; Provisioning Superadmin Pertama</h3><p class="doc-para">Database baru yang masih kosong <strong>wajib</strong> menjalankan inisialisasi skema dan pembuatan akun Superadmin pertama (<code>SPD001</code>). Anda dapat memilih salah satu dari 2 metode:</p><h4 class="minor-title">Metode A: Melalui Antarmuka Provisioning Satu Kali (Sangat Direkomendasikan)</h4><ol>
+<li>Buka URL Web customer di browser: <code>https://absensi.ptmakmur.co.id</code>.</li>
+<li>Sistem otomatis mendeteksi bahwa belum ada Superadmin dan langsung menampilkan antarmuka <strong>Provisioning Satu Kali</strong>.</li>
+<li>Masukkan data Superadmin pertama:<ul>
+<li><strong>Nama Lengkap</strong>: Contoh <em>&quot;Superadmin PT Makmur&quot;</em>.</li>
+<li><strong>Username</strong>: Contoh <code>superadmin</code> atau <code>admin.makmur</code>.</li>
+<li><strong>Password Kuat</strong>: Wajib minimal 12 karakter (kombinasi huruf besar, huruf kecil, angka, simbol khusus, dan tidak memuat username).</li>
+<li><strong>Ulangi Password</strong>: Masukkan konfirmasi password yang sama.</li>
+</ul>
+</li>
+<li>Klik tombol <strong>Aktifkan Superadmin</strong>.</li>
+<li>Sistem akan menginisialisasi 12 tabel snapshot operasional (<code>master_data</code>, <code>id_card</code>, <code>tbl_shift</code>, <code>tbl_hari_libur</code>, <code>setting_gex_system</code>, <code>company_profile</code>, <code>id_card_template</code>, <code>backup_karyawan</code>, <code>koreksi_admin</code>, <code>import_offline</code>, <code>absensi_harian</code>, <code>log_scan</code>) secara atomik dalam transaksi <code>BEGIN IMMEDIATE</code> dan menutup form provisioning secara permanen.</li>
+</ol>
+<h4 class="minor-title">Metode B: Melalui Terminal CLI Developer</h4><ol>
+<li>Buka terminal di folder <code>web-desktop</code>:
+    <div class="code-block-wrapper">
+      <div class="code-lang-tag">POWERSHELL</div>
+      <pre><code class="language-powershell">cd e:\Freelance\absensi-sppg-app\web-desktop</code></pre>
+    </div>
+  </li>
+<li>Jalankan perintah bootstrap:
+    <div class="code-block-wrapper">
+      <div class="code-lang-tag">POWERSHELL</div>
+      <pre><code class="language-powershell">$env:TURSO_DATABASE_URL="libsql://sppg-pt-makmur-username.turso.io"
+$env:TURSO_AUTH_TOKEN="&lt;token-server-turso&gt;"
+$env:SPPG_SUPERADMIN_NAME="Superadmin PT Makmur"
+$env:SPPG_SUPERADMIN_USERNAME="superadmin"
+$env:SPPG_SUPERADMIN_PASSWORD="GantiPasswordKuat2026!"
+
+bun run bootstrap:superadmin</code></pre>
+    </div>
+  </li>
+<li>Segera bersihkan password dari terminal PowerShell:
+    <div class="code-block-wrapper">
+      <div class="code-lang-tag">POWERSHELL</div>
+      <pre><code class="language-powershell">$env:SPPG_SUPERADMIN_PASSWORD=""</code></pre>
+    </div>
+  </li>
+</ol>
+<blockquote>
+<p class="doc-para">[!TIP]
+<strong>Pemulihan Darurat Jika Lupa Password / Akun Terkunci</strong>:
+Jika di kemudian hari customer lupa password Superadmin atau akun terkunci karena batas kesalahan login (<em>rate limit</em>), jalankan skrip reset interaktif:</p>
+    <div class="code-block-wrapper">
+      <div class="code-lang-tag">POWERSHELL</div>
+      <pre><code class="language-powershell">cd e:\Freelance\absensi-sppg-app\web-desktop
+bun run reset:superadmin</code></pre>
+    </div>
+  </blockquote>
+<hr>
+<h3 class="subsection-title">Langkah 4: Uji Web Admin Portal (Online Acceptance)</h3><ol>
+<li>Buka URL Web customer di browser: <code>https://absensi.ptmakmur.co.id/login</code>.</li>
+<li>Login dengan akun Superadmin yang baru saja dibuat saat provisioning.</li>
+<li>Verifikasi bahwa halaman Dashboard, Karyawan, Shift, Hari Libur, ID Card (Visual Studio), Master Operator, Operasional, Riwayat, dan Pengaturan (Profil Instansi) dapat diakses dengan lancar.</li>
+</ol>
+<hr>
+<h3 class="subsection-title">Langkah 5: Kompilasi Release Desktop Installer (.exe / .msi)</h3><ol>
+<li>Buka terminal di folder <code>web-desktop</code>:
+    <div class="code-block-wrapper">
+      <div class="code-lang-tag">POWERSHELL</div>
+      <pre><code class="language-powershell">cd e:\Freelance\absensi-sppg-app\web-desktop</code></pre>
+    </div>
+  </li>
+<li>Set konfigurasi build terikat ke domain customer:
+    <div class="code-block-wrapper">
+      <div class="code-lang-tag">POWERSHELL</div>
+      <pre><code class="language-powershell">$env:SPPG_API_BASE_URL="https://absensi.ptmakmur.co.id"
+$env:SPPG_OFFLINE_AUTH_MAX_AGE_HOURS="720"
+bun run tauri:build</code></pre>
+    </div>
+  </li>
+<li>Ambil file installer hasil build di:
+<code>web-desktop/src-tauri/target/release/bundle/nsis/Absensi SPPG_0.1.0_x64-setup.exe</code></li>
+<li>Beri nama file yang rapi: <code>Absensi-SPPG-Desktop-Setup-PT-Makmur.exe</code>.</li>
+</ol>
+<hr>
+<h3 class="subsection-title">Langkah 6: Kompilasi Release Mobile APK Android (.apk)</h3><ol>
+<li>Buka terminal di folder <code>mobile</code>:
+    <div class="code-block-wrapper">
+      <div class="code-lang-tag">POWERSHELL</div>
+      <pre><code class="language-powershell">cd e:\Freelance\absensi-sppg-app\mobile</code></pre>
+    </div>
+  </li>
+<li>Set konfigurasi build di <code>mobile/.env</code> atau PowerShell:
+    <div class="code-block-wrapper">
+      <div class="code-lang-tag">POWERSHELL</div>
+      <pre><code class="language-powershell">$env:SPPG_API_BASE_URL="https://absensi.ptmakmur.co.id"
+$env:SPPG_OFFLINE_AUTH_MAX_AGE_HOURS="720"
+$env:SPPG_BUILD_TARGET="mobile"
+$env:NEXT_PUBLIC_SPPG_RUNTIME="mobile"</code></pre>
+    </div>
+  </li>
+<li>Jalankan kompilasi ARM64 (atau split per ABI):
+    <div class="code-block-wrapper">
+      <div class="code-lang-tag">POWERSHELL</div>
+      <pre><code class="language-powershell">bun run tauri:android:build:arm64</code></pre>
+    </div>
+  </li>
+<li>Ambil file APK hasil build di:
+<code>mobile/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk</code></li>
+<li>Beri nama file: <code>Absensi-SPPG-Mobile-PT-Makmur-arm64.apk</code>.</li>
+</ol>
+<hr>
+<h3 class="subsection-title">Langkah 7: Pengujian Terakhir &amp; Verifikasi Kualitas</h3><ol>
+<li>Jalankan pengujian kualitas komprehensif di root workspace:
+    <div class="code-block-wrapper">
+      <div class="code-lang-tag">POWERSHELL</div>
+      <pre><code class="language-powershell">cd e:\Freelance\absensi-sppg-app
+bun run check:quick</code></pre>
+    </div>
+  <em>Pastikan skema database, validator Zod, Biome linter, dan TypeScript check 100% PASS.</em></li>
+<li>Pasang APK di HP Android fisik:<ul>
+<li>Uji buka kamera, scan QR karyawan, nyalakan senter, uji getaran (haptics), dan suara Text-to-Speech.</li>
+<li>Aktifkan <em>Mode Pesawat</em>, lakukan scan offline, pastikan data tersimpan di SQLite lokal.</li>
+<li>Matikan <em>Mode Pesawat</em>, tekan sinkronisasi, pastikan data otomatis masuk ke Web Cloud.</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h3 class="subsection-title">Langkah 8: Penyerahan Paket ke Customer (Handover Kit)</h3><p class="doc-para">Serahkan paket lengkap kepada customer:</p><ul>
+<li><strong>1. Tautan Portal Web</strong>: <code>https://absensi.ptmakmur.co.id</code></li>
+<li><strong>2. Kredensial Superadmin</strong>: Username &amp; Password yang dibuat saat provisioning (atau pandu customer melakukan provisioning mandiri).</li>
+<li><strong>3. File Installer Desktop</strong>: <code>Absensi-SPPG-Desktop-Setup-PT-Makmur.exe</code></li>
+<li><strong>4. File Installer Android</strong>: <code>Absensi-SPPG-Mobile-PT-Makmur-arm64.apk</code></li>
+<li><strong>5. Buku Manual Ini</strong>: <code>PANDUAN_LENGKAP_APLIKASI_SPPG.md</code> / <code>PANDUAN_LENGKAP_APLIKASI_SPPG.pdf</code></li>
+</ul>
+<hr>
+
+        <div class="chapter-break"></div>
+        <div class="chapter-header" id="bab-3-panduan-setup-awal-onboarding-customer-administrator-guide-">
+          <div class="chapter-badge">BAB 3</div>
+          <h2 class="chapter-title">Panduan Setup Awal & Onboarding Customer (Administrator Guide)</h2>
+        </div>
+      <p class="doc-para">Bagi Administrator / Superadmin yang baru pertama kali menerima aplikasi, ikuti <strong>10 Tahapan Konfigurasi Awal</strong> berikut:</p>
+    <div class="setup-flow-card">
+      <div class="setup-flow-header">
+        <span class="setup-flow-badge">PANDUAN ADMINISTRATOR</span>
+        <strong>10 Tahapan Konfigurasi Awal Sistem</strong>
+      </div>
+      <div class="setup-flow-grid">
+        
+    <div class="setup-flow-item">
+      <span class="setup-flow-num">1</span>
+      <span class="setup-flow-text">Provisioning Satu Kali & Akun Superadmin Pertama</span>
+    </div>
+  
+    <div class="setup-flow-item">
+      <span class="setup-flow-num">2</span>
+      <span class="setup-flow-text">Lengkapi Profil Instansi & Upload Logo, TTD, Stempel Resmi</span>
+    </div>
+  
+    <div class="setup-flow-item">
+      <span class="setup-flow-num">3</span>
+      <span class="setup-flow-text">Set Titik Koordinat GPS Kantor & Radius Geofence</span>
+    </div>
+  
+    <div class="setup-flow-item">
+      <span class="setup-flow-num">4</span>
+      <span class="setup-flow-text">Atur Parameter Keamanan Pemindai & Cooldown Anti Double-Scan</span>
+    </div>
+  
+    <div class="setup-flow-item">
+      <span class="setup-flow-num">5</span>
+      <span class="setup-flow-text">Aktifkan Otomasi Generate Alfa Harian</span>
+    </div>
+  
+    <div class="setup-flow-item">
+      <span class="setup-flow-num">6</span>
+      <span class="setup-flow-text">Buat Master Shift Kerja (Pagi, Siang, Malam, Fleksibel)</span>
+    </div>
+  
+    <div class="setup-flow-item">
+      <span class="setup-flow-num">7</span>
+      <span class="setup-flow-text">Input Kalender Hari Libur Nasional & Khusus Instansi</span>
+    </div>
+  
+    <div class="setup-flow-item">
+      <span class="setup-flow-num">8</span>
+      <span class="setup-flow-text">Buat Akun Operator & Role Hak Akses (Admin, Manajer, Scanner)</span>
+    </div>
+  
+    <div class="setup-flow-item">
+      <span class="setup-flow-num">9</span>
+      <span class="setup-flow-text">Masukkan Data Karyawan (Input Form / Import Excel)</span>
+    </div>
+  
+    <div class="setup-flow-item">
+      <span class="setup-flow-num">10</span>
+      <span class="setup-flow-text">Desain Template di ID Card Studio & Cetak Kartu Karyawan</span>
+    </div>
+  
+      </div>
+    </div>
+  <hr>
+<h3 class="subsection-title">1. Provisioning Satu Kali (First-Time Provisioning) &amp; Pembuatan Akun Superadmin Pertama</h3><p class="doc-para">Aplikasi Absensi SPPG menerapkan standar keamanan <strong>Zero-Default Password</strong>. Saat aplikasi pertama kali dibuka pada database yang belum memiliki Superadmin, sistem akan menyajikan layar <strong>&quot;Provisioning Satu Kali&quot;</strong>:</p>
+    <div class="provisioning-card">
+      <div class="provisioning-header">
+        <span class="provisioning-badge">KEAMANAN ZERO-DEFAULT</span>
+        <strong>Formulir Provisioning Satu Kali (First-Time Superadmin Setup)</strong>
+      </div>
+      <div class="provisioning-grid">
+        <div class="prov-item">
+          <div class="prov-label">URL & Auth Token Turso</div>
+          <div class="prov-desc">Diisi saat instalasi rilis mandiri (diamankan di Vault AES-256-GCM)</div>
+        </div>
+        <div class="prov-item">
+          <div class="prov-label">Kode Operator</div>
+          <div class="prov-desc">Otomatis terkunci <code>SPD001</code> (Hak akses Superadmin Master)</div>
+        </div>
+        <div class="prov-item">
+          <div class="prov-label">Nama & Username</div>
+          <div class="prov-desc">Nama pimpinan / instansi & username unik (alfanumerik min 3 karakter)</div>
+        </div>
+        <div class="prov-item">
+          <div class="prov-label">Password Kuat (Min 12 Karakter)</div>
+          <div class="prov-desc">Wajib kombinasi huruf besar, huruf kecil, angka, simbol & anti-username</div>
+        </div>
+      </div>
+      <div class="prov-footer">
+        <span class="prov-lock-icon">🔒</span>
+        <span>Setelah tersimpan, formulir ini <strong>ditutup permanen</strong> secara atomik dalam database cloud.</span>
+      </div>
+    </div>
+  <ol>
+<li>Buka browser atau jalankan aplikasi Desktop / Mobile APK.</li>
+<li>Pada layar <strong>Provisioning Satu Kali</strong>:<ul>
+<li>Jika aplikasi meminta konfigurasi database (pada fresh client tanpa cloud binding bawaan), masukkan <strong>URL Database Turso</strong> (<code>libsql://...</code>) dan <strong>Auth Token Turso</strong>. Kredensial ini akan langsung diamankan di dalam <em>Offline Security Vault</em> terenkripsi AES-256-GCM.</li>
+<li><strong>Kode Operator</strong>: Otomatis terisi <code>SPD001</code> sebagai identitas Superadmin utama.</li>
+<li><strong>Nama Lengkap</strong>: Masukkan nama lengkap Anda (minimal 3 karakter).</li>
+<li><strong>Username</strong>: Masukkan username login yang diinginkan (minimal 3 karakter, alfanumerik <code>[A-Za-z0-9._-]+</code>).</li>
+<li><strong>Password Kuat</strong>: Masukkan kata sandi dengan ketentuan:<ul>
+<li>Minimal 12 karakter.</li>
+<li>Mengandung minimal 1 huruf besar (A-Z).</li>
+<li>Mengandung minimal 1 huruf kecil (a-z).</li>
+<li>Mengandung minimal 1 angka (0-9).</li>
+<li>Mengandung minimal 1 simbol / karakter khusus (<code>!@#$%^&amp;*</code> dsb).</li>
+<li>Tidak boleh mengandung username Anda.</li>
+</ul>
+</li>
+<li><strong>Ulangi Password</strong>: Masukkan kembali kata sandi untuk konfirmasi.</li>
+</ul>
+</li>
+<li>Klik tombol <strong>Aktifkan Superadmin</strong>.</li>
+<li>Sistem akan mengeksekusi inisialisasi skema dan mencatat status bootstrap secara atomik. Setelah proses ini berhasil, form provisioning <strong>ditutup permanen</strong> dan Anda dapat langsung login ke Dashboard.</li>
+</ol>
+<hr>
+<h3 class="subsection-title">2. Pengaturan Profil Instansi &amp; Identitas Resmi (Company Profile)</h3><ol>
+<li>Buka menu <strong>Pengaturan</strong> di sidebar kiri.</li>
+<li>Pada bagian <strong>Profil Instansi &amp; Identitas ID Card</strong>:<ul>
+<li><strong>Nama Instansi / Perusahaan</strong>: Contoh <em>&quot;PT MAKMUR SENTOSA ABADI&quot;</em>.</li>
+<li><strong>Slogan / Tagline</strong>: Contoh <em>&quot;Inovasi &amp; Integritas Terbaik&quot;</em>.</li>
+<li><strong>Alamat Lengkap</strong>: Alamat kantor resmi.</li>
+<li><strong>Telepon, Email, &amp; Website</strong>: Kontak operasional.</li>
+<li><strong>Logo Instansi</strong>: Klik tombol unggah logo (sistem otomatis mengompresi gambar tanpa menurunkan kualitas).</li>
+<li><strong>Tanda Tangan Pimpinan</strong>: Unggah tanda tangan digital berlatar belakang transparan (PNG).</li>
+<li><strong>Stempel Resmi</strong>: Unggah stempel resmi instansi.</li>
+</ul>
+</li>
+<li>Klik tombol <strong>Simpan Profil Instansi</strong>. Data ini langsung terintegrasi ke seluruh template ID Card dan laporan sistem.</li>
+</ol>
+<hr>
+<h3 class="subsection-title">3. Pengaturan Lokasi Kantor &amp; GPS Geofencing</h3><p class="doc-para">Fitur ini memastikan karyawan atau petugas hanya dapat melakukan scan jika berada di dalam area lokasi kantor yang sah.</p><ol>
+<li>Buka menu <strong>Pengaturan</strong> → Gulir ke bagian <strong>Lokasi kantor &amp; geofencing</strong>.</li>
+<li>Masukkan <strong>Latitude kantor</strong> dan <strong>Longitude kantor</strong> (atau klik tombol <strong>Gunakan lokasi perangkat ini</strong> jika Anda sedang berada di kantor).</li>
+<li>Masukkan <strong>Radius maksimal (meter)</strong>, misalnya <code>100</code> meter (atau <code>200</code> meter jika area kantor luas).</li>
+<li>Centang opsi <strong>Wajibkan lokasi saat scan</strong>.</li>
+<li>Klik tombol <strong>Simpan pengaturan lokasi</strong>.</li>
+</ol>
+<hr>
+<h3 class="subsection-title">4. Pengaturan Keamanan Pemindai (Anti Double-Scan)</h3><ol>
+<li>Pada menu <strong>Pengaturan</strong> → Bagian <strong>Keamanan Pemindai &amp; Anti Double-Scan</strong>:<ul>
+<li><strong>Batas Multi-Scan Masuk (Menit)</strong>: Tentukan batas toleransi scan ulang (Default: <code>5</code> menit). Jika karyawan scan masuk lalu scan lagi dalam 5 menit, sistem tidak akan menganggapnya sebagai scan pulang atau duplikat.</li>
+<li><strong>Cooldown Anti Double-Scan (Detik)</strong>: Jeda waktu minimal sebelum scanner membaca kembali QR yang sama (Default: <code>60</code> detik). Mencegah scanner kamera membaca QR yang sama berkali-kali dalam hitungan detik.</li>
+</ul>
+</li>
+<li>Klik tombol <strong>Simpan Pengaturan Scanner</strong>.</li>
+</ol>
+<hr>
+<h3 class="subsection-title">5. Pengaturan Otomasi Generate Alfa Harian</h3><ol>
+<li>Pada menu <strong>Pengaturan</strong> → Bagian <strong>Otomasi Generate Alfa Harian</strong>:<ul>
+<li>Pastikan switch toggle <strong>Status Otomasi Generate Alfa</strong> dalam posisi <strong>AKTIF</strong> (warna emas).</li>
+</ul>
+</li>
+<li>Sistem akan secara otomatis menandai karyawan yang tidak hadir sebagai <strong>Alfa</strong> setelah jam pulang shift terlewati, kecuali jika:<ul>
+<li>Karyawan sudah memiliki absensi Masuk.</li>
+<li>Karyawan memiliki catatan Koreksi Admin (Sakit, Izin, Cuti, Dispensasi, Tugas Luar).</li>
+<li>Hari tersebut terdaftar sebagai <strong>Hari Libur Aktif</strong>.</li>
+</ul>
+</li>
+<li>Administrator juga dapat menekan tombol <strong>Eksekusi Sekarang</strong> kapan saja untuk memicu evaluasi kehadiran secara manual.</li>
+</ol>
+<hr>
+<h3 class="subsection-title">6. Pembuatan Master Data Shift Kerja</h3><ol>
+<li>Buka menu <strong>Data Shift</strong> di sidebar kiri.</li>
+<li>Klik tombol <strong>+ Tambah Shift</strong>.</li>
+<li>Isi parameter shift:<ul>
+<li><strong>Kode Shift</strong>: Angka unik (contoh: <code>1</code> untuk Shift Pagi, <code>2</code> untuk Shift Siang, <code>3</code> untuk Shift Malam).</li>
+<li><strong>Nama Shift</strong>: Contoh <em>&quot;Shift Pagi Regular&quot;</em>.</li>
+<li><strong>Jam Masuk</strong> &amp; <strong>Jam Pulang</strong>: Contoh <code>07:00</code> s/d <code>15:00</code>.</li>
+<li><strong>Awal Absen Masuk (Menit)</strong>: Berapa menit sebelum jam masuk scanner mulai membuka absensi (contoh: <code>120</code> menit = mulai pukul 05:00).</li>
+<li><strong>Batas Masuk (Menit)</strong>: Batas akhir absensi masuk diterima (contoh: <code>60</code> menit = sampai pukul 08:00).</li>
+<li><strong>Toleransi Masuk (Menit)</strong>: Menit toleransi keterlambatan tanpa dianggap terlambat (contoh: <code>10</code> menit = masuk 07:10 masih terhitung tepat waktu).</li>
+<li><strong>Jam Istirahat (Menit)</strong>: Waktu istirahat yang memotong jam kerja bersih (contoh: <code>60</code> menit).</li>
+<li><strong>Batas Pulang (Menit)</strong>: Batas akhir absensi pulang dibuka (contoh: <code>240</code> menit setelah jam pulang).</li>
+<li><strong>Shift Malam (Night Shift)</strong>: Jika jam pulang lebih kecil dari jam masuk (misal 20:00 s/d 04:00 subuh), sistem otomatis mendeteksi sebagai shift lintas hari.</li>
+</ul>
+</li>
+<li>Klik <strong>Simpan Shift</strong>.</li>
+</ol>
+<hr>
+<h3 class="subsection-title">7. Penginputan Kalender Hari Libur</h3><ol>
+<li>Buka menu <strong>Hari Libur</strong> di sidebar kiri.</li>
+<li>Klik tombol <strong>+ Tambah Hari Libur</strong>.</li>
+<li>Masukkan <strong>Tanggal Libur</strong>, <strong>Nama Libur</strong> (misal: <em>&quot;Tahun Baru Masehi&quot;</em> atau <em>&quot;Cuti Bersama Idul Fitri&quot;</em>), dan <strong>Jenis Libur</strong> (<em>Libur Nasional</em>, <em>Cuti Bersama</em>, atau <em>Libur Khusus Instansi</em>).</li>
+<li>Klik <strong>Simpan Hari Libur</strong>.</li>
+<li>Pada tanggal-tanggal libur ini, sistem tidak akan membangkitkan status Alfa otomatis bagi karyawan.</li>
+</ol>
+<hr>
+<h3 class="subsection-title">8. Manajemen Role &amp; Pengguna Operator</h3><ol>
+<li>Buka menu <strong>Master Operator</strong> di sidebar kiri.</li>
+<li><strong>Tab Roles</strong>: Anda dapat mengelola wewenang hak akses per role (<em>Admin</em>, <em>Manajer</em>, <em>Operator Scanner</em>).</li>
+<li><strong>Tab Operators</strong>: Klik <strong>+ Tambah Operator</strong> untuk membuat akun staf operasional:<ul>
+<li><strong>Kode Operator</strong>: Contoh <code>OPR001</code>.</li>
+<li><strong>Nama Lengkap &amp; Username</strong>: Contoh <code>Budi Santoso</code> / <code>budi_scanner</code>.</li>
+<li><strong>Password</strong>: Password login staf.</li>
+<li><strong>Role</strong>: Pilih role yang sesuai.</li>
+<li><strong>Status</strong>: <em>Aktif</em>.</li>
+</ul>
+</li>
+<li>Staf ini nantinya dapat login ke Web, Desktop, maupun Mobile APK sesuai wewenangnya.</li>
+</ol>
+<hr>
+<h3 class="subsection-title">9. Manajemen Master Data Karyawan</h3><ol>
+<li>Buka menu <strong>Data Karyawan</strong> di sidebar kiri.</li>
+<li><strong>Cara 1: Input Manual Satuan</strong>:<ul>
+<li>Klik <strong>+ Tambah Karyawan</strong>.</li>
+<li>Isi Kode Karyawan/NIK, Nama Lengkap, Divisi/Departemen, Jabatan, Nomor HP, Jenis Kelamin (L/P), Shift Utama, dan Tanggal Mulai Aktif.</li>
+<li>Klik <strong>Simpan Karyawan</strong>.</li>
+</ul>
+</li>
+<li><strong>Cara 2: Import Massal Excel (.xlsx)</strong>:<ul>
+<li>Klik tombol <strong>Template Excel</strong> untuk mengunduh template resmi.</li>
+<li>Buka template di Microsoft Excel, isi data ratusan karyawan Anda.</li>
+<li>Klik tombol <strong>Import Excel</strong>, pilih berkas yang sudah diisi.</li>
+<li>Sistem akan memvalidasi dan memasukkan seluruh data karyawan secara otomatis.</li>
+</ul>
+</li>
+<li><strong>Generate Token QR Massal</strong>:<ul>
+<li>Klik tombol <strong>Generate Token Massal</strong> di pojok kanan atas tabel karyawan agar seluruh karyawan yang belum memiliki token QR keamanan langsung dibuatkan token secara otomatis.</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h3 class="subsection-title">10. Kustomisasi Template di ID Card Studio &amp; Pencetakan Kartu</h3><ol>
+<li>Buka menu <strong>Cetak ID Card</strong> di sidebar kiri.</li>
+<li>Klik tombol <strong>🎨 Kustomisasi Desain ID Card</strong> untuk membuka Studio Visual.</li>
+<li>Atur desain kartu Depan &amp; Belakang sesuai identitas instansi (lihat Bab 5 untuk panduan mendalam).</li>
+<li>Klik <strong>Simpan Template</strong>. Desain kartu Anda akan langsung diterapkan ke seluruh kartu karyawan secara otomatis!</li>
+</ol>
+<hr>
+
+        <div class="chapter-break"></div>
+        <div class="chapter-header" id="bab-4-panduan-pemakaian-fitur-aplikasi-web-desktop-mobile-">
+          <div class="chapter-badge">BAB 4</div>
+          <h2 class="chapter-title">Panduan Pemakaian & Fitur Aplikasi (Web, Desktop, & Mobile)</h2>
+        </div>
+      <p class="doc-para">Aplikasi menyediakan antarmuka terpadu di 3 platform dengan fungsi yang saling melengkapi:</p><hr>
+<h3 class="subsection-title">4.1 Dashboard Utama &amp; Pemantauan Kehadiran Real-Time</h3><p class="doc-para">Dashboard menyajikan statistik kehadiran harian secara visual dan langsung diperbarui saat ada scan baru:</p><ul>
+<li><strong>Kartu Ringkasan Real-Time</strong>:<ul>
+<li><strong>Total Karyawan Aktif</strong>: Jumlah seluruh personil terdaftar.</li>
+<li><strong>Hadir Tepat Waktu</strong>: Karyawan yang scan masuk sebelum atau dalam masa toleransi.</li>
+<li><strong>Terlambat</strong>: Karyawan yang scan masuk melewati jam masuk + toleransi.</li>
+<li><strong>Pulang Cepat</strong>: Karyawan yang scan pulang sebelum jam pulang shift.</li>
+<li><strong>Sakit / Izin / Dispen</strong>: Karyawan yang memiliki catatan dispensasi resmi dari Admin.</li>
+<li><strong>Alfa (Tidak Hadir)</strong>: Karyawan yang tidak hadir setelah jam kerja berakhir.</li>
+</ul>
+</li>
+<li><strong>Widget Kalender Libur</strong>: Menampilkan status apakah hari ini merupakan hari libur aktif.</li>
+<li><strong>Tabel Monitoring Aktivitas Terkini</strong>: Daftar 10 absensi terakhir yang baru saja masuk secara real-time.</li>
+</ul>
+<hr>
+<h3 class="subsection-title">4.2 Pemindai Absensi (Scanner QR Code)</h3><p class="doc-para">Fitur scanner dirancang sangat cepat (sub-second scan processing) dengan 3 mode operasi:</p>
+    <div class="matrix-card">
+      <div class="matrix-header">
+        <span class="matrix-badge">MATRIKS PEMINDAI</span>
+        <strong>Perbandingan Kemampuan Scanner QR Code Berdasarkan Platform</strong>
+      </div>
+      <div class="matrix-grid">
+        <div class="matrix-col">
+          <div class="matrix-col-header web-col">🌐 VERSI WEB PORTAL</div>
+          <ul class="matrix-list">
+            <li>Kamera Webcam Browser / Laptop</li>
+            <li>Validasi Koordinat GPS HTML5</li>
+            <li>Kolom Input NIK / ID Manual</li>
+            <li>Monitoring Dashboard Real-Time</li>
+          </ul>
+        </div>
+        <div class="matrix-col">
+          <div class="matrix-col-header desktop-col">🖥️ VERSI DESKTOP (PC)</div>
+          <ul class="matrix-list">
+            <li>Hardware USB Barcode/QR Laser</li>
+            <li>Webcam PC & Laptop Terintegrasi</li>
+            <li>Mode Full Offline (Local SQLite)</li>
+            <li>Outbox Auto-Sync saat Internet Pulih</li>
+          </ul>
+        </div>
+        <div class="matrix-col">
+          <div class="matrix-col-header mobile-col">📱 VERSI MOBILE APK</div>
+          <ul class="matrix-list">
+            <li>Kamera Belakang ZXing Auto-Focus</li>
+            <li>Tombol Senter (Flashlight / Torch)</li>
+            <li>Haptic Feedback & Voice Synthesizer</li>
+            <li>Background GPS Geofencing Presisi</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  <h4 class="minor-title">Cara Melakukan Pemindaian di Mobile:</h4><ol>
+<li>Buka aplikasi <strong>Absensi SPPG</strong> di HP Android, login sebagai Operator.</li>
+<li>Ketuk tab menu <strong>Scanner</strong> di bagian bawah.</li>
+<li>Ketuk tombol <strong>Buka Kamera</strong>. Arahkan lensa kamera belakang ke QR Code pada kartu karyawan.</li>
+<li>Dalam waktu kurang dari 0.5 detik:<ul>
+<li>Layar akan menampilkan bingkai hijau sukses.</li>
+<li>HP bergetar pendek (<em>haptic feedback</em>).</li>
+<li>Terdengar nada <em>beep</em> sukses dan suara membacakan: <em>&quot;Budi Santoso. Masuk Tepat Waktu&quot;</em>.</li>
+<li>Data absensi langsung masuk ke antrean riwayat.</li>
+</ul>
+</li>
+<li>Jika ruangan redup, ketuk ikon <strong>Senter (Torch)</strong> di pojok kamera.</li>
+<li>Jika kamera HP rusak, gunakan kolom <strong>Input Manual</strong> di bawah kamera, ketik NIK/ID Unik karyawan lalu ketuk <strong>Proses</strong>.</li>
+</ol>
+<h4 class="minor-title">Cara Melakukan Pemindaian di Desktop (Pos Keamanan / Front Desk):</h4><ol>
+<li>Buka aplikasi <strong>Absensi SPPG Desktop</strong> di laptop/PC Windows.</li>
+<li>Colokkan alat <strong>USB Barcode Scanner</strong> ke port USB PC.</li>
+<li>Buka menu <strong>Scanner Absensi</strong>.</li>
+<li>Petugas cukup menembakkan laser scanner USB ke kartu karyawan. Data absensi langsung tersimpan seketika di SQLite lokal tanpa perlu klik mouse apapun.</li>
+</ol>
+<hr>
+<h3 class="subsection-title">4.3 Menu Operasional (Koreksi Admin, Backup, &amp; Import)</h3><p class="doc-para">Menu ini digunakan oleh Admin/Manajer untuk menangani kondisi lapangan yang dinamis:</p><h4 class="minor-title">1. Koreksi Admin (Izin, Sakit, Dispensasi, Cuti, Koreksi Jam)</h4><ul>
+<li>Digunakan jika karyawan tidak bisa scan karena surat dokter, dinas luar, lupa scan, atau izin resmi.</li>
+<li>Pilih nama karyawan, pilih tanggal, pilih jenis koreksi (<em>Izin</em>, <em>Sakit</em>, <em>Dispensasi</em>, <em>Cuti</em>, <em>Tugas Luar</em>, atau <em>Koreksi Jam Masuk/Pulang</em>), isi jam koreksi dan alasan admin.</li>
+<li>Klik <strong>Simpan Koreksi</strong>. Status kehadiran karyawan di dashboard dan laporan harian akan langsung otomatis berubah.</li>
+</ul>
+<h4 class="minor-title">2. Penugasan Backup Karyawan (Penggantian Shift Darurat)</h4><ul>
+<li>Digunakan jika seorang karyawan berhalangan hadir dan digantikan oleh personil lain pada shift tersebut.</li>
+<li>Pilih Karyawan Utama yang berhalangan, pilih Karyawan Pengganti (Backup), pilih Shift dan Tanggal penugasan.</li>
+<li>Absensi pada hari tersebut akan dialihkan secara sah ke personil pengganti.</li>
+</ul>
+<h4 class="minor-title">3. Import Log Absensi Offline (Emergency Upload)</h4><ul>
+<li>Digunakan jika terjadi kondisi darurat di mana absensi dicatat di file eksternal/buku tamu.</li>
+<li>Admin dapat mengunggah file batch scan untuk langsung disuntikkan ke rekap harian sistem.</li>
+</ul>
+<hr>
+<h3 class="subsection-title">4.4 Riwayat, Rekap Absensi, &amp; Export Excel Laporan</h3><p class="doc-para">Menu <strong>Riwayat &amp; Laporan</strong> menyediakan audit trail lengkap:</p><h4 class="minor-title">Tab 1: Riwayat Scan Mentah (Raw Audit Logs)</h4><ul>
+<li>Menampilkan setiap detik transaksi pemindaian yang terjadi (termasuk scan yang berhasil, ditolak, duplikat, atau di luar geofence).</li>
+<li>Dilengkapi detail waktu presisi per detik, status proses, pesan sistem, dan lokasi GPS.</li>
+</ul>
+<h4 class="minor-title">Tab 2: Rekap Absensi Harian (Processed Daily Attendance)</h4><ul>
+<li>Menampilkan tabel komprehensif per karyawan per tanggal:<ul>
+<li>NIK, Nama Karyawan, Divisi, Shift Kerja.</li>
+<li>Jam Scan Masuk, Jam Scan Pulang.</li>
+<li>Jumlah Menit Keterlambatan (<em>Late Minutes</em>).</li>
+<li>Jumlah Menit Pulang Cepat (<em>Early Departure Minutes</em>).</li>
+<li>Total Jam Kerja Bersih (<em>Net Working Hours</em>).</li>
+<li>Status Akhir (<em>Hadir Tepat Waktu</em>, <em>Terlambat</em>, <em>Pulang Cepat</em>, <em>Sakit</em>, <em>Izin</em>, <em>Dispensasi</em>, <em>Alfa</em>).</li>
+</ul>
+</li>
+</ul>
+<h4 class="minor-title">Fitur Filter &amp; Export Laporan:</h4><ul>
+<li><strong>Filter Rentang Waktu</strong>: Pilih <em>Hari Ini</em>, <em>7 Hari Terakhir</em>, <em>Bulan Ini</em>, atau tentukan tanggal mulai dan tanggal selesai kustom.</li>
+<li><strong>Filter Divisi &amp; Status</strong>: Saring berdasarkan divisi tertentu atau status kehadiran tertentu.</li>
+<li><strong>Pencarian Cepat</strong>: Ketik nama atau NIK karyawan untuk pencarian instan.</li>
+<li><strong>Export to Excel (.xlsx)</strong>: Klik tombol <strong>Export Excel</strong> untuk mengunduh laporan berformat spreadsheet lengkap dengan header resmi, warna status, dan ringkasan total keterlambatan yang siap diserahkan ke bagian Payroll / HRD / Pimpinan.</li>
+<li><strong>Export to CSV</strong>: Untuk kebutuhan integrasi dengan sistem database eksternal.</li>
+</ul>
+<hr>
+<h3 class="subsection-title">4.5 Pusat Sinkronisasi (Sync Center) — Local-First Engine</h3><p class="doc-para">Menu <strong>Sinkronisasi</strong> di Desktop dan Mobile mengelola aliran data dua arah antara perangkat lokal dan cloud:</p><ul>
+<li><strong>Indikator Metrik Antrean</strong>:<ul>
+<li><strong>Menunggu (Pending)</strong>: Jumlah transaksi lokal yang mengantre untuk dikirim ke cloud.</li>
+<li><strong>Event Terkirim (Synced)</strong>: Total transaksi yang sukses terverifikasi di server cloud.</li>
+<li><strong>Gagal (Failed)</strong>: Transaksi yang tertunda karena masalah jaringan (akan di-retry otomatis).</li>
+<li><strong>Konflik (Conflict)</strong>: Data yang membutuhkan konfirmasi (misal data karyawan diedit di cloud bersamaan dengan edit di lokal).</li>
+</ul>
+</li>
+<li><strong>Snapshot Operasional Lokal (12 Kategori)</strong>: Menampilkan jumlah baris data lokal yang tersimpan di memori perangkat (<em>Karyawan, ID Card, Shift, Hari Libur, Pengaturan, Profil Instansi, Template ID Card, Penugasan Backup, Koreksi, Import Offline, Absensi Harian, dan Log Scan</em>).</li>
+<li><strong>Tombol Sinkronkan Sekarang</strong>: Memaksa sinkronisasi manual seketika saat jaringan internet terhubung.</li>
+<li><strong>Tombol Sinkronkan Ulang Pengaturan (Force Resync Settings)</strong>: Mendaftarkan ulang konfigurasi profil instansi dan template ID card lokal ke antrean outbox jika antrean sempat dibersihkan.</li>
+<li><strong>Tombol Selesaikan Konflik</strong>: Secara cerdas menyelaraskan data lokal mengikuti versi master server cloud (<em>master authority</em>).</li>
+</ul>
+<hr>
+
+        <div class="chapter-break"></div>
+        <div class="chapter-header" id="bab-5-panduan-dynamic-id-card-studio-desain-kartu-karyawan">
+          <div class="chapter-badge">BAB 5</div>
+          <h2 class="chapter-title">Panduan Dynamic ID Card Studio & Desain Kartu Karyawan</h2>
+        </div>
+      <p class="doc-para">Aplikasi Absensi SPPG kini dilengkapi modul <strong>Dynamic ID Card Studio</strong> tingkat lanjut yang memungkinkan pembuatan kartu identitas standar <strong>CR80 (1011 × 638 piksel)</strong> profesional secara langsung dari dalam aplikasi:</p>
+    <div class="studio-card">
+      <div class="studio-header">
+        <span class="studio-badge">STUDIO DESAIN</span>
+        <strong>Spesifikasi & Kapabilitas Dynamic ID Card Studio</strong>
+      </div>
+      <div class="studio-grid">
+        <div class="studio-spec-item">
+          <div class="spec-label">Standar Dimensi</div>
+          <div class="spec-value">CR80 (85.6 × 53.98 mm / 1011 × 638 px HD)</div>
+        </div>
+        <div class="studio-spec-item">
+          <div class="spec-label">Dukungan Layout</div>
+          <div class="spec-value">Sisi Depan (Front) & Sisi Belakang (Back)</div>
+        </div>
+        <div class="studio-spec-item">
+          <div class="spec-label">Editor Visual</div>
+          <div class="spec-value">WYSIWYG Live Preview + Kontrol Presisi</div>
+        </div>
+        <div class="studio-spec-item">
+          <div class="spec-label">Elemen Dinamis</div>
+          <div class="spec-value">Logo, NIK, QR, TTD Direktur, Stempel, Syarat</div>
+        </div>
+        <div class="studio-spec-item">
+          <div class="spec-label">Opsi Export</div>
+          <div class="spec-value">PNG 300 DPI, Cetak Langsung, Grid A4 Massal</div>
+        </div>
+      </div>
+    </div>
+  <hr>
+<h3 class="subsection-title">1. Membuka Studio Desain</h3><ol>
+<li>Buka menu <strong>Cetak ID Card</strong> di sidebar navigasi.</li>
+<li>Klik tombol <strong>🎨 Kustomisasi Desain ID Card</strong> di bagian atas.</li>
+<li>Anda akan melihat jendela Editor Visual yang menampilkan <strong>Live Canvas Preview</strong> di sebelah kiri dan <strong>Panel Kontrol Elemen</strong> di sebelah kanan.</li>
+</ol>
+<hr>
+<h3 class="subsection-title">2. Memilih Sisi Kartu (Depan / Belakang)</h3><ul>
+<li>Di bagian atas canvas preview, klik tombol tab <strong>Sisi Depan (Front)</strong> atau <strong>Sisi Belakang (Back)</strong> untuk beralih mode desain.</li>
+</ul>
+<hr>
+<h3 class="subsection-title">3. Mengganti Background Kartu Kustom</h3><ol>
+<li>Pada panel samping, buka bagian <strong>Latar Belakang (Background)</strong>.</li>
+<li>Klik tombol <strong>Pilih Background Depan</strong> atau <strong>Pilih Background Belakang</strong>.</li>
+<li>Pilih gambar background desain instansi Anda (format PNG/JPG).</li>
+<li>Sistem otomatis mengompresi dan memotong gambar ke proporsi standar CR80 tanpa distorsi.</li>
+</ol>
+<hr>
+<h3 class="subsection-title">4. Mengatur Posisi dan Tampilan Elemen</h3><p class="doc-para">Setiap elemen (Logo, Nama Instansi, Nama Karyawan, NIK, Divisi, Jabatan, QR Code, Tanda Tangan, Stempel, dll.) dapat dikustomisasi secara mendalam:</p><ul>
+<li><strong>Toggle Visibilitas (Mata)</strong>: Aktifkan atau sembunyikan elemen tertentu.</li>
+<li><strong>Posisi X (%) &amp; Posisi Y (%)</strong>: Geser slider atau ketik angka persentase posisi horizontal dan vertikal.</li>
+<li><strong>Ukuran Font (px)</strong>: Sesuaikan besar kecilnya teks.</li>
+<li><strong>Warna Teks (Color Picker)</strong>: Pilih warna heksadesimal yang kontras dengan background.</li>
+<li><strong>Ketebalan Font (Font Weight)</strong>: Pilih <em>Normal</em>, <em>Semi-Bold</em>, atau <em>Bold</em>.</li>
+<li><strong>Perataan Teks (Alignment)</strong>: Pilih rata kiri (<em>Left</em>), tengah (<em>Center</em>), atau kanan (<em>Right</em>).</li>
+<li><strong>Huruf Kapital (Uppercase)</strong>: Centang jika teks ingin dipaksa berhuruf kapital.</li>
+</ul>
+<hr>
+<h3 class="subsection-title">5. Mode Fokus Elemen (Focus Mode)</h3><ul>
+<li>Klik tombol <strong>Fokus</strong> pada elemen yang sedang diedit di daftar elemen. Canvas akan menyorot elemen tersebut dengan kotak pembatas (<em>bounding box</em>) bersinar biru untuk memudahkan pemosisian yang presisi.</li>
+</ul>
+<hr>
+<h3 class="subsection-title">6. Opsi Pencetakan &amp; Export Kartu</h3><p class="doc-para">Setelah desain selesai dan disimpan dengan tombol <strong>Simpan Template</strong>, Anda dapat mencetak kartu karyawan dengan 3 metode:</p><ol>
+<li><strong>Download PNG Satuan (Depan / Belakang)</strong>: Mengunduh file PNG resolusi tinggi 300 DPI per sisi untuk dicetak pada mesin printer kartu PVC thermal (misal: Evolis, Fargo, Datacard, Zebra).</li>
+<li><strong>Cetak Langsung (Direct Print)</strong>: Membuka jendela dialog printer browser/OS secara langsung.</li>
+<li><strong>Cetak Lembar Grid A4 Massal (A4 Multi-Card Sheet)</strong>: Menggabungkan beberapa kartu karyawan dalam satu lembar kertas A4 (lengkap dengan garis potong presisi) untuk percetakan massal menggunakan printer inkjet/laser dan kertas PVC instan.</li>
+</ol>
+<hr>
+
+        <div class="chapter-break"></div>
+        <div class="chapter-header" id="bab-6-standar-operasional-prosedur-sop-aturan-scanner-qr">
+          <div class="chapter-badge">BAB 6</div>
+          <h2 class="chapter-title">Standar Operasional Prosedur (SOP) & Aturan Scanner QR</h2>
+        </div>
+      <p class="doc-para">Untuk memastikan proses absensi berjalan tertib, cepat, dan anti-kecurangan, terapkan SOP pemindaian berikut:</p>
+    <div class="sop-card">
+      <div class="sop-header">
+        <span class="sop-badge">STANDAR OPERASIONAL PROSEDUR</span>
+        <strong>SOP Pemindaian QR Code Presensi Karyawan</strong>
+      </div>
+      <div class="sop-grid">
+        <div class="sop-item">
+          <div class="sop-icon">🔒</div>
+          <div class="sop-info">
+            <strong>Format QR Code Terenkripsi</strong>
+            <div><code>ID_UNIK|TOKEN_SECURITY</code> (Anti-Manipulasi & Anti-Duplikasi)</div>
+          </div>
+        </div>
+        <div class="sop-item">
+          <div class="sop-icon">📏</div>
+          <div class="sop-info">
+            <strong>Jarak Pemindaian Optimal</strong>
+            <div>15 cm s/d 30 cm dari lensa kamera pemindai</div>
+          </div>
+        </div>
+        <div class="sop-item">
+          <div class="sop-icon">📐</div>
+          <div class="sop-info">
+            <strong>Sudut Bidik Pemindaian</strong>
+            <div>Tegak lurus 90° sejajar dengan permukaan kartu ID Card</div>
+          </div>
+        </div>
+        <div class="sop-item">
+          <div class="sop-icon">💡</div>
+          <div class="sop-info">
+            <strong>Kebutuhan Pencahayaan</strong>
+            <div>Minimal 150 Lux (Gunakan fitur senter/torch jika ruangan gelap)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  <h3 class="subsection-title">1. Struktur Keamanan QR Code</h3><ul>
+<li>QR Code yang dicetak melalui aplikasi Absensi SPPG memuat pasangan data: <code>ID_UNIK|TOKEN_QR</code>.</li>
+<li>Token QR di-generate secara kriptografis dan disimpan di database server. Jika ada oknum yang mencoba membuat QR palsu atau memanipulasi teks biasa, sistem scanner akan langsung menolaknya dengan status <em>&quot;Token QR Karyawan Tidak Valid&quot;</em>.</li>
+</ul>
+<hr>
+<h3 class="subsection-title">2. Aturan Multi-Sesi Absensi Harian</h3><p class="doc-para">Sistem mendukung 4 tahapan siklus absensi dalam 1 hari kerja:</p><ol>
+<li><strong>Sesi 1: Scan Masuk (Check-In)</strong>: Dilakukan saat tiba di kantor. Mengunci jam kedatangan dan mengevaluasi status keterlambatan terhadap shift.</li>
+<li><strong>Sesi 2: Scan Istirahat Keluar (Break-Out)</strong> <em>(Opsional)</em>: Dilakukan saat keluar istirahat.</li>
+<li><strong>Sesi 3: Scan Istirahat Kembali (Break-In)</strong> <em>(Opsional)</em>: Dilakukan saat kembali dari istirahat.</li>
+<li><strong>Sesi 4: Scan Pulang (Check-Out)</strong>: Dilakukan saat selesai jam kerja. Mengunci jam kepulangan dan menghitung total durasi jam kerja bersih serta mengevaluasi status pulang cepat/lembur.</li>
+</ol>
+<hr>
+<h3 class="subsection-title">3. Aturan Proteksi Anti Double-Scan &amp; Cooldown</h3><ul>
+<li><strong>Cooldown 60 Detik</strong>: Scanner memiliki pengaman jeda minimal 60 detik untuk kartu yang sama. Jika seorang karyawan menempelkan kartunya dua kali berturut-turut dalam hitungan detik, scan kedua akan diabaikan tanpa merusak data absensi pertama.</li>
+<li><strong>Batas Multi-Scan Masuk 5 Menit</strong>: Jika karyawan scan masuk pada pukul 07:01, lalu scan lagi pada pukul 07:03, sistem tetap mengenalinya sebagai penegasan scan masuk, bukan dianggap sebagai scan pulang.</li>
+</ul>
+<hr>
+<h3 class="subsection-title">4. Aturan Validasi Lokasi GPS Geofencing</h3><ul>
+<li>Saat fitur Geofencing aktif di menu Pengaturan, setiap kali pemindaian dilakukan (terutama pada aplikasi Mobile APK), sistem akan membaca koordinat satelit GPS perangkat.</li>
+<li>Jika jarak koordinat scan melebihi <strong>Radius Maksimal Kantor</strong> (misal &gt; 100 meter dari kantor), absensi akan <strong>DITOLAK</strong> dan tercatat di riwayat audit dengan keterangan <em>&quot;Scan Ditolak: Di Luar Radius Kantor (Jarak: X meter)&quot;</em>.</li>
+<li><strong>Anti Fake GPS</strong>: Sistem mendeteksi anomali koordinat instan dan menolak penggunaan aplikasi Fake GPS / Mock Location di Android.</li>
+</ul>
+<hr>
+
+        <div class="chapter-break"></div>
+        <div class="chapter-header" id="bab-7-aturan-bisnis-time-policy-guard-logika-kalkulasi-kehadiran">
+          <div class="chapter-badge">BAB 7</div>
+          <h2 class="chapter-title">Aturan Bisnis, Time Policy Guard, & Logika Kalkulasi Kehadiran</h2>
+        </div>
+      <h3 class="subsection-title">1. Time Policy Guard (Anti-Manipulasi Jam Perangkat)</h3><p class="doc-para">Salah satu celah umum pada aplikasi absensi mobile/desktop adalah karyawan memundurkan jam di pengaturan HP/Windows agar tidak terhitung terlambat.
+Aplikasi Absensi SPPG memiliki pengaman <strong>Time Policy Guard</strong> di level native Rust backend:</p><ul>
+<li>Sistem menggunakan referensi waktu sinkron server cloud + <em>Hardware Monotonic Clock</em> internal CPU.</li>
+<li>Jika sistem mendeteksi perbedaan step-back waktu lokal lebih dari toleransi wajar (5 menit), aplikasi akan memblokir pencatatan absensi dan mengeluarkan peringatan <em>&quot;Manipulasi Waktu Terdeteksi: Jam Perangkat Tidak Valid&quot;</em>.</li>
+</ul>
+<hr>
+<h3 class="subsection-title">2. Logika Penentuan Status Kehadiran</h3><div class="table-container"><table><thead><tr><th>Kondisi Scan</th><th>Rumus Evaluasi</th><th>Status yang Ditetapkan</th></tr></thead><tbody><tr><td>Scan Masuk $\le$ (Jam Masuk + Toleransi)</td><td><code>WaktuScan &lt;= (jam_masuk + toleransi_menit)</code></td><td><span class="badge badge-success">Hadir Tepat Waktu</span></td></tr><tr><td>Scan Masuk $&gt;$ (Jam Masuk + Toleransi)</td><td><code>WaktuScan &gt; (jam_masuk + toleransi_menit)</code></td><td><span class="badge badge-warning">Terlambat</span> <em>(Tercatat jumlah menit telat)</em></td></tr><tr><td>Scan Pulang $&lt;$ Jam Pulang Shift</td><td><code>WaktuScan &lt; jam_pulang</code></td><td><span class="badge badge-orange">Pulang Cepat</span> <em>(Tercatat jumlah menit awal)</em></td></tr><tr><td>Scan Pulang $\ge$ Jam Pulang Shift</td><td><code>WaktuScan &gt;= jam_pulang</code></td><td><span class="badge badge-info">Pulang Normal / Lembur</span></td></tr><tr><td>Ada Catatan Koreksi Admin</td><td>Berdasarkan input surat Izin/Sakit/Cuti</td><td><span class="badge badge-blue">Izin / Sakit / Dispen / Cuti</span></td></tr><tr><td>Tidak ada Scan hingga Batas Cutoff Shift</td><td><code>WaktuSekarang &gt; (jam_pulang - offset_alfa)</code></td><td><span class="badge badge-danger">Alfa (Tidak Hadir)</span></td></tr><tr><td>Tanggal terdaftar di Hari Libur</td><td>Tanggal ada di tabel <code>tbl_hari_libur</code> aktif</td><td><span class="badge badge-purple">Libur</span></td></tr></tbody></table></div><hr>
+<h3 class="subsection-title">3. Rumus Jam Kerja Bersih (Net Working Hours)</h3><p class="doc-para">Jam kerja bersih dihitung otomatis dengan rumus:
+$$\text{Jam Kerja Bersih} = (\text{Jam Pulang} - \text{Jam Masuk}) - \text{Istirahat Menit}$$
+<em>Jika karyawan bekerja pada Shift Malam (misal 21:00 s/d 05:00 subuh), sistem secara otomatis menambahkan 1440 menit (24 jam) pada jam pulang untuk normalisasi kalkulasi lintas hari.</em></p><hr>
+
+        <div class="chapter-break"></div>
+        <div class="chapter-header" id="bab-8-panduan-pemeliharaan-backup-troubleshooting-mandiri-faq-">
+          <div class="chapter-badge">BAB 8</div>
+          <h2 class="chapter-title">Panduan Pemeliharaan, Backup, & Troubleshooting Mandiri (FAQ)</h2>
+        </div>
+      <h3 class="subsection-title">Tanya Jawab Umum (Frequently Asked Questions):</h3>
+        <div class="faq-question">
+          <span class="faq-q-badge">FAQ</span>
+          <strong>Q1: Apa yang harus dilakukan jika kantor mati lampu dan koneksi internet putus total?</strong>
+        </div>
+      <div class="faq-answer"><strong>Jawab</strong>: Jangan panik! Petugas cukup membuka aplikasi Desktop (di laptop berbaterai) atau Mobile APK di HP Android. Aplikasi tetap dapat digunakan 100% untuk login operator dan scan absensi karyawan seperti biasa. Seluruh data tersimpan aman di SQLite lokal. Begitu listrik dan internet kembali menyala, data akan otomatis terunggah ke Web Cloud.</div>
+        <div class="faq-question">
+          <span class="faq-q-badge">FAQ</span>
+          <strong>Q2: Mengapa di HP Android muncul pesan &quot;Lokasi tidak dapat dideteksi&quot;?</strong>
+        </div>
+      <div class="faq-answer"><strong>Jawab</strong>:</div><ol>
+<li>Pastikan GPS di HP sudah dinyalakan (Ikon Lokasi di notifikasi bar atas).</li>
+<li>Buka <em>Pengaturan HP → Aplikasi → Absensi SPPG → Izin → Lokasi</em> → Pilih <strong>Izinkan hanya saat aplikasi digunakan</strong> dan aktifkan toggle <strong>Gunakan lokasi akurat (Precise Location)</strong>.</li>
+<li>Buka aplikasi Google Maps sebentar agar sinyal satelit GPS HP terkunci, lalu kembali ke aplikasi Absensi SPPG.</li>
+</ol>
+
+        <div class="faq-question">
+          <span class="faq-q-badge">FAQ</span>
+          <strong>Q3: Mengapa kamera di Mobile APK tidak mau menyala?</strong>
+        </div>
+      <div class="faq-answer"><strong>Jawab</strong>:
+Pastikan izin kamera sudah diberikan. Buka <em>Pengaturan HP → Aplikasi → Absensi SPPG → Izin → Kamera → Izinkan</em>. Tutup aplikasi dari recent apps lalu buka kembali.</div>
+        <div class="faq-question">
+          <span class="faq-q-badge">FAQ</span>
+          <strong>Q4: Bagaimana cara mengganti logo instansi atau nama kantor?</strong>
+        </div>
+      <div class="faq-answer"><strong>Jawab</strong>:
+Login sebagai Superadmin di Web Portal, buka menu <strong>Pengaturan</strong>, isi formulir <strong>Profil Instansi &amp; Identitas ID Card</strong>, unggah logo dan tanda tangan pimpinan, lalu klik <strong>Simpan Profil Instansi</strong>. Perubahan akan langsung tampil di seluruh sistem dan kartu ID Card.</div>
+        <div class="faq-question">
+          <span class="faq-q-badge">FAQ</span>
+          <strong>Q5: Bagaimana cara backup data absensi secara berkala?</strong>
+        </div>
+      <div class="faq-answer"><strong>Jawab</strong>:</div><ol>
+<li><strong>Backup Cloud Otomatis</strong>: Database Turso Cloud secara otomatis memiliki fitur replikasi dan snapshot harian di server cloud.</li>
+<li><strong>Backup Manual Excel</strong>: Buka menu <strong>Riwayat &amp; Laporan</strong> → Pilih tab <strong>Rekap Absensi Harian</strong> → Pilih rentang tanggal (misal 1 bulan penuh) → Klik tombol <strong>Export Excel</strong>. Simpan file <code>.xlsx</code> tersebut di Google Drive atau penyimpanan arsip instansi Anda.</li>
+</ol>
+
+        <div class="faq-question">
+          <span class="faq-q-badge">FAQ</span>
+          <strong>Q6: Mengapa saat pertama kali membuka aplikasi muncul layar &quot;Provisioning Satu Kali&quot; dan bukan halaman login biasa?</strong>
+        </div>
+      <div class="faq-answer"><strong>Jawab</strong>:
+Ini adalah fitur keamanan standar enterprise <strong>Zero-Default Password</strong>. Aplikasi Absensi SPPG sengaja tidak menyediakan username/password bawaan pabrik (seperti <code>admin/123456</code>) untuk mencegah peretasan database oleh pihak ketiga. Layar Provisioning Satu Kali memberikan wewenang penuh kepada Administrator pertama untuk menentukan username dan kata sandi kuat secara mandiri. Setelah akun pertama aktif dibuat, layar ini langsung terkunci selamanya.</div>
+        <div class="faq-question">
+          <span class="faq-q-badge">FAQ</span>
+          <strong>Q7: Bagaimana jika Superadmin lupa password atau akun terkunci akibat salah password berkali-kali?</strong>
+        </div>
+      <div class="faq-answer"><strong>Jawab</strong>:
+Gunakan skrip darurat developer melalui terminal:</div><ol>
+<li>Buka terminal di folder <code>web-desktop/</code>.</li>
+<li>Jalankan perintah: <code>bun run reset:superadmin</code>.</li>
+<li>Skrip interaktif akan meminta Anda memasukkan password baru (wajib minimal 12 karakter memenuhi standar keamanan).</li>
+<li>Skrip akan memperbarui hash password secara aman di database cloud dan otomatis membersihkan catatan kesalahan login (<em>rate limit</em>) sehingga akun Superadmin dapat langsung digunakan kembali.</li>
+</ol>
+
+        <div class="faq-question">
+          <span class="faq-q-badge">FAQ</span>
+          <strong>Q8: Apakah token database dan data login aman saat disimpan di komputer pos keamanan atau HP Android?</strong>
+        </div>
+      <div class="faq-answer"><strong>Jawab</strong>:
+Sangat aman. Seluruh data kredensial dan snapshot sesi login lokal dienkripsi menggunakan modul <strong>Offline Security Vault</strong> berbasis algoritma <strong>AES-256-GCM</strong> dengan kunci derivasi <strong>Argon2id</strong>. Kredensial diikat kuat (<em>hard-bound</em>) dengan kombinasi ID Perangkat fisik (<em>Device ID</em>), server origin, dan username sehingga tidak dapat disalin atau dibajak ke perangkat lain.</div><hr>
+<h3 class="subsection-title">Kontak Dukungan &amp; Layanan Teknis</h3><p class="doc-para">Jika memerlukan bantuan konfigurasi server, pembaruan fitur, atau penambahan lisensi perangkat, silakan hubungi tim pengembang:</p><ul>
+<li><strong>Pengembang Aplikasi</strong>: Freelance Software Engineer</li>
+<li><strong>Platform</strong>: Absensi SPPG Ecosystem (Web, Desktop Tauri v2, Mobile Android Tauri v2)</li>
+<li><strong>Status Rilis</strong>: Production Ready v0.1.0</li>
+</ul>
+<hr>
+<div class="doc-footer-notice"><em>Dokumen ini merupakan panduan resmi operasional aplikasi Absensi SPPG. Seluruh hak cipta dilindungi undang-undang.</em></div>
+
+</body>
+</html>

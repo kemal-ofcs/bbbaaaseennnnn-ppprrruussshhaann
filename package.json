@@ -1,0 +1,19 @@
+{
+  "name": "absensi-sppg-root",
+  "private": true,
+  "scripts": {
+    "sync:mobile": "cd mobile && bun scripts/sync-frontend-lib.ts && bun scripts/sync-rust-modules.ts",
+    "audit:schema": "bun scripts/schema-audit.ts",
+    "audit:contract": "bun .agents/skills/absensi-sppg-rules/scripts/audit-sync-contract.ts",
+    "audit:docs": "bun .agents/skills/absensi-sppg-rules/scripts/audit-docs.ts",
+    "check:quick": "bun scripts/schema-audit.ts && bun .agents/skills/absensi-sppg-rules/scripts/audit-sync-contract.ts && bun .agents/skills/absensi-sppg-rules/scripts/audit-docs.ts && cd web-desktop && bun run check:quick && cd ../mobile && bun run check:quick",
+    "check": "bun scripts/schema-audit.ts && bun .agents/skills/absensi-sppg-rules/scripts/audit-sync-contract.ts && bun .agents/skills/absensi-sppg-rules/scripts/audit-docs.ts && cd web-desktop && bun run check && cd ../mobile && bun run check",
+    "reset:superadmin": "cd web-desktop && bun scripts/reset-superadmin.ts",
+    "image:build": "bun scripts/build-images.ts",
+    "paket:build": "bun scripts/build-paket.ts"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "marked": "^18.0.10"
+  }
+}

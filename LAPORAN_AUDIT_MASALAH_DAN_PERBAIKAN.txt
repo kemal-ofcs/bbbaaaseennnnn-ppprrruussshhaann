@@ -1,0 +1,958 @@
+================================================================================
+LAPORAN AUDIT MASALAH, BUG, KEAMANAN, GUARD, SINKRONISASI, DAN PERFORMA
+APLIKASI ABSENSI SPPG 2-TIER - DESKTOP DAN MOBILE
+================================================================================
+
+Tanggal laporan : 21 Agustus 2026
+Workspace       : E:\Freelance\absensi-sppg-app
+Desktop         : E:\Freelance\absensi-sppg-app\web-desktop
+Mobile          : E:\Freelance\absensi-sppg-app\mobile
+Referensi lama  : E:\Freelance\absensi-sppg-app\absensi-sppg-web-main
+
+Dokumen ini mencatat:
+1. masalah yang ditemukan pada proses stabilisasi aplikasi;
+2. dampak dan akar penyebabnya;
+3. perbaikan yang sudah diterapkan;
+4. guard untuk mencegah masalah yang sama terulang;
+5. peningkatan performa yang sudah diterapkan;
+6. risiko tersisa yang tidak boleh disamarkan sebagai sudah selesai.
+
+Dokumen ini tidak menyatakan bahwa keamanan perangkat lunak dapat dijamin 100%.
+Khusus pada arsitektur direct 2-tier, perangkat customer masih memegang token database
+ketika aplikasi sedang berjalan. Batas ini dijelaskan pada bagian RISIKO TERSISA.
+
+STATUS YANG DIGUNAKAN
+---------------------
+[SELESAI]
+    Perbaikan sudah diterapkan pada desktop dan mobile serta melewati pengujian.
+
+[TERKENDALI - PERLU OPERASIONAL]
+    Guard kode sudah tersedia, tetapi instalasi/database lama memerlukan tindakan admin.
+
+[BELUM - PERLU PERSETUJUAN ARSITEKTUR]
+    Tidak boleh dilakukan diam-diam karena mengubah arsitektur atau kebijakan data.
+
+
+================================================================================
+A. RINGKASAN HASIL
+================================================================================
+
+1. Akun bawaan superadmin/admin123 sudah tidak dibuat pada database baru.
+2. Bootstrap Superadmin hanya dapat diklaim satu kali dan dilakukan secara atomik.
+3. Build release tidak lagi menanam URL dan Auth Token Turso dari mesin build.
+4. Token Turso dan snapshot login disimpan dalam vault terenkripsi serta diikat ke
+   origin customer, username, dan device ID.
+5. Kontrak sinkronisasi dibatasi menjadi 26 route domain/operation kanonik.
+6. Alias domain lama dinormalisasi pada boundary, lalu cloud hanya menyimpan nama
+   kanonik dengan hyphen-case.
+7. Event asing, payload rusak, entity kosong, payload terlalu besar, event collision,
+   stale revision, dan mutasi kosong sekarang ditolak.
+8. Push mutation, changelog, receipt, dan revision dibuat atomik.
+9. Snapshot cloud tidak boleh menimpa perubahan lokal yang belum tersinkronisasi.
+10. Cloud kosong tidak lagi boleh menghapus data lokal lama yang belum pernah dilacak
+    oleh server.
+11. Bug employee/update dan cascade nama/divisi ke tabel terkait sudah diperbaiki.
+12. Kontrak attendance/create untuk Auto-Alfa sudah ditambahkan.
+13. Schema dan kontrak sync desktop-mobile sekarang diaudit oleh skrip deterministik.
+14. Seluruh check, test, production frontend build, dan Rust release check yang
+    dijalankan pada audit ini lulus.
+
+
+================================================================================
+B. TEMUAN DAN PERBAIKAN AUTENTIKASI / BOOTSTRAP
+================================================================================
+
+B-01. Seed akun Superadmin menggunakan password default admin123
+STATUS: [SELESAI] untuk database baru
+
+Masalah:
+- Akun default yang username/password-nya diketahui publik dapat dipakai oleh siapa
+  pun yang memperoleh aplikasi atau menemukan database customer yang belum diamankan.
+- Kredensial seragam pada banyak customer menciptakan satu titik kompromi massal.
+
+Akar penyebab:
+- Proses inisialisasi lama membuat akun admin/superadmin otomatis menggunakan nilai
+  yang mudah ditebak.
+
+Perbaikan:
+- Seed operator default dihapus dari inisialisasi production.
+- Database baru wajib menjalankan provisioning satu kali.
+- Customer memilih username dan password sendiri sebelum login pertama.
+- Nilai admin123 hanya boleh berada pada regression test yang membuktikan penolakan.
+
+Guard pencegahan:
+- Password bootstrap minimal 12 karakter.
+- Wajib memuat huruf besar, huruf kecil, angka, dan simbol.
+- Password tidak boleh memuat username.
+- Bootstrap ditutup setelah Superadmin pertama berhasil dibuat.
+
+Catatan penting:
+- Akun admin123 yang sudah tersimpan di database legacy tidak dihapus otomatis karena
+  penghapusan atau penguncian tanpa recovery path dapat membuat customer terkunci.
+- Database legacy wajib merotasi password melalui halaman Operator sebelum distribusi.
+
+
+B-02. Perilaku autentikasi development dan release berpotensi berbeda
+STATUS: [SELESAI]
+
+Masalah:
+- Development dapat terlihat berhasil karena memakai environment lokal, tetapi build
+  customer dapat mempunyai perilaku bootstrap atau kredensial yang berbeda.
+
+Perbaikan:
+- Dev, desktop release, dan Android release menggunakan kontrak bootstrap yang sama.
+- Tidak ada username/password khusus berdasarkan mode build.
+- Perbedaan yang diperbolehkan hanya sumber konfigurasi Turso: environment boleh
+  menjadi fallback debug, sedangkan release wajib diprovisi customer.
+
+
+B-03. URL/Auth Token Turso berisiko tertanam di binary release
+STATUS: [SELESAI]
+
+Masalah:
+- option_env! dapat mengambil environment pada waktu kompilasi.
+- Jika .env mesin developer ikut masuk ke release, token database dapat diekstrak dari
+  installer atau APK dan dipakai oleh pihak lain.
+
+Perbaikan:
+- Konstanta build TURSO_DATABASE_URL dan TURSO_AUTH_TOKEN hanya aktif pada
+  debug_assertions.
+- Pada not(debug_assertions), keduanya dipaksa menjadi None.
+- Fresh release meminta URL/token melalui provisioning dan menyimpannya ke vault.
+
+Guard pencegahan:
+- Auditor kontrak memeriksa bahwa cabang release selalu None.
+- Nilai rahasia tidak dicetak pada log atau laporan audit.
+
+
+B-04. Bootstrap mengasumsikan role_id Superadmin selalu bernilai 1
+STATUS: [SELESAI]
+
+Masalah:
+- Urutan insert/migrasi database berbeda dapat menghasilkan role ID berbeda.
+- Operator pertama dapat terhubung ke role yang salah walaupun labelnya Superadmin.
+
+Perbaikan:
+- Role dipilih berdasarkan role_key='superadmin', is_superadmin=1, dan status aktif.
+- Bootstrap tidak lagi bergantung pada ID numerik hasil asumsi.
+
+
+B-05. Bootstrap berpotensi menghasilkan state parsial atau Superadmin ganda
+STATUS: [SELESAI]
+
+Masalah:
+- Dua perangkat dapat mencoba bootstrap bersamaan.
+- Claim bootstrap dapat berhasil tetapi insert operator gagal, atau sebaliknya.
+
+Perbaikan:
+- Pembuatan schema, pengecekan status, claim app_bootstrap_state, dan insert operator
+  menggunakan transaksi atomik.
+- Unique constraint dan pemeriksaan status menutup bootstrap berikutnya.
+- Jika salah satu statement gagal, seluruh transaksi di-rollback.
+
+
+B-06. Password legacy plaintext dan hash lama
+STATUS: [TERKENDALI - PERLU OPERASIONAL]
+
+Masalah:
+- Database lama mungkin mempunyai format password yang lebih lemah.
+
+Perbaikan:
+- Login tetap dapat memverifikasi format legacy agar migrasi tidak mengunci customer.
+- Setelah login legacy berhasil, hash di-upgrade ke format kuat.
+- Bootstrap baru memakai PBKDF2 dengan salt acak dan iterasi tinggi.
+
+Saran lanjutan:
+- Sediakan kebijakan password_expired/password_reset_required untuk mendeteksi akun
+  legacy default tanpa langsung membuat lockout permanen.
+- Implementasi ini memerlukan UI recovery/reset yang jelas sebelum diwajibkan.
+
+
+B-07. Brute-force login dan penyalahgunaan sesi
+STATUS: [SELESAI]
+
+Masalah:
+- Percobaan password tanpa batas memungkinkan brute force.
+- Perubahan role/operator dapat meninggalkan session lama tetap aktif.
+
+Perbaikan:
+- Rate limit login persisten diterapkan.
+- Setelah lima kegagalan, login dikunci sementara.
+- Reservasi login dilakukan atomik agar request paralel tidak melewati batas.
+- Perubahan permission mencabut session role terkait.
+- Operator nonaktif dan session kedaluwarsa ditolak.
+- Superadmin aktif terakhir tidak dapat diturunkan secara sembarangan.
+
+
+B-08. Penyimpanan token dan snapshot login pada perangkat
+STATUS: [SELESAI untuk keamanan at-rest]
+
+Masalah:
+- Plaintext token/password pada disk, localStorage, atau sessionStorage mudah dicuri.
+- File snapshot dari customer/perangkat lain berpotensi dipakai untuk impersonation.
+
+Perbaikan:
+- Vault memakai AES-256-GCM dengan derivasi kunci Argon2id.
+- Snapshot diikat ke server_origin + username + device_id.
+- Salt rusak, snapshot kedaluwarsa, alias yang dimodifikasi, origin berbeda, dan
+  password salah ditolak.
+- Token yang sudah disimpan tidak diekspos lagi ke frontend.
+- Menyimpan konfigurasi dengan token kosong mempertahankan token vault lama.
+
+Batas:
+- Enkripsi ini melindungi token saat tersimpan. Token tetap harus didekripsi di memori
+  ketika direct-Turso dipakai. Lihat bagian RISIKO TERSISA.
+
+
+================================================================================
+C. TEMUAN DAN PERBAIKAN KONTRAK DOMAIN / OUTBOX
+================================================================================
+
+C-01. Salah nama domain: underscore, hyphen, atau istilah lama tidak konsisten
+STATUS: [SELESAI]
+
+Contoh risiko:
+- company_profile seharusnya company-profile.
+- id_card_template seharusnya id-card-template.
+- offline_import seharusnya offline-import.
+- scan_log dinormalisasi menjadi log-scan.
+
+Dampak:
+- Handler tidak ditemukan.
+- Event dapat terus retry, masuk conflict, atau sebelumnya dianggap berhasil padahal
+  tidak ada perubahan database.
+- Desktop dan mobile dapat menulis nama berbeda untuk operasi yang sama.
+
+Perbaikan:
+- Dibuat CANONICAL_SYNC_ROUTES yang identik di desktop dan mobile.
+- Alias lama hanya diterima pada boundary kompatibilitas Turso.
+- Setelah normalisasi, changelog dan receipt menyimpan nama hyphen-case kanonik.
+- Route yang tidak termasuk kontrak ditolak secara fail-closed.
+
+26 ROUTE KANONIK YANG DIIZINKAN
+-------------------------------
+attendance/create
+attendance/delete
+attendance/scan
+attendance/update
+backup/cancel
+backup/create
+company-profile/update
+correction/create
+correction/delete
+employee/create
+employee/status
+employee/token
+employee/update
+holiday/create
+holiday/delete
+holiday/update
+id-card/update
+id-card-template/save
+log-scan/delete
+offline-import/delete
+offline-import/row
+setting/update
+setting/upsert
+shift/create
+shift/delete
+shift/update
+
+
+C-02. Producer lokal dapat mendaftarkan route yang tidak mempunyai consumer
+STATUS: [SELESAI]
+
+Masalah:
+- Typo domain/operation dapat masuk outbox dan baru gagal setelah sinkronisasi.
+
+Perbaikan:
+- enqueue memvalidasi pasangan domain/operation terhadap daftar kanonik sebelum row
+  outbox dibuat.
+- Auditor membandingkan producer route desktop dan mobile dengan kontrak consumer.
+
+
+C-03. Payload primitive/null dapat lolos ke mutation handler
+STATUS: [SELESAI]
+
+Masalah:
+- Handler mengharapkan object tetapi menerima string, angka, array, atau null.
+- Akses field dapat menghasilkan error atau mutasi tanpa nilai yang benar.
+
+Perbaikan:
+- Payload wajib JSON object pada enqueue dan boundary Turso.
+- Zod boundary server menolak field liar dan tipe yang salah.
+- Payload diparse satu kali, lalu object tervalidasi diteruskan ke handler.
+
+
+C-04. Entity key kosong, terlalu panjang, atau identitas hanya bergantung payload
+STATUS: [SELESAI]
+
+Masalah:
+- Update/delete gagal ketika payload draft tidak menyertakan ID.
+- Payload yang dimodifikasi dapat menargetkan entity berbeda dari outbox.
+
+Perbaikan:
+- Entity key wajib terisi dan mempunyai batas panjang.
+- entity_key menjadi identitas resmi operasi update/status/delete.
+- Field ID payload hanya dipakai sebagai override yang sudah divalidasi.
+- Fallback entity key diterapkan untuk employee, id-card, shift, holiday, attendance,
+  log-scan, backup, correction, dan offline-import.
+
+
+C-05. Mutation kosong dapat ditandai applied
+STATUS: [SELESAI]
+
+Masalah:
+- Route dikenali tetapi tidak menghasilkan SQL karena field/ID tidak lengkap.
+- Event dapat ditandai sukses dan hilang dari outbox walaupun data cloud tidak berubah.
+
+Perbaikan:
+- StatementCollector wajib memiliki minimal satu statement mutation.
+- Nol statement menghasilkan conflict/rejected, bukan applied.
+
+
+C-06. Payload aset besar tidak mempunyai batas yang konsisten
+STATUS: [SELESAI]
+
+Masalah:
+- Base64 logo/background dapat menghabiskan memori, membuat request terlalu besar,
+  atau dipakai untuk denial-of-service lokal/cloud.
+
+Perbaikan:
+- Payload outbox dibatasi sekitar 25 MB.
+- Zod membedakan shortText, longText, dan assetText.
+- Aset gambar dioptimalkan sebelum disimpan/dikirim.
+- Body reader server menggunakan batas eksplisit untuk route aset besar.
+
+
+================================================================================
+D. TEMUAN DAN PERBAIKAN ATOMICITY / IDEMPOTENSI / KONFLIK
+================================================================================
+
+D-01. Receipt sukses dapat terpisah dari mutation sebenarnya
+STATUS: [SELESAI]
+
+Masalah:
+- Jika mutation berhasil tetapi receipt gagal, retry dapat menggandakan data.
+- Jika receipt berhasil tetapi mutation gagal, event tampak sukses padahal data hilang.
+
+Perbaikan:
+- BEGIN IMMEDIATE membungkus target mutation, sync_changelog, dan
+  sync_operation_receipt.
+- Semua statement COMMIT bersama atau ROLLBACK bersama.
+
+
+D-02. Event ID sama dapat dipakai ulang dengan payload berbeda
+STATUS: [SELESAI]
+
+Masalah:
+- Collision/replay dapat menyamarkan operasi baru sebagai retry operasi lama.
+
+Perbaikan:
+- Receipt lama hanya dikembalikan jika client, domain, operation, entity, dan payload
+  cocok.
+- Event ID sama dengan isi berbeda ditolak sebagai collision.
+
+
+D-03. Retry event dapat membuat record ganda
+STATUS: [SELESAI]
+
+Perbaikan:
+- Event ID unik dan receipt idempoten.
+- Retry payload yang sama mengembalikan hasil lama.
+- Scan dan log memakai insert-if-missing/upsert sesuai kontrak entity.
+- Test membuktikan retry shift, attendance Auto-Alfa, dan log scan tidak menggandakan
+  row.
+
+
+D-04. Stale baseRevision dapat menimpa perubahan perangkat lain
+STATUS: [SELESAI]
+
+Masalah:
+- Perangkat A membaca revision lama.
+- Perangkat B menyimpan perubahan baru.
+- A kemudian melakukan update dan berpotensi menimpa B.
+
+Perbaikan:
+- baseRevision wajib diparse dan divalidasi.
+- Dalam transaksi BEGIN IMMEDIATE, server membandingkan revision entity terbaru.
+- Jika revision server lebih besar, transaksi ditolak sebagai conflict.
+- Revision baru ditulis atomik ke changelog.
+
+
+D-05. Respons push parsial atau serverRevision nol
+STATUS: [SELESAI]
+
+Masalah:
+- Client dapat menandai seluruh batch synced walaupun hasil tidak lengkap.
+- Receipt tanpa revision valid membuat pull berikutnya tidak deterministik.
+
+Perbaikan:
+- Jumlah dan event ID seluruh push result diverifikasi.
+- Status applied wajib mempunyai serverRevision > 0.
+- Hasil yang hilang/duplikat membuat batch gagal aman.
+
+
+D-06. Urutan pull sebelum push dapat menimpa perubahan lokal
+STATUS: [SELESAI]
+
+Perbaikan:
+- Urutan resmi: push outbox -> commit cloud -> pull snapshot -> apply lokal.
+- AutoSyncRunner menjalankan siklus berkala dan saat window kembali aktif.
+
+
+================================================================================
+E. TEMUAN DAN PERBAIKAN SCHEMA / TABEL / KOLOM / SNAPSHOT
+================================================================================
+
+E-01. Nama tabel/kolom berbeda pada Rust SQLite, Turso, TypeScript, dan Zod
+STATUS: [SELESAI untuk kontrak yang diaudit]
+
+Masalah:
+- Query berhasil di satu platform tetapi gagal di platform lain.
+- Kolom baru dapat ada di DDL tetapi tidak ada di snapshot atau validator.
+- Typo dapat baru muncul ketika customer melakukan sync nyata.
+
+Perbaikan:
+- Kontrak diverifikasi pada empat lapisan:
+  1. SNAPSHOT_TABLES/sync.rs;
+  2. DDL storage.rs;
+  3. DDL/migration Turso dan db-schema.ts/db-migrations.ts;
+  4. validator sync-schema.ts.
+- Ditambahkan schema consistency test dan auditor lintas workspace.
+
+12 TABEL SNAPSHOT OPERASIONAL
+-----------------------------
+master_data
+id_card
+tbl_shift
+tbl_hari_libur
+setting_gex_system
+company_profile
+id_card_template
+backup_karyawan
+koreksi_admin
+import_offline
+absensi_harian
+log_scan
+
+Catatan:
+- master_operator bukan bagian dari snapshot operasional perangkat.
+- Operator, password hash, role, permission, dan revocation dikelola terpisah sebagai
+  boundary autentikasi/RBAC cloud.
+
+
+E-02. Database Turso kosong belum mempunyai tabel atau kolom
+STATUS: [SELESAI untuk schema]
+
+Perbaikan:
+- Client menginisialisasi tabel, kolom kompatibilitas, index, role, permission,
+  setting, shift, profil, template, dan bootstrap state secara idempoten.
+- Migrasi kolom dapat dijalankan berulang tanpa menggandakan schema.
+- Bootstrap baru dilakukan setelah schema siap.
+
+
+E-03. Cloud kosong dapat menghapus data lokal legacy ketika snapshot kosong
+STATUS: [SELESAI]
+
+Masalah:
+- Algoritma delete_missing lama dapat menganggap row lokal tidak ada di cloud berarti
+  row tersebut harus dihapus.
+- Ini sangat berbahaya saat cloud baru masih kosong.
+
+Perbaikan:
+- Snapshot hanya boleh menghapus row yang memiliki desktop_entity_revision.
+- Row lokal untracked tanpa revision server dipertahankan.
+- Row dengan pending/conflict outbox juga tidak boleh ditimpa atau dihapus.
+
+
+E-04. Data lokal legacy dianggap otomatis sudah terunggah
+STATUS: [TERKENDALI - BELUM ADA BLIND BULK SEED]
+
+Masalah:
+- Membuat outbox massal tanpa memilih sumber otoritatif dapat menggandakan data atau
+  menimpa cloud dari perangkat yang salah.
+
+Keputusan aman:
+- Hanya mutation yang mempunyai outbox yang otomatis di-push.
+- Row legacy tanpa outbox tetap lokal dan tidak diklaim sudah berada di cloud.
+- Bulk seed harus menjadi fitur eksplisit yang menampilkan preview jumlah data,
+  sumber perangkat, duplicate key, dan kebijakan konflik sebelum dieksekusi.
+
+
+E-05. Snapshot lama atau parsial menurunkan revision lokal
+STATUS: [SELESAI]
+
+Perbaikan:
+- max revision cloud menggunakan nilai monotonik dan tidak boleh lebih kecil dari
+  last revision client.
+- Snapshot hanya menerapkan table key yang benar-benar hadir.
+- Revision per entity dicatat untuk menentukan overwrite/delete yang aman.
+
+
+E-06. ID shift lokal tidak sama dengan ID shift server
+STATUS: [SELESAI]
+
+Masalah:
+- Shift offline memakai ID lokal sementara Turso menghasilkan ID permanen.
+- master_data/absensi dapat mengacu ke ID yang tidak ada setelah sync.
+
+Perbaikan:
+- Rekonsiliasi menggunakan kode_shift sebagai stable business key.
+- Setelah server memberikan id_shift, foreign key pada master_data dan
+  absensi_harian dicascade sebelum tabel shift lokal diselesaikan.
+
+
+E-07. Dokumentasi AI menyebut 13 snapshot termasuk master_operator
+STATUS: [SELESAI pada laporan ini]
+
+Masalah:
+- Kontrak runtime dan auditor memakai 12 tabel, tetapi satu bagian skill masih
+  menyebut 13 dengan master_operator.
+- Agent berikutnya berisiko memasukkan data autentikasi ke snapshot operasional.
+
+Perbaikan:
+- Skill dikoreksi menjadi 12 snapshot operasional.
+- master_operator ditandai sebagai data auth/RBAC terpisah.
+
+
+================================================================================
+F. TEMUAN DAN PERBAIKAN LOGIKA BISNIS
+================================================================================
+
+F-01. employee/update tidak selalu membawa id_unik
+STATUS: [SELESAI]
+
+Masalah:
+- Draft update hanya berisi field perubahan dan dapat tidak menyertakan id_unik.
+- Event sebelumnya berpotensi dianggap applied tanpa mengubah employee.
+
+Perbaikan:
+- entity_key dipakai sebagai ID resmi.
+- Update employee memakai upsert yang mempertahankan token dan field QR yang tidak
+  sedang diubah.
+- Nama/divisi dicascade atomik ke id_card, attendance, log_scan, backup, dan correction.
+- Employee baru memastikan row id_card terkait tersedia.
+
+
+F-02. attendance/create Auto-Alfa tidak mempunyai validator/handler lengkap
+STATUS: [SELESAI]
+
+Masalah:
+- Auto-Alfa menghasilkan outbox attendance/create, tetapi kontrak push sebelumnya
+  tidak lengkap.
+
+Perbaikan:
+- Validator attendance/create ditambahkan.
+- Handler melakukan upsert penuh dan menulis revision.
+- Test membuktikan operasi diterapkan serta retry tetap idempoten.
+
+
+F-03. Scanner dapat meninggalkan log tanpa attendance atau data parsial saat error
+STATUS: [SELESAI]
+
+Perbaikan:
+- Penulisan log, attendance, revision, dan outbox yang saling terkait dibungkus dalam
+  transaksi lokal.
+- Jika attendance gagal, log/revision/outbox ikut rollback.
+- Penolakan kebijakan/geofence tetap dicatat ke log untuk audit tetapi tidak membuat
+  attendance palsu.
+
+
+F-04. Double scan, scan ketiga, dan cooldown
+STATUS: [SELESAI]
+
+Perbaikan:
+- Cooldown ditegakkan di backend, bukan hanya UI.
+- Scan kedua hanya menjadi pulang jika memenuhi policy waktu.
+- Scan ketiga setelah sesi selesai ditolak jika multi-session tidak diizinkan.
+- Multi-session aktif hanya jika shift target mengizinkannya.
+
+
+F-05. Koreksi Admin dapat tertimpa scanner
+STATUS: [SELESAI]
+
+Perbaikan:
+- Record hasil Koreksi Admin diperlakukan sebagai sumber yang dilindungi.
+- Scanner tidak boleh menimpa status/jam koreksi secara diam-diam.
+
+
+F-06. Shift malam lintas tengah malam memakai tanggal yang salah
+STATUS: [SELESAI]
+
+Perbaikan:
+- Tanggal kerja mengikuti tanggal masuk sesi.
+- Scan setelah tengah malam tetap direkonsiliasi ke sesi H-1 yang relevan.
+- Buffer shift malam dan backup shift ikut diperhitungkan.
+
+
+F-07. Import offline shift normal dan backup dapat tercampur
+STATUS: [SELESAI]
+
+Perbaikan:
+- Import menyimpan baris terpisah untuk shift normal dan backup.
+- Jam masuk/pulang manual lintas hari direkonsiliasi ke sesi yang sama.
+- Mutation hapus/update menjaga relasi log_scan dan absensi_harian.
+
+
+F-08. Manipulasi waktu perangkat
+STATUS: [SELESAI untuk guard aplikasi]
+
+Perbaikan:
+- Backend Rust tidak mempercayai timestamp bebas dari JavaScript.
+- Waktu cloud/server dibandingkan dengan monotonic clock lokal.
+- Rollback jam perangkat di luar toleransi ditolak/dicurigai.
+
+
+F-09. Geofence gagal tetapi attendance tetap dibuat
+STATUS: [SELESAI]
+
+Perbaikan:
+- Koordinat dan radius divalidasi.
+- Jarak memakai formula Haversine.
+- GPS tidak tersedia/di luar radius: scan ditolak, audit log tetap dibuat, attendance
+  tidak dibuat.
+- Cache koordinat 60 detik mencegah scan menunggu query GPS berulang.
+
+
+================================================================================
+G. TEMUAN DAN PERBAIKAN JARINGAN / ANDROID / UI
+================================================================================
+
+G-01. Respon Turso terkompresi gagal diparse
+STATUS: [SELESAI]
+
+Masalah:
+- Cloud edge dapat mengirim gzip/brotli/deflate.
+- Client yang tidak mendekompresi menghasilkan error decoding response body.
+
+Perbaikan:
+- reqwest mengaktifkan json, gzip, brotli, dan deflate.
+- Respon dibaca sebagai text terlebih dahulu agar error JSON dapat memberi cuplikan
+  aman tanpa membocorkan token.
+
+
+G-02. Endpoint tidak aman atau format URL memuat kredensial
+STATUS: [SELESAI]
+
+Perbaikan:
+- URL dinormalisasi dan wajib memiliki host.
+- Username/password tidak boleh ditanam di URL.
+- Release mewajibkan HTTPS/libSQL yang aman.
+- HTTP hanya diizinkan untuk localhost/emulator/LAN yang telah diizinkan pada debug.
+
+
+G-03. Android crash karena TLS provider/JNI
+STATUS: [SELESAI pada aturan dan konfigurasi]
+
+Perbaikan:
+- Android memakai webpki-roots dan crypto provider ring.
+- Provider dipasang sebelum Tauri builder dibuat.
+- rustls-platform-verifier dan aws-lc-rs tidak boleh dipakai pada jalur Android.
+
+
+G-04. Kamera terbuka sebentar lalu mati
+STATUS: [SELESAI pada guard lifecycle]
+
+Perbaikan:
+- Cleanup unmount dipisahkan dari state kamera.
+- visibilitychange mempunyai lifecycle sendiri.
+- Constraint kamera belakang mempunyai fallback video generik.
+- Video memakai autoPlay, playsInline, dan muted.
+
+
+G-05. Halaman tidak memperlihatkan hasil sync sampai reload/login ulang
+STATUS: [SELESAI]
+
+Perbaikan:
+- AutoSyncRunner berjalan berkala dan saat focus/visibility kembali aktif.
+- Setelah sync sukses, event sppg:sync-completed dibroadcast.
+- Halaman data dapat refresh setelah menerima event tersebut.
+- Tombol Muat Ulang melakukan sync lebih dahulu sebelum membaca lokal.
+
+
+================================================================================
+H. PENINGKATAN PERFORMA YANG SUDAH DITERAPKAN
+================================================================================
+
+H-01. Parse/serialize JSON berulang
+STATUS: [SELESAI]
+
+Perbaikan performa:
+- Payload outbox diserialisasi satu kali saat enqueue.
+- Boundary Turso memparse payload satu kali.
+- Handler menerima referensi Value tervalidasi, bukan melakukan parse ulang.
+
+
+H-02. Sinkronisasi terlalu banyak round-trip
+STATUS: [SELESAI pada pipeline saat ini]
+
+Perbaikan performa:
+- Push dikirim sebagai batch dengan batas aman.
+- Pipeline Turso menggabungkan statement transaksi.
+- Pull menggunakan revision dan snapshot terkontrol.
+- Receipt idempoten menghindari mutation ulang pada retry jaringan.
+
+
+H-03. Response cloud besar
+STATUS: [SELESAI pada transport]
+
+Perbaikan performa:
+- gzip/brotli/deflate diaktifkan.
+- Payload dibatasi agar memori tidak tumbuh tanpa kendali.
+- Gambar/logo/background dioptimalkan sebelum sinkronisasi.
+
+
+H-04. GPS memperlambat setiap scan
+STATUS: [SELESAI]
+
+Perbaikan performa:
+- Koordinat disimpan pada in-memory cache dengan TTL 60 detik.
+- Scan memakai koordinat cache ketika masih valid.
+
+
+H-05. UI melakukan akses backend mentah
+STATUS: [SELESAI pada pola arsitektur]
+
+Perbaikan:
+- Komponen menggunakan gateway TypeScript.
+- Gateway menentukan IPC desktop/mobile atau jalur server.
+- Logika transport tidak diduplikasi di banyak halaman.
+
+
+H-06. Rekomendasi performa lanjutan jika gateway disetujui
+STATUS: [BELUM - PERLU PERSETUJUAN ARSITEKTUR]
+
+Desain yang disarankan:
+- Batch sync tetap digunakan; jangan membuat satu HTTP request per row.
+- Gunakan delta revision/pagination, bukan full snapshot setiap siklus.
+- Gateway dan Turso ditempatkan pada region yang berdekatan.
+- Gunakan connection keep-alive dan compression.
+- Cache metadata read-only yang aman, bukan data absensi sensitif tanpa invalidation.
+- Terapkan backpressure, timeout, retry dengan exponential backoff + jitter.
+- Gunakan circuit breaker untuk outage cloud agar UI offline tidak ikut macet.
+
+
+================================================================================
+I. GUARD WAJIB UNTUK PERUBAHAN BERIKUTNYA
+================================================================================
+
+1. Jangan menebak nama tabel atau kolom.
+   Verifikasi storage.rs, turso.rs, db-schema.ts, db-migrations.ts, sync-schema.ts,
+   dan database nyata jika tersedia.
+
+2. Jangan membuat domain/operation baru sebelum:
+   - menambahkannya ke kontrak kanonik;
+   - menambah validator;
+   - menambah handler cloud;
+   - menambah producer desktop dan/atau mobile;
+   - menambah idempotency test;
+   - menjalankan auditor kontrak.
+
+3. Jangan menandai event applied jika:
+   - mutation statement kosong;
+   - serverRevision nol;
+   - result batch tidak lengkap;
+   - baseRevision stale;
+   - event ID bertabrakan dengan payload berbeda.
+
+4. Jangan menghapus row lokal dari snapshot kecuali row tersebut mempunyai bukti
+   desktop_entity_revision dan tidak mempunyai pending/conflict outbox.
+
+5. Jangan membuat bulk seed cloud otomatis. Tampilkan preview dan minta keputusan
+   sumber otoritatif serta kebijakan konflik.
+
+6. Jangan menyimpan token/password/salt mentah di localStorage, sessionStorage, log,
+   SQLite setting biasa, source code, atau binary release.
+
+7. Jangan mempercayai role, operator ID, timestamp, koordinat, entity ID, atau status
+   yang dikirim UI tanpa validasi backend.
+
+8. Semua mutation relasional wajib transaksi atomik: data utama + audit log + outbox
+   harus commit/rollback bersama.
+
+9. Semua perubahan berisiko wajib mempunyai test desktop dan mobile yang setara.
+
+10. Jangan menghapus arsitektur/fungsi legacy tanpa persetujuan eksplisit user.
+
+
+================================================================================
+J. RISIKO TERSISA DAN RENCANA PERBAIKAN POWERFUL
+================================================================================
+
+J-01. Token Turso masih berada di runtime aplikasi direct 2-tier
+STATUS: [BELUM - PERLU PERSETUJUAN ARSITEKTUR]
+
+Risiko:
+- Vault melindungi token saat tersimpan, tetapi aplikasi harus mendekripsinya saat
+  request berlangsung.
+- Perangkat rooted, malware, debugger, atau customer yang menguasai perangkat dapat
+  mencoba mengambil token dari memori/runtime.
+- Pemegang token dapat melewati UI dan guard aplikasi jika token database memberikan
+  akses langsung yang luas.
+
+Perbaikan paling kuat:
+- Desktop/mobile -> HTTPS Gateway -> Turso.
+- Auth Token Turso hanya disimpan pada gateway.
+- Client menerima access token singkat dan refresh credential device-bound.
+- Gateway menegakkan RBAC, customer/tenant scope, device registration, rate limit,
+  replay guard, schema validation, revision conflict, dan audit log.
+- Direct-Turso dipertahankan sementara hanya untuk debug/rollback sampai migrasi
+  terbukti stabil.
+
+
+J-02. Database legacy masih mungkin mempunyai superadmin/admin123
+STATUS: [TERKENDALI - PERLU OPERASIONAL]
+
+Tindakan wajib sebelum distribusi:
+- Inventaris semua operator legacy.
+- Rotasi password default/lemah.
+- Nonaktifkan operator tidak digunakan.
+- Pastikan minimal satu Superadmin aktif mempunyai password kuat.
+- Setelah recovery flow tersedia, tambahkan password_reset_required untuk default lama.
+
+
+J-03. Bulk seed cloud untuk data historis belum dibuat
+STATUS: [BELUM - PERLU PERSETUJUAN KEBIJAKAN DATA]
+
+Desain aman yang disarankan:
+- Pilih satu perangkat/database sebagai sumber awal.
+- Jalankan dry-run dan tampilkan jumlah row per tabel.
+- Deteksi duplicate business key dan foreign key yang tidak valid.
+- Pilihan konflik: server-wins, source-wins, skip, atau review manual.
+- Backup database cloud sebelum commit.
+- Seed dalam batch atomik dan buat manifest/receipt migrasi.
+- Pull ulang dan bandingkan checksum/count setelah seed.
+
+
+J-04. Packaging installer Windows dan APK ARM64 penuh belum dibuktikan dalam audit ini
+STATUS: [TERKENDALI - PERLU UJI RELEASE/HARDWARE]
+
+Yang sudah lulus:
+- Frontend production build desktop dan mobile.
+- Rust cargo check --release desktop dan mobile.
+
+Yang tetap perlu dijalankan sebelum distribusi customer:
+- bun run tauri:build
+- bun run tauri:android:build:arm64
+- Install bersih pada Windows customer-like.
+- Install bersih dan upgrade APK pada Android nyata.
+- Uji kamera, GPS, offline scan, restart perangkat, reconnect, dan multi-device sync.
+- Verifikasi binary/APK tidak memuat URL/token Turso mesin build.
+
+
+J-05. Warning toolchain non-runtime
+STATUS: [TERKENDALI]
+
+Warning yang terlihat:
+- Linker debug Windows memberi LNK4099 karena PDB libsodium pihak ketiga tidak tersedia
+  dan LNK4098 terkait default library debug.
+- Git memberi informasi konversi LF ke CRLF pada working copy Windows.
+
+Penilaian:
+- Seluruh test tetap lulus dan warning tersebut bukan warning logika aplikasi.
+- Jangan menyembunyikan warning dengan flag global. Prioritaskan upgrade dependency atau
+  penyeragaman toolchain/runtime bila warning muncul pada packaging release sebenarnya.
+- Tambahkan .gitattributes secara terencana jika tim ingin line ending konsisten;
+  jangan melakukan rewrite massal tanpa review karena worktree sedang berisi perubahan.
+
+
+================================================================================
+K. BUKTI VALIDASI AUDIT
+================================================================================
+
+1. Desktop bun run check
+   Hasil: LULUS.
+   Rust: 50 passed, 0 failed.
+   Lint, TypeScript, frontend tests, dan Rust tests selesai.
+
+2. Mobile bun run check
+   Hasil: LULUS.
+   Rust: 50 passed, 0 failed.
+   Lint, TypeScript, frontend tests, dan Rust tests selesai.
+
+3. Desktop cargo check --release
+   Hasil: LULUS.
+
+4. Mobile cargo check --release
+   Hasil: LULUS.
+
+5. Desktop bun run build
+   Hasil: LULUS; optimized production frontend berhasil dibuat.
+
+6. Mobile bun run build
+   Hasil: LULUS; static production frontend berhasil dibuat.
+
+7. Auditor kontrak sinkronisasi
+   Perintah:
+   bun .agents\skills\absensi-sppg-rules\scripts\audit-sync-contract.ts
+
+   Hasil:
+   - 26 route kanonik konsisten.
+   - 12 tabel snapshot konsisten.
+   - Bootstrap, atomic receipt, entity-key, dan empty-cloud guard terdeteksi.
+
+8. Skill validator
+   Hasil: Skill is valid.
+
+9. git diff --check
+   Hasil: exit code 0 pada desktop dan mobile.
+
+
+================================================================================
+L. CHECKLIST WAJIB SEBELUM APLIKASI DIBAGIKAN KE CUSTOMER
+================================================================================
+
+[ ] Rotasi seluruh password default/lemah pada database legacy.
+[ ] Gunakan database/token terpisah per customer jika masih direct 2-tier.
+[ ] Jangan pernah membagikan organization/master token Turso.
+[ ] Backup database sebelum migrasi atau bulk seed.
+[ ] Jalankan auditor sync contract.
+[ ] Jalankan bun run check pada desktop dan mobile.
+[ ] Build installer Windows dan APK ARM64 dari environment release bersih.
+[ ] Scan binary/APK untuk memastikan secret mesin build tidak tertanam.
+[ ] Uji fresh install dan upgrade install.
+[ ] Uji bootstrap bersamaan dari dua perangkat.
+[ ] Uji offline scan, restart, reconnect, dan retry idempoten.
+[ ] Uji dua perangkat mengubah entity yang sama untuk memastikan conflict muncul.
+[ ] Uji cloud kosong tidak menghapus data legacy lokal.
+[ ] Uji kehilangan/revocation perangkat.
+[ ] Simulasikan Turso timeout, 401, 403, 413, 429, dan 5xx.
+[ ] Verifikasi audit log tidak memuat password, token, atau payload sensitif penuh.
+[ ] Putuskan implementasi gateway penuh sebelum distribusi skala luas.
+
+
+================================================================================
+M. KESIMPULAN
+================================================================================
+
+Stabilisasi saat ini telah memperbaiki kelas masalah utama berikut:
+- default credential;
+- build-time secret leakage;
+- salah nama domain;
+- route producer/consumer tidak cocok;
+- entity key hilang;
+- false-applied mutation;
+- duplicate/replay event;
+- stale revision overwrite;
+- receipt non-atomik;
+- schema/snapshot drift;
+- cloud kosong menghapus data lokal;
+- employee update/cascade;
+- attendance Auto-Alfa;
+- transaksi scanner;
+- shift malam, backup, koreksi, geofence, dan offline import;
+- parse/serialize, compression, batching, dan GPS caching.
+
+Fondasi aplikasi sekarang jauh lebih stabil dan defensif, tetapi dua pekerjaan besar
+tetap harus diperlakukan sebagai proyek tersendiri:
+1. gateway penuh agar Auth Token Turso tidak pernah berada pada runtime customer;
+2. bulk seed/migrasi data legacy dengan preview, backup, dan kebijakan konflik.
+
+Keduanya tidak boleh diaktifkan diam-diam karena mengubah boundary keamanan dan sumber
+otoritatif data. Implementasi harus bertahap, dapat di-rollback, dan mempertahankan
+SQLite offline, outbox, scanner, serta struktur aplikasi lama.
+
+================================================================================
+AKHIR LAPORAN
+================================================================================
