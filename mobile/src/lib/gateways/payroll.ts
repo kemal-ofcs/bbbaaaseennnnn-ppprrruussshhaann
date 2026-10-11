@@ -1,6 +1,7 @@
 "use client";
 
 import { requestWebApi } from "@/lib/client/api-client";
+import type { SalaryType } from "@/lib/constants/payroll";
 import { requestSyncNow } from "@/lib/gateways/sync-status";
 import { isDesktopRuntime, isMobileRuntime } from "@/lib/runtime/app-runtime";
 import { invokeDesktop } from "@/lib/runtime/desktop-commands";
@@ -17,6 +18,10 @@ export interface SalaryConfigRow {
   effective_date: string;
   created_by: string;
   created_at: string;
+  /** `HOURLY` = per jam + lembur; `FLAT_DAILY` = tarif harian tetap. */
+  salary_type: SalaryType;
+  /** Hanya bermakna untuk `FLAT_DAILY`; selain itu 0. */
+  daily_rate: number;
 }
 
 export interface OvertimeTierRuleRow {
@@ -85,6 +90,10 @@ export interface PayrollRecapRow {
   est_bpjs_employee: number;
   est_pph21: number;
   est_net_salary: number;
+  salary_type: SalaryType;
+  daily_rate: number;
+  /** Tanggal unik berstatus Hadir (dasar upah `FLAT_DAILY`). */
+  days_present: number;
 }
 
 export interface PayrollRunRow {
@@ -125,6 +134,9 @@ export interface PayrollItemRow {
   net_salary: number;
   breakdown_snapshot: string;
   created_at: string;
+  salary_type: SalaryType;
+  daily_rate: number;
+  days_present: number;
 }
 
 export interface PayrollAuditLogRow {
@@ -176,6 +188,39 @@ export async function saveSalaryConfig(
     { draft },
   );
   return response.sukses;
+}
+
+/**
+ * Menerapkan tarif harian tetap ke seluruh karyawan aktif (`divisi` kosong)
+ * atau satu divisi. Mengembalikan jumlah karyawan yang diperbarui.
+ */
+export async function bulkApplyFlatDaily(input: {
+  divisi?: string;
+  dailyRate: number;
+  effectiveDate: string;
+}): Promise<number> {
+  if (isDesktopRuntime()) {
+    const result = await invokeDesktop<number>(
+      "desktop_bulk_apply_flat_daily",
+      {
+        divisi: input.divisi || null,
+        dailyRate: input.dailyRate,
+        effectiveDate: input.effectiveDate,
+      },
+    );
+    kickDesktopSync();
+    return result;
+  }
+  const response = await requestWebApi<{ sukses: boolean; jumlah: number }>(
+    "/api/payroll/config/salary",
+    "PATCH",
+    {
+      divisi: input.divisi || null,
+      daily_rate: input.dailyRate,
+      effective_date: input.effectiveDate,
+    },
+  );
+  return response.jumlah;
 }
 
 export async function deleteSalaryConfig(id: string): Promise<boolean> {
@@ -582,6 +627,9 @@ export interface MobileSlipDetail {
   net_salary: number;
   breakdown_snapshot: string;
   created_at: string;
+  salary_type?: SalaryType;
+  daily_rate?: number;
+  days_present?: number;
 }
 
 export async function getEmployeePayrollEstimate(
@@ -646,7 +694,13 @@ export async function getEmployeePayrollEstimate(
     bpjs_company_total: 0,
     pph21_amount: row.est_pph21,
     net_salary: row.est_net_salary,
+    salary_type: row.salary_type,
+    daily_rate: row.daily_rate,
+    days_present: row.days_present,
     breakdown_snapshot: JSON.stringify({
+      salary_type: row.salary_type,
+      daily_rate: row.daily_rate,
+      days_present: row.days_present,
       rate_per_hour: row.rate_per_hour,
       regular_hours: row.total_regular_hours,
       overtime_hours: row.total_overtime_hours,
@@ -745,6 +799,9 @@ export async function getPayrollSlipDetail(
           net_salary: item.net_salary,
           breakdown_snapshot: item.breakdown_snapshot,
           created_at: item.created_at,
+          salary_type: item.salary_type,
+          daily_rate: item.daily_rate,
+          days_present: item.days_present,
         };
       }
     } catch {

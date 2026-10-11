@@ -125,6 +125,7 @@
     "allow-desktop-clear-turso-config",
     "allow-desktop-get-salary-configs",
     "allow-desktop-save-salary-config",
+    "allow-desktop-bulk-apply-flat-daily",
     "allow-desktop-delete-salary-config",
     "allow-desktop-get-overtime-rules",
     "allow-desktop-save-overtime-rule",

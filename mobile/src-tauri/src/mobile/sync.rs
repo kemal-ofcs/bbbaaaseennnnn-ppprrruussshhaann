@@ -19,7 +19,7 @@ use super::{
 /// `CURRENT_SCHEMA_VERSION` di `web-desktop/src/lib/db-schema.ts` setiap kali
 /// migrasi baru ditambahkan, karena keduanya membaca tabel `schema_migration`
 /// yang sama di Turso.
-pub const CLIENT_SCHEMA_VERSION: i64 = 17;
+pub const CLIENT_SCHEMA_VERSION: i64 = 18;
 
 /// Hanya `cloud > client` yang berbahaya; `cloud <= client` adalah kondisi normal.
 fn is_client_schema_outdated(cloud_version: i64) -> bool {
@@ -389,6 +389,8 @@ const SNAPSHOT_TABLES: &[SnapshotTable] = &[
             "effective_date",
             "created_by",
             "created_at",
+            "salary_type",
+            "daily_rate",
         ],
         conflict_column: "id_karyawan, effective_date",
         entity_column: "id",
@@ -509,6 +511,9 @@ const SNAPSHOT_TABLES: &[SnapshotTable] = &[
             "net_salary",
             "breakdown_snapshot",
             "created_at",
+            "salary_type",
+            "daily_rate",
+            "days_present",
         ],
         conflict_column: "id",
         entity_column: "id",
@@ -1906,7 +1911,8 @@ fn ensure_unsynced_payroll_data_enqueued(state: &MobileState) -> Result<(), Comm
 
     // 1. Salary Configs
     if let Ok(mut stmt) = transaction.prepare(
-        "SELECT id, id_karyawan, rate_per_hour, ptkp_status, effective_date, created_by, created_at
+        "SELECT id, id_karyawan, rate_per_hour, ptkp_status, effective_date, created_by, created_at,
+                salary_type, daily_rate
          FROM salary_configs
          WHERE id NOT IN (
              SELECT entity_key FROM desktop_sync_outbox WHERE domain = 'payroll' AND operation = 'salary-config'
@@ -1924,12 +1930,16 @@ fn ensure_unsynced_payroll_data_enqueued(state: &MobileState) -> Result<(), Comm
                     row.get::<_, String>(4)?,
                     row.get::<_, String>(5)?,
                     row.get::<_, String>(6)?,
+                    row.get::<_, String>(7)?,
+                    row.get::<_, i64>(8)?,
                 ))
             })
             .and_then(|mapped| mapped.collect::<Result<Vec<_>, _>>())
         {
             drop(stmt);
-            for (id, id_karyawan, rate_per_hour, ptkp_status, effective_date, created_by, created_at) in rows {
+            for (id, id_karyawan, rate_per_hour, ptkp_status, effective_date, created_by, created_at, salary_type, daily_rate) in rows {
+                // Kedua kolom gaji harian WAJIB ikut: tanpa itu konfigurasi
+                // FLAT_DAILY terdorong ulang ke cloud sebagai HOURLY.
                 let payload = json!({
                     "id": id,
                     "id_karyawan": id_karyawan,
@@ -1938,6 +1948,8 @@ fn ensure_unsynced_payroll_data_enqueued(state: &MobileState) -> Result<(), Comm
                     "effective_date": effective_date,
                     "created_by": created_by,
                     "created_at": created_at,
+                    "salary_type": salary_type,
+                    "daily_rate": daily_rate,
                 });
                 let _ = enqueue(&transaction, &client_id, "payroll", "salary-config", &id, &payload, None);
             }
@@ -2146,7 +2158,9 @@ fn ensure_unsynced_payroll_data_enqueued(state: &MobileState) -> Result<(), Comm
                             total_regular_hours, total_overtime_hours, total_overtime_index,
                             rate_per_hour, basic_salary, overtime_salary, gross_salary,
                             total_allowances, total_deductions, bpjs_employee_total, bpjs_company_total,
-                            pph21_amount, net_salary, breakdown_snapshot, created_at
+                            pph21_amount, net_salary, breakdown_snapshot, created_at,
+                            COALESCE(total_holiday_hours, 0), COALESCE(total_holiday_overtime_index, 0),
+                            salary_type, daily_rate, days_present
                      FROM payroll_items
                      WHERE payroll_run_id = ?;",
                 ) {
@@ -2172,6 +2186,11 @@ fn ensure_unsynced_payroll_data_enqueued(state: &MobileState) -> Result<(), Comm
                             "net_salary": row.get::<_, i64>(17)?,
                             "breakdown_snapshot": row.get::<_, String>(18)?,
                             "created_at": row.get::<_, String>(19)?,
+                            "total_holiday_hours": row.get::<_, f64>(20)?,
+                            "total_holiday_overtime_index": row.get::<_, f64>(21)?,
+                            "salary_type": row.get::<_, String>(22)?,
+                            "daily_rate": row.get::<_, i64>(23)?,
+                            "days_present": row.get::<_, i64>(24)?,
                         }))
                     });
                     mapped_items.map(|iter| iter.filter_map(|r| r.ok()).collect()).unwrap_or_default()

@@ -21,9 +21,15 @@ import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
+import {
+  DAILY_RATE_MAX,
+  DAILY_RATE_MIN,
+  type SalaryType,
+} from "@/lib/constants/payroll";
 import { useAuth } from "@/lib/context/AuthContext";
 import { getDaftarKaryawan } from "@/lib/gateways/employee";
 import {
+  bulkApplyFlatDaily,
   deletePayrollComponent,
   deleteSalaryConfig,
   getPayrollComponents,
@@ -77,8 +83,16 @@ const RULE_LINKS = [
 interface SalaryDraft {
   id: string;
   id_karyawan: string;
+  salary_type: SalaryType;
+  /** Tarif per jam untuk HOURLY, tarif harian untuk FLAT_DAILY. */
   rate: string;
   ptkp_status: string;
+  effective_date: string;
+}
+
+interface BulkDraft {
+  divisi: string;
+  rate: string;
   effective_date: string;
 }
 
@@ -121,6 +135,7 @@ export default function MobilePayrollConfigPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const isSubmittingRef = useRef(false);
+  const [bulkDraft, setBulkDraft] = useState<BulkDraft | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -220,6 +235,7 @@ export default function MobilePayrollConfigPage() {
     setSalaryDraft({
       id: "",
       id_karyawan: "",
+      salary_type: "HOURLY",
       rate: "25000",
       ptkp_status: "TK/0",
       effective_date: today,
@@ -229,25 +245,115 @@ export default function MobilePayrollConfigPage() {
   const openEditSalary = (cfg: SalaryConfigRow) => {
     setFormError(null);
     setEmployeeFilter("");
+    const isFlat = cfg.salary_type === "FLAT_DAILY";
     setSalaryDraft({
       id: cfg.id,
       id_karyawan: cfg.id_karyawan,
-      rate: String(cfg.rate_per_hour),
+      salary_type: isFlat ? "FLAT_DAILY" : "HOURLY",
+      rate: String(isFlat ? cfg.daily_rate : cfg.rate_per_hour),
       ptkp_status: cfg.ptkp_status || "TK/0",
       effective_date: cfg.effective_date,
     });
   };
 
+  const activeEmployees = useMemo(
+    () =>
+      employees.filter(
+        (emp) => String(emp.status_aktif ?? "Aktif") === "Aktif",
+      ),
+    [employees],
+  );
+  const divisions = useMemo(
+    () =>
+      [
+        ...new Set(
+          activeEmployees
+            .map((emp) => String(emp.divisi ?? "").trim())
+            .filter(Boolean),
+        ),
+      ].sort(),
+    [activeEmployees],
+  );
+  const bulkTargetCount = bulkDraft?.divisi
+    ? activeEmployees.filter(
+        (emp) => String(emp.divisi ?? "").trim() === bulkDraft.divisi,
+      ).length
+    : activeEmployees.length;
+
+  const openBulk = () => {
+    triggerHaptic("light");
+    setFormError(null);
+    setBulkDraft({ divisi: "", rate: "150000", effective_date: today });
+  };
+
+  const submitBulk = async () => {
+    if (!bulkDraft || isSubmittingRef.current) return;
+    const rate = Number(bulkDraft.rate);
+    if (
+      !Number.isInteger(rate) ||
+      rate < DAILY_RATE_MIN ||
+      rate > DAILY_RATE_MAX
+    ) {
+      setFormError(
+        `Tarif harian harus bilangan bulat antara ${IDR.format(DAILY_RATE_MIN)} dan ${IDR.format(DAILY_RATE_MAX)}.`,
+      );
+      return;
+    }
+    if (bulkTargetCount === 0) {
+      setFormError("Tidak ada karyawan aktif pada cakupan ini.");
+      return;
+    }
+    isSubmittingRef.current = true;
+    setSaving(true);
+    setFormError(null);
+    try {
+      const jumlah = await bulkApplyFlatDaily({
+        divisi: bulkDraft.divisi,
+        dailyRate: rate,
+        effectiveDate: bulkDraft.effective_date,
+      });
+      triggerHaptic("success");
+      setBulkDraft(null);
+      setFeedback({
+        type: "success",
+        message: `Gaji harian tetap diterapkan ke ${jumlah} karyawan.`,
+      });
+      await loadData(true);
+    } catch (err) {
+      triggerHaptic("error");
+      setFormError(
+        err instanceof Error
+          ? err.message
+          : "Gagal menerapkan gaji harian tetap.",
+      );
+    } finally {
+      isSubmittingRef.current = false;
+      setSaving(false);
+    }
+  };
+
   const submitSalary = async () => {
     if (!salaryDraft || isSubmittingRef.current) return;
     const rate = Number(salaryDraft.rate);
+    const isFlat = salaryDraft.salary_type === "FLAT_DAILY";
     if (!salaryDraft.id_karyawan) {
       setFormError("Pilih karyawan terlebih dahulu.");
       return;
     }
-    // Rust menyimpan `rate_per_hour` sebagai i64: angka pecahan akan ditolak
-    // saat deserialisasi dengan pesan yang tidak bisa dipahami pengguna.
-    if (!Number.isInteger(rate) || rate <= 0) {
+    // Rust menyimpan tarif sebagai i64: angka pecahan akan ditolak saat
+    // deserialisasi dengan pesan yang tidak bisa dipahami pengguna.
+    if (
+      isFlat &&
+      (!Number.isInteger(rate) ||
+        rate < DAILY_RATE_MIN ||
+        rate > DAILY_RATE_MAX)
+    ) {
+      setFormError(
+        `Tarif harian harus bilangan bulat antara ${IDR.format(DAILY_RATE_MIN)} dan ${IDR.format(DAILY_RATE_MAX)}.`,
+      );
+      return;
+    }
+    if (!isFlat && (!Number.isInteger(rate) || rate <= 0)) {
       setFormError("Rate per jam harus bilangan bulat lebih dari 0.");
       return;
     }
@@ -273,7 +379,9 @@ export default function MobilePayrollConfigPage() {
       await saveSalaryConfig({
         id: existing?.id ?? salaryDraft.id,
         id_karyawan: salaryDraft.id_karyawan,
-        rate_per_hour: rate,
+        salary_type: salaryDraft.salary_type,
+        rate_per_hour: isFlat ? 0 : rate,
+        daily_rate: isFlat ? rate : 0,
         ptkp_status: salaryDraft.ptkp_status,
         effective_date: salaryDraft.effective_date,
       });
@@ -491,6 +599,15 @@ export default function MobilePayrollConfigPage() {
                 className={CONFIG_INPUT_CLASS}
               />
               <button
+                id="bulk-flat-daily-button"
+                type="button"
+                onClick={openBulk}
+                aria-label="Terapkan gaji harian tetap massal"
+                className="grid size-11 shrink-0 place-items-center rounded-xl border border-amber-500/40 bg-slate-900 text-amber-200 transition active:scale-95"
+              >
+                <Icon name="users" className="size-5" />
+              </button>
+              <button
                 type="button"
                 onClick={openNewSalary}
                 aria-label="Atur rate gaji karyawan"
@@ -528,14 +645,28 @@ export default function MobilePayrollConfigPage() {
                             {emp?.divisi ? ` · ${emp.divisi}` : ""}
                           </p>
                         </div>
-                        <p className="shrink-0 font-mono text-sm font-black text-sky-300">
-                          {IDR.format(cfg.rate_per_hour)}
-                          <span className="text-[10px] font-semibold text-slate-500">
-                            /jam
-                          </span>
-                        </p>
+                        {cfg.salary_type === "FLAT_DAILY" ? (
+                          <p className="shrink-0 font-mono text-sm font-black text-amber-200">
+                            {IDR.format(cfg.daily_rate)}
+                            <span className="text-[10px] font-semibold text-slate-500">
+                              /hari
+                            </span>
+                          </p>
+                        ) : (
+                          <p className="shrink-0 font-mono text-sm font-black text-sky-300">
+                            {IDR.format(cfg.rate_per_hour)}
+                            <span className="text-[10px] font-semibold text-slate-500">
+                              /jam
+                            </span>
+                          </p>
+                        )}
                       </div>
                       <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
+                        {cfg.salary_type === "FLAT_DAILY" ? (
+                          <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 font-bold text-amber-200">
+                            Harian tetap
+                          </span>
+                        ) : null}
                         <span className="rounded-md border border-white/10 bg-slate-950/60 px-2 py-0.5 font-bold text-slate-300">
                           PTKP {cfg.ptkp_status || "-"}
                         </span>
@@ -740,16 +871,56 @@ export default function MobilePayrollConfigPage() {
               </div>
             )}
 
+            <div>
+              <label htmlFor="salary-type" className={CONFIG_LABEL_CLASS}>
+                Skema gaji
+              </label>
+              <select
+                id="salary-type"
+                value={salaryDraft.salary_type}
+                onChange={(event) => {
+                  const salaryType = event.target.value as SalaryType;
+                  setSalaryDraft((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          salary_type: salaryType,
+                          rate:
+                            salaryType === "FLAT_DAILY" ? "150000" : "25000",
+                        }
+                      : prev,
+                  );
+                }}
+                className={CONFIG_INPUT_CLASS}
+              >
+                <option value="HOURLY">Per jam + lembur</option>
+                <option value="FLAT_DAILY">Harian tetap (tanpa lembur)</option>
+              </select>
+              {salaryDraft.salary_type === "FLAT_DAILY" ? (
+                <p className="mt-1 text-[10px] leading-4 text-slate-400">
+                  Dibayar per tanggal Hadir, berapa pun jamnya. Lembur, BPJS,
+                  PPh 21, dan komponen umum tidak dihitung; komponen khusus
+                  karyawan ini tetap berlaku.
+                </p>
+              ) : null}
+            </div>
+
             <div className="grid grid-cols-2 gap-2">
-              <div>
+              <div className="min-w-0">
                 <label htmlFor="salary-rate" className={CONFIG_LABEL_CLASS}>
-                  Rate pokok (Rp/jam)
+                  {salaryDraft.salary_type === "FLAT_DAILY"
+                    ? "Tarif (Rp/hari)"
+                    : "Rate pokok (Rp/jam)"}
                 </label>
                 <input
                   id="salary-rate"
                   type="number"
                   inputMode="numeric"
-                  min={1}
+                  min={
+                    salaryDraft.salary_type === "FLAT_DAILY"
+                      ? DAILY_RATE_MIN
+                      : 1
+                  }
                   step={1}
                   value={salaryDraft.rate}
                   onChange={(event) =>
@@ -761,7 +932,7 @@ export default function MobilePayrollConfigPage() {
                   className={`${CONFIG_INPUT_CLASS} font-mono`}
                 />
               </div>
-              <div>
+              <div className="min-w-0">
                 <label htmlFor="salary-ptkp" className={CONFIG_LABEL_CLASS}>
                   Status PTKP
                 </label>
@@ -808,6 +979,92 @@ export default function MobilePayrollConfigPage() {
                 required
                 className={`${CONFIG_INPUT_CLASS} font-mono`}
               />
+            </div>
+          </>
+        ) : null}
+      </ConfigFormModal>
+
+      <ConfigFormModal
+        isOpen={Boolean(bulkDraft)}
+        title="Terapkan Gaji Harian Tetap"
+        titleId="payroll-bulk-flat-daily-title"
+        error={formError}
+        saving={saving}
+        submitLabel={`Terapkan ke ${bulkTargetCount} karyawan`}
+        onDismissError={() => setFormError(null)}
+        onClose={() => setBulkDraft(null)}
+        onSubmit={() => void submitBulk()}
+      >
+        {bulkDraft ? (
+          <>
+            <p className="text-[11px] leading-4 text-slate-400">
+              Setiap karyawan aktif pada cakupan ini dibayar tarif harian tetap
+              per tanggal Hadir. Status PTKP masing-masing dipertahankan.
+              Kembali ke skema per jam dilakukan per karyawan.
+            </p>
+            <div>
+              <label htmlFor="bulk-scope" className={CONFIG_LABEL_CLASS}>
+                Cakupan
+              </label>
+              <select
+                id="bulk-scope"
+                value={bulkDraft.divisi}
+                onChange={(event) =>
+                  setBulkDraft((prev) =>
+                    prev ? { ...prev, divisi: event.target.value } : prev,
+                  )
+                }
+                className={CONFIG_INPUT_CLASS}
+              >
+                <option value="">Semua karyawan aktif</option>
+                {divisions.map((divisi) => (
+                  <option key={divisi} value={divisi}>
+                    Divisi {divisi}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="min-w-0">
+                <label htmlFor="bulk-rate" className={CONFIG_LABEL_CLASS}>
+                  Tarif (Rp/hari)
+                </label>
+                <input
+                  id="bulk-rate"
+                  type="number"
+                  inputMode="numeric"
+                  min={DAILY_RATE_MIN}
+                  max={DAILY_RATE_MAX}
+                  step={1}
+                  value={bulkDraft.rate}
+                  onChange={(event) =>
+                    setBulkDraft((prev) =>
+                      prev ? { ...prev, rate: event.target.value } : prev,
+                    )
+                  }
+                  required
+                  className={`${CONFIG_INPUT_CLASS} font-mono`}
+                />
+              </div>
+              <div className="min-w-0">
+                <label htmlFor="bulk-date" className={CONFIG_LABEL_CLASS}>
+                  Tanggal berlaku
+                </label>
+                <input
+                  id="bulk-date"
+                  type="date"
+                  value={bulkDraft.effective_date}
+                  onChange={(event) =>
+                    setBulkDraft((prev) =>
+                      prev
+                        ? { ...prev, effective_date: event.target.value }
+                        : prev,
+                    )
+                  }
+                  required
+                  className={`${CONFIG_INPUT_CLASS} font-mono`}
+                />
+              </div>
             </div>
           </>
         ) : null}

@@ -57,6 +57,18 @@ fn default_active() -> i64 {
     1
 }
 
+pub const SALARY_TYPE_HOURLY: &str = "HOURLY";
+pub const SALARY_TYPE_FLAT_DAILY: &str = "FLAT_DAILY";
+/// Rentang tarif harian yang diterima. Batas atasnya menangkap salah ketik
+/// satu nol; cerminannya ada di route `config/salary` (Web).
+pub const DAILY_RATE_MIN: i64 = 1_000;
+pub const DAILY_RATE_MAX: i64 = 10_000_000;
+pub const PTKP_STATUSES: [&str; 8] = ["TK/0", "TK/1", "TK/2", "TK/3", "K/0", "K/1", "K/2", "K/3"];
+
+fn default_salary_type() -> String {
+    SALARY_TYPE_HOURLY.to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OvertimeTierRule {
     #[serde(default)]
@@ -125,6 +137,66 @@ pub struct SalaryConfig {
     pub created_by: String,
     #[serde(default)]
     pub created_at: String,
+    /// `HOURLY` (per jam + lembur) atau `FLAT_DAILY` (tarif harian tetap).
+    #[serde(default = "default_salary_type")]
+    pub salary_type: String,
+    /// Hanya bermakna untuk `FLAT_DAILY`; selain itu selalu 0.
+    #[serde(default)]
+    pub daily_rate: i64,
+}
+
+impl SalaryConfig {
+    /// Validasi dan normalisasi SEBELUM menyentuh SQLite dan outbox.
+    ///
+    /// Nilai yang lolos di SQLite lokal (tipenya longgar) tetapi ditolak
+    /// CHECK constraint cloud membuat event outbox gagal permanen. Aturan yang
+    /// sama ditegakkan route `config/salary` di Web.
+    pub fn normalized(&self) -> Result<SalaryConfig, String> {
+        let id_karyawan = self.id_karyawan.trim();
+        if id_karyawan.is_empty() {
+            return Err("Karyawan wajib dipilih.".into());
+        }
+        let effective_date = self.effective_date.trim();
+        if !super::super::time_policy::is_calendar_date(effective_date) {
+            return Err("Tanggal berlaku harus berformat YYYY-MM-DD.".into());
+        }
+        let ptkp_status = if self.ptkp_status.trim().is_empty() {
+            "TK/0".to_string()
+        } else {
+            self.ptkp_status.trim().to_uppercase()
+        };
+        if !PTKP_STATUSES.contains(&ptkp_status.as_str()) {
+            return Err("Status PTKP tidak dikenal.".into());
+        }
+        let (rate_per_hour, daily_rate) = match self.salary_type.as_str() {
+            SALARY_TYPE_HOURLY => {
+                if self.rate_per_hour < 0 {
+                    return Err("Tarif per jam tidak boleh negatif.".into());
+                }
+                (self.rate_per_hour, 0)
+            }
+            SALARY_TYPE_FLAT_DAILY => {
+                if !(DAILY_RATE_MIN..=DAILY_RATE_MAX).contains(&self.daily_rate) {
+                    return Err(format!(
+                        "Tarif harian harus antara Rp {DAILY_RATE_MIN} dan Rp {DAILY_RATE_MAX}."
+                    ));
+                }
+                (0, self.daily_rate)
+            }
+            _ => return Err("Tipe gaji harus HOURLY atau FLAT_DAILY.".into()),
+        };
+        Ok(SalaryConfig {
+            id: self.id.trim().to_string(),
+            id_karyawan: id_karyawan.to_string(),
+            rate_per_hour,
+            ptkp_status,
+            effective_date: effective_date.to_string(),
+            created_by: self.created_by.clone(),
+            created_at: self.created_at.clone(),
+            salary_type: self.salary_type.clone(),
+            daily_rate,
+        })
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -174,6 +246,9 @@ pub struct PayrollItem {
     pub net_salary: i64,
     pub breakdown_snapshot: String,
     pub created_at: String,
+    pub salary_type: String,
+    pub daily_rate: i64,
+    pub days_present: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -226,4 +301,48 @@ pub struct PayrollRecapRow {
     pub est_bpjs_employee: i64,
     pub est_pph21: i64,
     pub est_net_salary: i64,
+    pub salary_type: String,
+    pub daily_rate: i64,
+    /// Tanggal unik berstatus Hadir. Berbeda dengan `total_hadir` (jumlah
+    /// baris): sesi PENGGANTI di tanggal yang sama tidak menambah hari.
+    pub days_present: i64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SalaryConfig;
+
+    fn draft(salary_type: &str, rate_per_hour: i64, daily_rate: i64) -> SalaryConfig {
+        SalaryConfig {
+            id: String::new(),
+            id_karyawan: "K001".into(),
+            rate_per_hour,
+            ptkp_status: "tk/0".into(),
+            effective_date: "2026-10-01".into(),
+            created_by: String::new(),
+            created_at: String::new(),
+            salary_type: salary_type.into(),
+            daily_rate,
+        }
+    }
+
+    #[test]
+    fn konfigurasi_gaji_dinormalisasi_sesuai_check_cloud() {
+        let flat = draft("FLAT_DAILY", 25_000, 150_000).normalized().unwrap();
+        assert_eq!((flat.rate_per_hour, flat.daily_rate), (0, 150_000));
+        assert_eq!(flat.ptkp_status, "TK/0");
+        let hourly = draft("HOURLY", 25_000, 150_000).normalized().unwrap();
+        assert_eq!((hourly.rate_per_hour, hourly.daily_rate), (25_000, 0));
+
+        assert!(draft("FLAT", 0, 150_000).normalized().is_err());
+        assert!(draft("FLAT_DAILY", 0, 999).normalized().is_err());
+        assert!(draft("FLAT_DAILY", 0, 10_000_001).normalized().is_err());
+        assert!(draft("HOURLY", -1, 0).normalized().is_err());
+        let mut bad_date = draft("HOURLY", 1, 0);
+        bad_date.effective_date = "2026-2-30".into();
+        assert!(bad_date.normalized().is_err());
+        let mut bad_ptkp = draft("HOURLY", 1, 0);
+        bad_ptkp.ptkp_status = "K/9".into();
+        assert!(bad_ptkp.normalized().is_err());
+    }
 }

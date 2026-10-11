@@ -150,6 +150,7 @@ pub fn run() {
             mobile::payroll::mobile_get_payroll_slip_detail,
             mobile::payroll_admin::commands::desktop_get_salary_configs,
             mobile::payroll_admin::commands::desktop_save_salary_config,
+            mobile::payroll_admin::commands::desktop_bulk_apply_flat_daily,
             mobile::payroll_admin::commands::desktop_delete_salary_config,
             mobile::payroll_admin::commands::desktop_get_overtime_rules,
             mobile::payroll_admin::commands::desktop_save_overtime_rule,

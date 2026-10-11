@@ -493,6 +493,8 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         effective_date TEXT NOT NULL,
         created_by TEXT NOT NULL,
         created_at TEXT NOT NULL,
+        salary_type TEXT NOT NULL DEFAULT 'HOURLY' CHECK (salary_type IN ('HOURLY','FLAT_DAILY')),
+        daily_rate INTEGER NOT NULL DEFAULT 0 CHECK (daily_rate >= 0),
         UNIQUE(id_karyawan, effective_date)
       );
       CREATE TABLE IF NOT EXISTS overtime_tier_rules (
@@ -571,6 +573,9 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         net_salary INTEGER NOT NULL CHECK (net_salary >= 0),
         breakdown_snapshot TEXT NOT NULL,
         created_at TEXT NOT NULL,
+        salary_type TEXT NOT NULL DEFAULT 'HOURLY' CHECK (salary_type IN ('HOURLY','FLAT_DAILY')),
+        daily_rate INTEGER NOT NULL DEFAULT 0 CHECK (daily_rate >= 0),
+        days_present INTEGER NOT NULL DEFAULT 0 CHECK (days_present >= 0),
         UNIQUE (payroll_run_id, id_karyawan)
       );
       CREATE TABLE IF NOT EXISTS payroll_audit_logs (
@@ -638,6 +643,40 @@ pub fn initialize(path: &Path) -> Result<(), String> {
         "total_holiday_overtime_index",
         "ALTER TABLE payroll_items ADD COLUMN total_holiday_overtime_index REAL NOT NULL DEFAULT 0;",
     )?;
+
+    // Skema gaji harian tetap (v18). Baris lama otomatis 'HOURLY' lewat
+    // DEFAULT, jadi tidak ada backfill: perilaku per jam tetap persis seperti
+    // sebelumnya. Kolom yang sama ada di CREATE TABLE di atas, di DDL cloud
+    // `turso.rs`, dan di `db-migrations.ts`.
+    for (table, column, sql) in [
+        (
+            "salary_configs",
+            "salary_type",
+            "ALTER TABLE salary_configs ADD COLUMN salary_type TEXT NOT NULL DEFAULT 'HOURLY' CHECK (salary_type IN ('HOURLY','FLAT_DAILY'));",
+        ),
+        (
+            "salary_configs",
+            "daily_rate",
+            "ALTER TABLE salary_configs ADD COLUMN daily_rate INTEGER NOT NULL DEFAULT 0 CHECK (daily_rate >= 0);",
+        ),
+        (
+            "payroll_items",
+            "salary_type",
+            "ALTER TABLE payroll_items ADD COLUMN salary_type TEXT NOT NULL DEFAULT 'HOURLY' CHECK (salary_type IN ('HOURLY','FLAT_DAILY'));",
+        ),
+        (
+            "payroll_items",
+            "daily_rate",
+            "ALTER TABLE payroll_items ADD COLUMN daily_rate INTEGER NOT NULL DEFAULT 0 CHECK (daily_rate >= 0);",
+        ),
+        (
+            "payroll_items",
+            "days_present",
+            "ALTER TABLE payroll_items ADD COLUMN days_present INTEGER NOT NULL DEFAULT 0 CHECK (days_present >= 0);",
+        ),
+    ] {
+        ensure_column(&connection, table, column, sql)?;
+    }
 
     // Stempel waktu pembuatan tarif payroll. `turso.rs` sudah memilikinya di
     // CREATE TABLE maupun di daftar ensure_column-nya, sehingga tanpa blok ini

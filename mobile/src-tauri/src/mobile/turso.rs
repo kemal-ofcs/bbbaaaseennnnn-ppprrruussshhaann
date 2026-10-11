@@ -1850,6 +1850,8 @@ impl TursoClient {
                     effective_date TEXT NOT NULL,
                     created_by TEXT NOT NULL,
                     created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    salary_type TEXT NOT NULL DEFAULT 'HOURLY' CHECK (salary_type IN ('HOURLY','FLAT_DAILY')),
+                    daily_rate INTEGER NOT NULL DEFAULT 0 CHECK (daily_rate >= 0),
                     UNIQUE(id_karyawan, effective_date),
                     FOREIGN KEY (id_karyawan) REFERENCES master_data(id_unik) ON DELETE CASCADE
                 );"#,
@@ -1947,6 +1949,9 @@ impl TursoClient {
                     net_salary INTEGER NOT NULL CHECK (net_salary >= 0),
                     breakdown_snapshot TEXT NOT NULL,
                     created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                    salary_type TEXT NOT NULL DEFAULT 'HOURLY' CHECK (salary_type IN ('HOURLY','FLAT_DAILY')),
+                    daily_rate INTEGER NOT NULL DEFAULT 0 CHECK (daily_rate >= 0),
+                    days_present INTEGER NOT NULL DEFAULT 0 CHECK (days_present >= 0),
                     UNIQUE (payroll_run_id, id_karyawan)
                 );"#,
                 vec![],
@@ -2094,6 +2099,13 @@ impl TursoClient {
             // IF NOT EXISTS di pipeline tidak akan menambahkan kolomnya.
             ("payroll_items", "total_holiday_hours", "ALTER TABLE payroll_items ADD COLUMN total_holiday_hours REAL NOT NULL DEFAULT 0;"),
             ("payroll_items", "total_holiday_overtime_index", "ALTER TABLE payroll_items ADD COLUMN total_holiday_overtime_index REAL NOT NULL DEFAULT 0;"),
+            // Gaji harian tetap (schema versi 18). Baris lama otomatis 'HOURLY'
+            // lewat DEFAULT, sehingga perhitungan per jamnya tidak berubah.
+            ("salary_configs", "salary_type", "ALTER TABLE salary_configs ADD COLUMN salary_type TEXT NOT NULL DEFAULT 'HOURLY' CHECK (salary_type IN ('HOURLY','FLAT_DAILY'));"),
+            ("salary_configs", "daily_rate", "ALTER TABLE salary_configs ADD COLUMN daily_rate INTEGER NOT NULL DEFAULT 0 CHECK (daily_rate >= 0);"),
+            ("payroll_items", "salary_type", "ALTER TABLE payroll_items ADD COLUMN salary_type TEXT NOT NULL DEFAULT 'HOURLY' CHECK (salary_type IN ('HOURLY','FLAT_DAILY'));"),
+            ("payroll_items", "daily_rate", "ALTER TABLE payroll_items ADD COLUMN daily_rate INTEGER NOT NULL DEFAULT 0 CHECK (daily_rate >= 0);"),
+            ("payroll_items", "days_present", "ALTER TABLE payroll_items ADD COLUMN days_present INTEGER NOT NULL DEFAULT 0 CHECK (days_present >= 0);"),
         ] {
             self.ensure_column(table, column, sql).await?;
         }
@@ -2229,6 +2241,16 @@ impl TursoClient {
         .await?;
         self.query_one(
             "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2013, 'personnel-photo-foundation-v1', datetime('now'));",
+            vec![],
+        )
+        .await?;
+        self.query_one(
+            "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (18, 'payroll-flat-daily', datetime('now'));",
+            vec![],
+        )
+        .await?;
+        self.query_one(
+            "INSERT OR IGNORE INTO schema_migration (version, name, applied_at) VALUES (-2014, 'payroll-flat-daily-v1', datetime('now'));",
             vec![],
         )
         .await?;
@@ -2446,7 +2468,7 @@ impl TursoClient {
                 // Sentinel WAJIB dinaikkan setiap kali ensure_schema menambah
                 // tabel atau kolom — nilainya di sini dan pada INSERT di atas
                 // harus selalu sama.
-                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2013;",
+                "SELECT COUNT(*) AS total FROM schema_migration WHERE version = -2014;",
                 vec![],
             )
             .await
@@ -6408,12 +6430,15 @@ async fn apply_event_to_turso(
             if !id.is_empty() {
                 let sql = r#"
                     INSERT INTO salary_configs (
-                        id, id_karyawan, rate_per_hour, ptkp_status, effective_date, created_by, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                        id, id_karyawan, rate_per_hour, ptkp_status, effective_date, created_by, created_at,
+                        salary_type, daily_rate
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id_karyawan, effective_date) DO UPDATE SET
                         rate_per_hour = excluded.rate_per_hour,
                         ptkp_status = excluded.ptkp_status,
-                        created_by = excluded.created_by;
+                        created_by = excluded.created_by,
+                        salary_type = excluded.salary_type,
+                        daily_rate = excluded.daily_rate;
                 "#;
                 turso
                     .query_one(
@@ -6432,6 +6457,13 @@ async fn apply_event_to_turso(
                                 .unwrap_or("")),
                             json!(row.get("created_by").and_then(Value::as_str).unwrap_or("")),
                             json!(row.get("created_at").and_then(Value::as_str).unwrap_or("")),
+                            // Event dari build sebelum v18 tidak membawa kedua
+                            // kunci ini: artinya per jam, bukan nilai kosong.
+                            json!(row
+                                .get("salary_type")
+                                .and_then(Value::as_str)
+                                .unwrap_or("HOURLY")),
+                            json!(row.get("daily_rate").and_then(Value::as_i64).unwrap_or(0)),
                         ],
                     )
                     .await?;
@@ -6647,10 +6679,12 @@ async fn apply_event_to_turso(
                     INSERT INTO payroll_items (
                         id, payroll_run_id, id_karyawan, nama_karyawan, divisi, ptkp_status,
                         total_regular_hours, total_overtime_hours, total_overtime_index,
+                        total_holiday_hours, total_holiday_overtime_index,
                         rate_per_hour, basic_salary, overtime_salary, gross_salary,
                         total_allowances, total_deductions, bpjs_employee_total, bpjs_company_total,
-                        pph21_amount, net_salary, breakdown_snapshot, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        pph21_amount, net_salary, breakdown_snapshot, created_at,
+                        salary_type, daily_rate, days_present
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO NOTHING;
                 "#;
                 for item in items {
@@ -6686,6 +6720,16 @@ async fn apply_event_to_turso(
                                     .get("total_overtime_index")
                                     .and_then(Value::as_f64)
                                     .unwrap_or(0.0)),
+                                // Dulu tidak ditulis sama sekali, sehingga run
+                                // dari Desktop kehilangan jam hari libur di cloud.
+                                json!(item
+                                    .get("total_holiday_hours")
+                                    .and_then(Value::as_f64)
+                                    .unwrap_or(0.0)),
+                                json!(item
+                                    .get("total_holiday_overtime_index")
+                                    .and_then(Value::as_f64)
+                                    .unwrap_or(0.0)),
                                 json!(item.get("rate_per_hour").and_then(Value::as_i64).unwrap_or(0)),
                                 json!(item.get("basic_salary").and_then(Value::as_i64).unwrap_or(0)),
                                 json!(item
@@ -6716,6 +6760,12 @@ async fn apply_event_to_turso(
                                     .and_then(Value::as_str)
                                     .unwrap_or("{}")),
                                 json!(item.get("created_at").and_then(Value::as_str).unwrap_or("")),
+                                json!(item
+                                    .get("salary_type")
+                                    .and_then(Value::as_str)
+                                    .unwrap_or("HOURLY")),
+                                json!(item.get("daily_rate").and_then(Value::as_i64).unwrap_or(0)),
+                                json!(item.get("days_present").and_then(Value::as_i64).unwrap_or(0)),
                             ],
                         )
                         .await?;

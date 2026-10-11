@@ -157,8 +157,10 @@ export default function PayrollDashboardPage() {
     (acc, curr) => acc + curr.est_net_salary,
     0,
   );
+  // Jam lembur pekerja harian tetap hanya catatan audit, tidak dibayar.
   const totalLembur = data.reduce(
-    (acc, curr) => acc + curr.total_overtime_hours,
+    (acc, curr) =>
+      curr.salary_type === "FLAT_DAILY" ? acc : acc + curr.total_overtime_hours,
     0,
   );
   const totalRegular = data.reduce(

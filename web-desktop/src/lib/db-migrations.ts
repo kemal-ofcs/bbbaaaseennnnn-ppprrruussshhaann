@@ -22,6 +22,7 @@ const HOLIDAY_WHITELIST_MIGRATION_VERSION = 14;
 const PASSWORD_RECOVERY_MIGRATION_VERSION = 15;
 const SHIFT_TIME_RULES_MIGRATION_VERSION = 16;
 const PERSONNEL_PHOTO_MIGRATION_VERSION = 17;
+const PAYROLL_FLAT_DAILY_MIGRATION_VERSION = 18;
 
 /**
  * v16 — aturan jam scan baru: Jam Kerja Normal = (Jam Pulang − Jam Masuk) −
@@ -687,6 +688,8 @@ export async function runDatabaseMigrations(client: Client) {
       effective_date TEXT NOT NULL,
       created_by TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      salary_type TEXT NOT NULL DEFAULT 'HOURLY' CHECK (salary_type IN ('HOURLY','FLAT_DAILY')),
+      daily_rate INTEGER NOT NULL DEFAULT 0 CHECK (daily_rate >= 0),
       UNIQUE(id_karyawan, effective_date)
     );
   `);
@@ -781,6 +784,9 @@ export async function runDatabaseMigrations(client: Client) {
       net_salary INTEGER NOT NULL CHECK (net_salary >= 0),
       breakdown_snapshot TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      salary_type TEXT NOT NULL DEFAULT 'HOURLY' CHECK (salary_type IN ('HOURLY','FLAT_DAILY')),
+      daily_rate INTEGER NOT NULL DEFAULT 0 CHECK (daily_rate >= 0),
+      days_present INTEGER NOT NULL DEFAULT 0 CHECK (days_present >= 0),
       UNIQUE (payroll_run_id, id_karyawan)
     );
   `);
@@ -983,6 +989,47 @@ export async function runDatabaseMigrations(client: Client) {
     sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
           VALUES (?, 'personnel-photo-foundation', ?);`,
     args: [PERSONNEL_PHOTO_MIGRATION_VERSION, now],
+  });
+
+  // ── v18: Gaji harian tetap (FLAT_DAILY) ──
+  //
+  // Baris lama otomatis 'HOURLY' lewat DEFAULT, jadi tidak ada backfill.
+  // Daftar yang sama ada di `ensure_column` milik `turso.rs` dan `storage.rs`.
+  for (const [table, column, sql] of [
+    [
+      "salary_configs",
+      "salary_type",
+      "ALTER TABLE salary_configs ADD COLUMN salary_type TEXT NOT NULL DEFAULT 'HOURLY' CHECK (salary_type IN ('HOURLY','FLAT_DAILY'));",
+    ],
+    [
+      "salary_configs",
+      "daily_rate",
+      "ALTER TABLE salary_configs ADD COLUMN daily_rate INTEGER NOT NULL DEFAULT 0 CHECK (daily_rate >= 0);",
+    ],
+    [
+      "payroll_items",
+      "salary_type",
+      "ALTER TABLE payroll_items ADD COLUMN salary_type TEXT NOT NULL DEFAULT 'HOURLY' CHECK (salary_type IN ('HOURLY','FLAT_DAILY'));",
+    ],
+    [
+      "payroll_items",
+      "daily_rate",
+      "ALTER TABLE payroll_items ADD COLUMN daily_rate INTEGER NOT NULL DEFAULT 0 CHECK (daily_rate >= 0);",
+    ],
+    [
+      "payroll_items",
+      "days_present",
+      "ALTER TABLE payroll_items ADD COLUMN days_present INTEGER NOT NULL DEFAULT 0 CHECK (days_present >= 0);",
+    ],
+  ] as const) {
+    if (!(await hasColumn(client, table, column))) {
+      await client.execute(sql);
+    }
+  }
+  await client.execute({
+    sql: `INSERT OR IGNORE INTO schema_migration (version, name, applied_at)
+          VALUES (?, 'payroll-flat-daily', ?);`,
+    args: [PAYROLL_FLAT_DAILY_MIGRATION_VERSION, now],
   });
 
   await client.execute(

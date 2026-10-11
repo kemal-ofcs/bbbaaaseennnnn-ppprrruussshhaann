@@ -239,10 +239,15 @@ Nama: ${detail.nama_karyawan} (${detail.id_karyawan})
 Divisi: ${detail.divisi}
 Periode: ${detail.period_start} s.d. ${detail.period_end}
 ----------------------------------------
-Kehadiran: ${detail.total_hadir ?? 0} Hari (${(detail.total_regular_hours || 0).toFixed(1)} Jam Reguler)
+${
+  detail.salary_type === "FLAT_DAILY"
+    ? `Kehadiran: ${detail.days_present ?? 0} Hari × ${IDR.format(detail.daily_rate ?? 0)} (harian tetap)
+Upah Harian: ${IDR.format(detail.basic_salary)}`
+    : `Kehadiran: ${detail.total_hadir ?? 0} Hari (${(detail.total_regular_hours || 0).toFixed(1)} Jam Reguler)
 Jam Lembur: ${(detail.total_overtime_hours || 0).toFixed(1)} Jam (Indeks ${(detail.total_overtime_index || 0).toFixed(2)})
 Gaji Pokok: ${IDR.format(detail.basic_salary)}
-Upah Lembur: ${IDR.format(detail.overtime_salary)}
+Upah Lembur: ${IDR.format(detail.overtime_salary)}`
+}
 Tunjangan: ${IDR.format(detail.total_allowances)}
 Total Potongan: -${IDR.format(totalPotongan)}
 ----------------------------------------
@@ -290,6 +295,10 @@ Status: Estimasi Real-Time ${companyName}`;
     (c) => c.category === "DEDUCTION",
   );
   const bpjsList = (parsedBreakdown.bpjs || []).filter((b) => b.is_employee);
+  const isFlatDaily = estimateDetail?.salary_type === "FLAT_DAILY";
+  const hadirHari = isFlatDaily
+    ? (estimateDetail?.days_present ?? 0)
+    : (estimateDetail?.total_hadir ?? 0);
 
   return (
     <MobileAppShell>
@@ -498,7 +507,7 @@ Status: Estimasi Real-Time ${companyName}`;
                     <div>
                       Hadir:{" "}
                       <span className="font-bold text-slate-200">
-                        {estimateDetail.total_hadir ?? 0} Hari
+                        {hadirHari} Hari
                       </span>{" "}
                       ·{" "}
                       <span className="text-slate-300">
@@ -508,7 +517,9 @@ Status: Estimasi Real-Time ${companyName}`;
                     <div>
                       Lembur:{" "}
                       <span className="font-bold text-amber-300">
-                        {(estimateDetail.total_overtime_hours || 0).toFixed(1)}j
+                        {isFlatDaily
+                          ? "–"
+                          : `${(estimateDetail.total_overtime_hours || 0).toFixed(1)}j`}
                       </span>
                     </div>
                   </div>
@@ -522,17 +533,22 @@ Status: Estimasi Real-Time ${companyName}`;
                       {IDR.format(estimateDetail.basic_salary)}
                     </p>
                     <p className="text-[10px] text-slate-400">
-                      @ {IDR.format(estimateDetail.rate_per_hour)} / jam
+                      {isFlatDaily
+                        ? `${hadirHari} hari × ${IDR.format(estimateDetail.daily_rate ?? 0)}`
+                        : `@ ${IDR.format(estimateDetail.rate_per_hour)} / jam`}
                     </p>
                   </div>
                   <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-3.5 space-y-1">
                     <p className="text-[11px] text-amber-400/90">Upah Lembur</p>
                     <p className="text-base font-bold text-amber-300">
-                      {IDR.format(estimateDetail.overtime_salary)}
+                      {isFlatDaily
+                        ? "–"
+                        : IDR.format(estimateDetail.overtime_salary)}
                     </p>
                     <p className="text-[10px] text-slate-400">
-                      Indeks:{" "}
-                      {(estimateDetail.total_overtime_index || 0).toFixed(2)}
+                      {isFlatDaily
+                        ? "Tidak berlaku (harian tetap)"
+                        : `Indeks: ${(estimateDetail.total_overtime_index || 0).toFixed(2)}`}
                     </p>
                   </div>
                   <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-3.5 space-y-1">
@@ -691,7 +707,9 @@ Status: Estimasi Real-Time ${companyName}`;
                     </span>
                     <span className="font-medium text-slate-200">
                       {estimateDetail.ptkp_status} ·{" "}
-                      {IDR.format(estimateDetail.rate_per_hour)}/jam
+                      {isFlatDaily
+                        ? `${IDR.format(estimateDetail.daily_rate ?? 0)}/hari`
+                        : `${IDR.format(estimateDetail.rate_per_hour)}/jam`}
                     </span>
                   </div>
                 </div>
@@ -704,7 +722,7 @@ Status: Estimasi Real-Time ${companyName}`;
                     Total Hadir
                   </span>
                   <span className="font-bold text-white text-sm">
-                    {estimateDetail.total_hadir ?? 0} Hari
+                    {hadirHari} Hari
                   </span>
                 </div>
                 <div>
@@ -720,7 +738,9 @@ Status: Estimasi Real-Time ${companyName}`;
                     Jam Lembur
                   </span>
                   <span className="font-bold text-amber-300 text-sm">
-                    {(estimateDetail.total_overtime_hours || 0).toFixed(2)}j
+                    {isFlatDaily
+                      ? "–"
+                      : `${(estimateDetail.total_overtime_hours || 0).toFixed(2)}j`}
                   </span>
                 </div>
               </div>
@@ -731,20 +751,26 @@ Status: Estimasi Real-Time ${companyName}`;
                   I. Penghasilan Kotor
                 </div>
                 <div className="flex justify-between py-1 border-b border-white/5">
-                  <span className="text-slate-300">Gaji Pokok (Reguler)</span>
+                  <span className="text-slate-300">
+                    {isFlatDaily
+                      ? `Upah Harian (${hadirHari} hari × ${IDR.format(estimateDetail.daily_rate ?? 0)})`
+                      : "Gaji Pokok (Reguler)"}
+                  </span>
                   <span className="font-mono font-medium text-white">
                     {IDR.format(estimateDetail.basic_salary)}
                   </span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-white/5">
-                  <span className="text-slate-300">
-                    Upah Lembur (Indeks{" "}
-                    {(estimateDetail.total_overtime_index || 0).toFixed(2)})
-                  </span>
-                  <span className="font-mono font-medium text-amber-300">
-                    {IDR.format(estimateDetail.overtime_salary)}
-                  </span>
-                </div>
+                {isFlatDaily ? null : (
+                  <div className="flex justify-between py-1 border-b border-white/5">
+                    <span className="text-slate-300">
+                      Upah Lembur (Indeks{" "}
+                      {(estimateDetail.total_overtime_index || 0).toFixed(2)})
+                    </span>
+                    <span className="font-mono font-medium text-amber-300">
+                      {IDR.format(estimateDetail.overtime_salary)}
+                    </span>
+                  </div>
+                )}
                 {allowances.map((comp) => (
                   <div
                     key={comp.id}

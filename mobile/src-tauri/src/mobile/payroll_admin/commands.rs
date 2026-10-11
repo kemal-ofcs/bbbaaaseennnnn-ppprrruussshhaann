@@ -4,10 +4,10 @@ use rust_decimal::Decimal;
 use serde_json::{json, Value};
 use tauri::State;
 
-use super::engine::PayrollCalculator;
+use super::engine::{PayInput, PayRules, PayrollCalculator};
 use super::models::{
     BpjsRule, OvertimeTierRule, PayrollAuditLog, PayrollComponent, PayrollItem, PayrollRecapRow,
-    PayrollRun, PayrollStatus, SalaryConfig, TaxRule,
+    PayrollRun, PayrollStatus, SalaryConfig, TaxRule, SALARY_TYPE_FLAT_DAILY,
 };
 use crate::mobile::config::MobileState;
 use crate::mobile::models::CommandError;
@@ -86,7 +86,8 @@ pub async fn desktop_get_salary_configs(
         .prepare(
             r#"
             SELECT sc.id, sc.id_karyawan, sc.rate_per_hour, sc.ptkp_status,
-                   sc.effective_date, sc.created_by, sc.created_at
+                   sc.effective_date, sc.created_by, sc.created_at,
+                   sc.salary_type, sc.daily_rate
             FROM salary_configs sc
             LEFT JOIN master_data md ON md.id_unik = sc.id_karyawan
             WHERE (?1 = '%' OR COALESCE(md.nama, '') LIKE ?1 OR COALESCE(md.kode_karyawan, '') LIKE ?1 OR sc.id_karyawan LIKE ?1)
@@ -105,6 +106,8 @@ pub async fn desktop_get_salary_configs(
                 effective_date: row.get(4)?,
                 created_by: row.get(5)?,
                 created_at: row.get(6)?,
+                salary_type: row.get(7)?,
+                daily_rate: row.get(8)?,
             })
         })
         .map_err(|_| CommandError::internal())?;
@@ -124,13 +127,31 @@ pub async fn desktop_save_salary_config(
     draft: SalaryConfig,
 ) -> Result<bool, CommandError> {
     let operator = require_permission(&state, "payroll.config.manage")?;
+    let draft = draft
+        .normalized()
+        .map_err(|message| CommandError::new("VALIDATION_ERROR", message))?;
     let mut conn = storage::database(&state.data_dir)?;
 
     let tx = conn.transaction().map_err(|_| CommandError::internal())?;
+    let client_id = sync::ensure_client_id(&state)?;
+    upsert_salary_config(&tx, &client_id, &draft, &operator.username)?;
+    tx.commit().map_err(|_| CommandError::internal())?;
+    Ok(true)
+}
+
+/// Satu baris `salary_configs` + event outbox-nya, di transaksi pemanggil.
+///
+/// `draft` WAJIB sudah melewati `SalaryConfig::normalized`.
+fn upsert_salary_config(
+    tx: &rusqlite::Transaction<'_>,
+    client_id: &str,
+    draft: &SalaryConfig,
+    created_by: &str,
+) -> Result<(), CommandError> {
     // Rate unik per (karyawan, tanggal berlaku) dan INSERT di bawah menimpa
     // baris lama lewat kunci alami itu — dengan id LAMA. Tanpa pencarian ini,
     // outbox mengantrekan id baru yang tidak dimiliki baris mana pun.
-    let config_id = if draft.id.trim().is_empty() {
+    let config_id = if draft.id.is_empty() {
         tx.query_row(
             "SELECT id FROM salary_configs WHERE id_karyawan = ?1 AND effective_date = ?2;",
             params![draft.id_karyawan, draft.effective_date],
@@ -142,17 +163,20 @@ pub async fn desktop_save_salary_config(
     } else {
         draft.id.clone()
     };
-    let now = iso_now_tx(&tx);
+    let now = iso_now_tx(tx);
 
     tx.execute(
         r#"
         INSERT INTO salary_configs (
-            id, id_karyawan, rate_per_hour, ptkp_status, effective_date, created_by, created_at
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            id, id_karyawan, rate_per_hour, ptkp_status, effective_date, created_by, created_at,
+            salary_type, daily_rate
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
         ON CONFLICT(id_karyawan, effective_date) DO UPDATE SET
             rate_per_hour = excluded.rate_per_hour,
             ptkp_status = excluded.ptkp_status,
-            created_by = excluded.created_by;
+            created_by = excluded.created_by,
+            salary_type = excluded.salary_type,
+            daily_rate = excluded.daily_rate;
         "#,
         params![
             config_id,
@@ -160,16 +184,17 @@ pub async fn desktop_save_salary_config(
             draft.rate_per_hour,
             draft.ptkp_status,
             draft.effective_date,
-            operator.username,
-            now
+            created_by,
+            now,
+            draft.salary_type,
+            draft.daily_rate
         ],
     )
     .map_err(|_| CommandError::new("SAVE_FAILED", "Gagal menyimpan konfigurasi gaji karyawan."))?;
 
-    let client_id = sync::ensure_client_id(&state)?;
     sync::enqueue(
-        &tx,
-        &client_id,
+        tx,
+        client_id,
         "payroll",
         "salary-config",
         &config_id,
@@ -179,14 +204,85 @@ pub async fn desktop_save_salary_config(
             "rate_per_hour": draft.rate_per_hour,
             "ptkp_status": draft.ptkp_status.clone(),
             "effective_date": draft.effective_date.clone(),
-            "created_by": operator.username.clone(),
-            "created_at": now.clone(),
+            "created_by": created_by,
+            "created_at": now,
+            "salary_type": draft.salary_type.clone(),
+            "daily_rate": draft.daily_rate,
         }),
         None,
     )?;
+    Ok(())
+}
+
+/// Menerapkan tarif harian tetap ke seluruh karyawan aktif, atau satu divisi.
+///
+/// Satu transaksi untuk seluruh baris dan event outbox-nya, lewat rute kanonik
+/// `salary-config` yang sama dengan simpan tunggal. Status PTKP setiap
+/// karyawan dipertahankan dari konfigurasi terakhirnya. Mengembalikan jumlah
+/// karyawan yang diperbarui.
+#[tauri::command]
+pub async fn desktop_bulk_apply_flat_daily(
+    state: State<'_, MobileState>,
+    divisi: Option<String>,
+    daily_rate: i64,
+    effective_date: String,
+) -> Result<i64, CommandError> {
+    let operator = require_permission(&state, "payroll.config.manage")?;
+    let divisi = divisi
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    let mut conn = storage::database(&state.data_dir)?;
+    let tx = conn.transaction().map_err(|_| CommandError::internal())?;
+
+    let targets: Vec<(String, String)> = {
+        let mut stmt = tx
+            .prepare(
+                r#"
+                SELECT md.id_unik,
+                       COALESCE((
+                           SELECT sc.ptkp_status FROM salary_configs sc
+                           WHERE sc.id_karyawan = md.id_unik
+                           ORDER BY sc.effective_date DESC LIMIT 1
+                       ), 'TK/0')
+                FROM master_data md
+                WHERE md.status_aktif = 'Aktif' AND (?1 IS NULL OR md.divisi = ?1)
+                ORDER BY md.id_unik;
+                "#,
+            )
+            .map_err(|_| CommandError::internal())?;
+        let rows = stmt
+            .query_map(params![divisi], |row| Ok((row.get(0)?, row.get(1)?)))
+            .map_err(|_| CommandError::internal())?;
+        rows.collect::<Result<_, _>>()
+            .map_err(|_| CommandError::internal())?
+    };
+    if targets.is_empty() {
+        return Err(CommandError::new(
+            "VALIDATION_ERROR",
+            "Tidak ada karyawan aktif pada cakupan yang dipilih.",
+        ));
+    }
+
+    let client_id = sync::ensure_client_id(&state)?;
+    for (id_karyawan, ptkp_status) in &targets {
+        let draft = SalaryConfig {
+            id: String::new(),
+            id_karyawan: id_karyawan.clone(),
+            rate_per_hour: 0,
+            ptkp_status: ptkp_status.clone(),
+            effective_date: effective_date.clone(),
+            created_by: String::new(),
+            created_at: String::new(),
+            salary_type: SALARY_TYPE_FLAT_DAILY.to_string(),
+            daily_rate,
+        }
+        .normalized()
+        .map_err(|message| CommandError::new("VALIDATION_ERROR", message))?;
+        upsert_salary_config(&tx, &client_id, &draft, &operator.username)?;
+    }
 
     tx.commit().map_err(|_| CommandError::internal())?;
-    Ok(true)
+    Ok(targets.len() as i64)
 }
 
 #[tauri::command]
@@ -960,7 +1056,11 @@ pub async fn desktop_get_payroll_recap(
                 COALESCE(SUM(CASE WHEN hl.tanggal IS NULL THEN ah.jam_kerja ELSE 0 END), 0) AS total_jam_kerja_menit,
                 COALESCE(SUM(CASE WHEN hl.tanggal IS NULL THEN ah.lembur ELSE 0 END), 0) AS total_lembur_menit,
                 COALESCE(SUM(CASE WHEN hl.tanggal IS NOT NULL
-                    THEN COALESCE(ah.jam_kerja, 0) + COALESCE(ah.lembur, 0) ELSE 0 END), 0) AS total_libur_menit
+                    THEN COALESCE(ah.jam_kerja, 0) + COALESCE(ah.lembur, 0) ELSE 0 END), 0) AS total_libur_menit,
+                COALESCE(sc.salary_type, 'HOURLY') AS salary_type,
+                COALESCE(sc.daily_rate, 0) AS daily_rate,
+                -- Hari UNIK: sesi PENGGANTI di tanggal yang sama tidak menambah hari.
+                COUNT(DISTINCT CASE WHEN ah.status_kehadiran IN ('Hadir', 'PRESENT') THEN ah.tanggal END) AS days_present
             FROM master_data md
             LEFT JOIN salary_configs sc ON sc.id_karyawan = md.id_unik
                 AND sc.effective_date = (
@@ -992,6 +1092,9 @@ pub async fn desktop_get_payroll_recap(
         jam_kerja_menit: i64,
         lembur_menit: i64,
         libur_menit: i64,
+        salary_type: String,
+        daily_rate: i64,
+        days_present: i64,
     }
 
     let rows = stmt
@@ -1007,10 +1110,20 @@ pub async fn desktop_get_payroll_recap(
                 jam_kerja_menit: row.get(7)?,
                 lembur_menit: row.get(8)?,
                 libur_menit: row.get(9)?,
+                salary_type: row.get(10)?,
+                daily_rate: row.get(11)?,
+                days_present: row.get(12)?,
             })
         })
         .map_err(|_| CommandError::internal())?;
 
+    let rules = PayRules {
+        overtime_tiers: &overtime_tiers,
+        holiday_tiers: &holiday_tiers,
+        components: &components,
+        tax_rules: &tax_rules,
+        bpjs_rules: &bpjs_rules,
+    };
     let mut result = Vec::new();
 
     for item in rows {
@@ -1018,29 +1131,30 @@ pub async fn desktop_get_payroll_recap(
             let reg_hours = Decimal::from(agg.jam_kerja_menit) / Decimal::from(60);
             let ot_hours = Decimal::from(agg.lembur_menit) / Decimal::from(60);
             let holiday_hours = Decimal::from(agg.libur_menit) / Decimal::from(60);
-            let rate_dec = Decimal::from(agg.rate_per_hour);
-
-            // Dua indeks, dua jenjang: jam lembur hari biasa memakai HARI_KERJA,
-            // seluruh jam pada tanggal libur memakai HARI_LIBUR. Keduanya
-            // dijumlahkan lalu dikalikan rate per jam karyawan SEKALI, supaya
-            // pembulatannya sama dengan versi satu-indeks sebelumnya.
-            let ot_index = PayrollCalculator::calculate_overtime_index(ot_hours, &overtime_tiers);
-            let holiday_index =
-                PayrollCalculator::calculate_overtime_index(holiday_hours, &holiday_tiers);
-            let basic_salary =
-                PayrollCalculator::wage_from_minutes(agg.jam_kerja_menit, agg.rate_per_hour);
-            let overtime_salary = ((ot_index + holiday_index) * rate_dec)
-                .round_dp_with_strategy(0, RoundingStrategy::MidpointAwayFromZero);
-
-            let (allowance, deduction, _) =
-                PayrollCalculator::calculate_components(basic_salary, &components, &agg.id_unik);
-
-            let gross = basic_salary + overtime_salary + allowance;
-            let (bpjs_emp, _, _) = PayrollCalculator::calculate_bpjs(gross, &bpjs_rules);
-            let (pph21, _) =
-                PayrollCalculator::calculate_pph21_ter(gross, &agg.ptkp_status, &tax_rules);
-
-            let net = (gross - deduction - bpjs_emp - pph21).max(Decimal::ZERO);
+            let pay = PayrollCalculator::calculate_employee_pay(
+                &PayInput {
+                    id_karyawan: &agg.id_unik,
+                    ptkp_status: &agg.ptkp_status,
+                    salary_type: &agg.salary_type,
+                    rate_per_hour: agg.rate_per_hour,
+                    daily_rate: agg.daily_rate,
+                    days_present: agg.days_present,
+                    regular_minutes: agg.jam_kerja_menit,
+                    overtime_minutes: agg.lembur_menit,
+                    holiday_minutes: agg.libur_menit,
+                },
+                &rules,
+            );
+            let ot_index = pay.overtime_index;
+            let holiday_index = pay.holiday_index;
+            let basic_salary = pay.basic;
+            let overtime_salary = pay.overtime;
+            let allowance = pay.allowance;
+            let deduction = pay.deduction;
+            let gross = pay.gross;
+            let bpjs_emp = pay.bpjs_employee;
+            let pph21 = pay.pph21;
+            let net = pay.net;
 
             result.push(PayrollRecapRow {
                 id_karyawan: agg.id_unik,
@@ -1069,6 +1183,9 @@ pub async fn desktop_get_payroll_recap(
                 est_bpjs_employee: bpjs_emp.to_i64().unwrap_or(0),
                 est_pph21: pph21.to_i64().unwrap_or(0),
                 est_net_salary: net.to_i64().unwrap_or(0),
+                salary_type: agg.salary_type,
+                daily_rate: agg.daily_rate,
+                days_present: agg.days_present,
             });
         }
     }
@@ -1137,46 +1254,50 @@ pub async fn desktop_create_payroll_run(
     let mut total_net_sum = 0i64;
     let total_emp_count = recap.len() as i64;
     let mut calculated_items = Vec::new();
+    let rules = PayRules {
+        overtime_tiers: &overtime_tiers,
+        holiday_tiers: &holiday_tiers,
+        components: &components,
+        tax_rules: &tax_rules,
+        bpjs_rules: &bpjs_rules,
+    };
 
     for row in &recap {
         let item_id = format!("{}-{}", run_id, row.id_karyawan);
-        // Jam diturunkan dari MENIT MENTAH, sama persis seperti di
-        // `desktop_get_payroll_recap`. Bentuk sebelumnya membaca ulang
-        // `total_regular_hours` yang bertipe `f64`, dan `from_f64_retain` tidak
-        // mengembalikan presisi yang sudah hilang saat pembagian: pratinjau
-        // menghitung 11/60 secara eksak sehingga 11 menit pada tarif
-        // 18.750/jam menjadi 3.437,5 tepat lalu dibulatkan ke 3.438, sementara
-        // pembekuan mendapat 3.437,4999… dan membekukan 3.437.
-        //
-        // Selisihnya satu rupiah per baris, tetapi ia mengalir ke gross,
-        // komponen, BPJS, PPh 21, dan net — dan yang lebih buruk, angka yang
-        // DISETUJUI admin bukan angka yang DIBAYARKAN.
-        // Jam reguler tidak lagi diturunkan di sini: upahnya dihitung langsung
-        // dari menit lewat `wage_from_minutes`. Jam lembur masih diperlukan
-        // karena jenjangnya memang dinyatakan dalam jam.
-        let ot_hours = Decimal::from(row.total_overtime_minutes) / Decimal::from(60);
-        let holiday_hours = Decimal::from(row.total_holiday_minutes) / Decimal::from(60);
-        let rate_dec = Decimal::from(row.rate_per_hour);
-
-        let ot_index = PayrollCalculator::calculate_overtime_index(ot_hours, &overtime_tiers);
-        let holiday_index =
-            PayrollCalculator::calculate_overtime_index(holiday_hours, &holiday_tiers);
-        let basic_salary =
-            PayrollCalculator::wage_from_minutes(row.total_regular_minutes, row.rate_per_hour);
-        let overtime_salary = ((ot_index + holiday_index) * rate_dec)
-            .round_dp_with_strategy(0, RoundingStrategy::MidpointAwayFromZero);
-
-        let (allowance, deduction, comp_breakdown) =
-            PayrollCalculator::calculate_components(basic_salary, &components, &row.id_karyawan);
-
-        let gross = basic_salary + overtime_salary + allowance;
-        let (bpjs_emp, bpjs_co, bpjs_breakdown) = PayrollCalculator::calculate_bpjs(gross, &bpjs_rules);
-        let (pph21, tax_breakdown) =
-            PayrollCalculator::calculate_pph21_ter(gross, &row.ptkp_status, &tax_rules);
-
-        let net = (gross - deduction - bpjs_emp - pph21).max(Decimal::ZERO);
+        // Dihitung dari MENIT MENTAH lewat fungsi yang sama dengan
+        // `desktop_get_payroll_recap`, bukan dari jam `f64` yang presisinya
+        // sudah hilang — angka yang DISETUJUI admin harus sama dengan angka
+        // yang DIBEKUKAN, sampai titik tengah pembulatannya.
+        let pay = PayrollCalculator::calculate_employee_pay(
+            &PayInput {
+                id_karyawan: &row.id_karyawan,
+                ptkp_status: &row.ptkp_status,
+                salary_type: &row.salary_type,
+                rate_per_hour: row.rate_per_hour,
+                daily_rate: row.daily_rate,
+                days_present: row.days_present,
+                regular_minutes: row.total_regular_minutes,
+                overtime_minutes: row.total_overtime_minutes,
+                holiday_minutes: row.total_holiday_minutes,
+            },
+            &rules,
+        );
+        let ot_index = pay.overtime_index;
+        let holiday_index = pay.holiday_index;
+        let basic_salary = pay.basic;
+        let overtime_salary = pay.overtime;
+        let allowance = pay.allowance;
+        let deduction = pay.deduction;
+        let gross = pay.gross;
+        let bpjs_emp = pay.bpjs_employee;
+        let bpjs_co = pay.bpjs_company;
+        let pph21 = pay.pph21;
+        let net = pay.net;
 
         let snapshot = json!({
+            "salary_type": row.salary_type,
+            "daily_rate": row.daily_rate,
+            "days_present": row.days_present,
             "rate_per_hour": row.rate_per_hour,
             "regular_hours": row.total_regular_hours,
             "overtime_hours": row.total_overtime_hours,
@@ -1185,9 +1306,9 @@ pub async fn desktop_create_payroll_run(
             "holiday_overtime_index": holiday_index.to_f64().unwrap_or(0.0),
             "basic_salary": basic_salary.to_i64().unwrap_or(0),
             "overtime_salary": overtime_salary.to_i64().unwrap_or(0),
-            "components": comp_breakdown,
-            "bpjs": bpjs_breakdown,
-            "tax": tax_breakdown,
+            "components": pay.components,
+            "bpjs": pay.bpjs,
+            "tax": pay.tax,
             "calculated_at": now.clone()
         });
 
@@ -1226,6 +1347,9 @@ pub async fn desktop_create_payroll_run(
             pph21_i64,
             net_i64,
             snapshot.to_string(),
+            row.salary_type.clone(),
+            row.daily_rate,
+            row.days_present,
         ));
     }
 
@@ -1256,6 +1380,9 @@ pub async fn desktop_create_payroll_run(
                 "net_salary": it.19,
                 "breakdown_snapshot": it.20.clone(),
                 "created_at": now.clone(),
+                "salary_type": it.21.clone(),
+                "daily_rate": it.22,
+                "days_present": it.23,
             })
         })
         .collect();
@@ -1294,8 +1421,9 @@ pub async fn desktop_create_payroll_run(
                 total_holiday_hours, total_holiday_overtime_index,
                 rate_per_hour, basic_salary, overtime_salary, gross_salary,
                 total_allowances, total_deductions, bpjs_employee_total, bpjs_company_total,
-                pph21_amount, net_salary, breakdown_snapshot, created_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23);
+                pph21_amount, net_salary, breakdown_snapshot, created_at,
+                salary_type, daily_rate, days_present
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26);
             "#,
             params![
                 it.0,
@@ -1320,7 +1448,10 @@ pub async fn desktop_create_payroll_run(
                 it.18,
                 it.19,
                 it.20,
-                now
+                now,
+                it.21,
+                it.22,
+                it.23
             ],
         )
         .map_err(|_| CommandError::new("RUN_FAILED", "Gagal menyimpan rincian slip gaji karyawan."))?;
@@ -1488,7 +1619,8 @@ pub async fn desktop_get_payroll_run_detail(
                    COALESCE(total_holiday_hours, 0), COALESCE(total_holiday_overtime_index, 0),
                    rate_per_hour, basic_salary, overtime_salary, gross_salary,
                    total_allowances, total_deductions, bpjs_employee_total, bpjs_company_total,
-                   pph21_amount, net_salary, breakdown_snapshot, created_at
+                   pph21_amount, net_salary, breakdown_snapshot, created_at,
+                   COALESCE(salary_type, 'HOURLY'), COALESCE(daily_rate, 0), COALESCE(days_present, 0)
             FROM payroll_items
             WHERE payroll_run_id = ?1
             ORDER BY nama_karyawan ASC;
@@ -1522,6 +1654,9 @@ pub async fn desktop_get_payroll_run_detail(
                 net_salary: row.get(20)?,
                 breakdown_snapshot: row.get(21)?,
                 created_at: row.get(22)?,
+                salary_type: row.get(23)?,
+                daily_rate: row.get(24)?,
+                days_present: row.get(25)?,
             })
         })
         .map_err(|_| CommandError::internal())?

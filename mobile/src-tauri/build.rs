@@ -125,6 +125,7 @@ const MOBILE_COMMANDS: &[&str] = &[
     "mobile_get_payroll_slip_detail",
     "desktop_get_salary_configs",
     "desktop_save_salary_config",
+    "desktop_bulk_apply_flat_daily",
     "desktop_delete_salary_config",
     "desktop_get_overtime_rules",
     "desktop_save_overtime_rule",

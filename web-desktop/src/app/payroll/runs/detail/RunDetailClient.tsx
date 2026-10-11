@@ -342,9 +342,16 @@ export default function RunDetailClient() {
                       </td>
                       <td className="py-3 px-4 text-right font-mono text-slate-300">
                         {Number(it.total_regular_hours.toFixed(2))}j
+                        {it.salary_type === "FLAT_DAILY" ? (
+                          <div className="text-[10px] text-amber-200">
+                            {it.days_present} hari × {IDR.format(it.daily_rate)}
+                          </div>
+                        ) : null}
                       </td>
                       <td className="py-3 px-4 text-right font-mono text-amber-400">
-                        {Number(it.total_overtime_hours.toFixed(2))}j
+                        {it.salary_type === "FLAT_DAILY"
+                          ? "–"
+                          : `${Number(it.total_overtime_hours.toFixed(2))}j`}
                       </td>
                       <td className="py-3 px-4 text-right font-mono text-rose-400">
                         {Number(it.total_holiday_hours.toFixed(2))}j
@@ -353,7 +360,9 @@ export default function RunDetailClient() {
                         {IDR.format(it.basic_salary)}
                       </td>
                       <td className="py-3 px-4 text-right font-mono text-amber-400">
-                        {IDR.format(it.overtime_salary)}
+                        {it.salary_type === "FLAT_DAILY"
+                          ? "–"
+                          : IDR.format(it.overtime_salary)}
                       </td>
                       <td className="py-3 px-4 text-right font-mono text-rose-400">
                         {IDR.format(

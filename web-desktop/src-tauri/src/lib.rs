@@ -141,6 +141,7 @@ pub fn run() {
             desktop::commands::desktop_clear_turso_config,
             desktop::payroll::commands::desktop_get_salary_configs,
             desktop::payroll::commands::desktop_save_salary_config,
+            desktop::payroll::commands::desktop_bulk_apply_flat_daily,
             desktop::payroll::commands::desktop_delete_salary_config,
             desktop::payroll::commands::desktop_get_overtime_rules,
             desktop::payroll::commands::desktop_save_overtime_rule,

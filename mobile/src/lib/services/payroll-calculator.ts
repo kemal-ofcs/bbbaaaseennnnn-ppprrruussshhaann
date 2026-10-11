@@ -249,6 +249,135 @@ export function calculatePph21Ter(
   };
 }
 
+export interface PayInput {
+  idKaryawan: string;
+  ptkpStatus: string;
+  salaryType: string;
+  ratePerHour: number;
+  dailyRate: number;
+  daysPresent: number;
+  regularMinutes: number;
+  overtimeMinutes: number;
+  holidayMinutes: number;
+}
+
+export interface PayRules {
+  overtimeTiers: OvertimeTierRule[];
+  holidayTiers: OvertimeTierRule[];
+  components: PayrollComponent[];
+  taxRules: TaxRule[];
+  bpjsRules: BpjsRule[];
+}
+
+export interface EmployeePay {
+  overtimeIndex: number;
+  holidayIndex: number;
+  basic: number;
+  overtime: number;
+  allowance: number;
+  deduction: number;
+  gross: number;
+  bpjsEmployee: number;
+  bpjsCompany: number;
+  pph21: number;
+  net: number;
+  components: ComponentBreakdownEntry[];
+  bpjs: BpjsBreakdownEntry[];
+  tax: Pph21Breakdown | null;
+}
+
+/**
+ * Gaji satu karyawan untuk satu periode. Cerminan persis
+ * `PayrollCalculator::calculate_employee_pay` di `payroll/engine.rs`.
+ */
+export function calculateEmployeePay(
+  input: PayInput,
+  rules: PayRules,
+): EmployeePay {
+  if (input.salaryType === "FLAT_DAILY") {
+    // Upah harian tetap: durasi kerja, lembur, BPJS, dan PPh 21 tidak ikut.
+    // Hanya komponen milik karyawan ini sendiri yang berlaku; komponen 'ALL'
+    // dirancang untuk skema per jam. Hasil kalinya bilangan bulat eksak.
+    const basic = Math.max(0, input.daysPresent) * Math.max(0, input.dailyRate);
+    const personal = rules.components.filter(
+      (comp) => comp.applies_to === input.idKaryawan,
+    );
+    const { allowance, deduction, breakdown } = calculateComponents(
+      basic,
+      personal,
+      input.idKaryawan,
+    );
+    const gross = basic + allowance;
+    return {
+      overtimeIndex: 0,
+      holidayIndex: 0,
+      basic,
+      overtime: 0,
+      allowance,
+      deduction,
+      gross,
+      bpjsEmployee: 0,
+      bpjsCompany: 0,
+      pph21: 0,
+      net: Math.max(0, gross - deduction),
+      components: breakdown,
+      bpjs: [],
+      tax: null,
+    };
+  }
+
+  // Dua indeks, dua jenjang: jam lembur hari biasa memakai HARI_KERJA,
+  // seluruh jam pada tanggal libur memakai HARI_LIBUR.
+  const overtimeIndex = calculateOvertimeIndex(
+    input.overtimeMinutes / 60,
+    rules.overtimeTiers,
+  );
+  const holidayIndex = calculateOvertimeIndex(
+    input.holidayMinutes / 60,
+    rules.holidayTiers,
+  );
+  // Uang diturunkan dari MENIT BULAT, bukan dari jam yang sudah dibagi:
+  // `menit * tarif` bilangan bulat eksak, sehingga titik tengahnya terwakili
+  // persis dan `roundMoney` sepakat dengan `Decimal` di Rust.
+  const basic = roundMoney((input.regularMinutes * input.ratePerHour) / 60);
+  // Indeks sudah dibulatkan ke 2 desimal, jadi seratus kalinya bilangan bulat
+  // dan perkaliannya menjadi eksak.
+  const indeksRatusan = Math.round((overtimeIndex + holidayIndex) * 100);
+  const overtime = roundMoney((indeksRatusan * input.ratePerHour) / 100);
+  const {
+    allowance,
+    deduction,
+    breakdown: components,
+  } = calculateComponents(basic, rules.components, input.idKaryawan);
+  const gross = basic + overtime + allowance;
+  const {
+    employee: bpjsEmployee,
+    company: bpjsCompany,
+    breakdown: bpjs,
+  } = calculateBpjs(gross, rules.bpjsRules);
+  const { pph21Amount: pph21, breakdown: tax } = calculatePph21Ter(
+    gross,
+    input.ptkpStatus,
+    rules.taxRules,
+  );
+  return {
+    overtimeIndex,
+    holidayIndex,
+    basic,
+    overtime,
+    allowance,
+    deduction,
+    gross,
+    bpjsEmployee,
+    bpjsCompany,
+    pph21,
+    net: Math.max(0, gross - deduction - bpjsEmployee - pph21),
+    components,
+    bpjs,
+    tax,
+  };
+}
+
 const PAYROLL_STATUS_TRANSITIONS: Record<string, string[]> = {
   DRAFT: ["SUBMITTED"],
   SUBMITTED: ["REVIEWED", "REJECTED"],

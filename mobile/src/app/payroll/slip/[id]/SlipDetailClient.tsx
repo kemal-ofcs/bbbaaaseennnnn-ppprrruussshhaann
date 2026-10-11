@@ -122,8 +122,12 @@ Nama: ${slip.nama_karyawan} (${slip.id_karyawan})
 Divisi: ${slip.divisi}
 Periode: ${slip.period_start} s.d. ${slip.period_end}
 ----------------------------------------
-Gaji Pokok: ${IDR.format(slip.basic_salary)}
-Upah Lembur: ${IDR.format(slip.overtime_salary)}
+${
+  slip.salary_type === "FLAT_DAILY"
+    ? `Upah Harian: ${slip.days_present ?? 0} Hari × ${IDR.format(slip.daily_rate ?? 0)} = ${IDR.format(slip.basic_salary)}`
+    : `Gaji Pokok: ${IDR.format(slip.basic_salary)}
+Upah Lembur: ${IDR.format(slip.overtime_salary)}`
+}
 Total Potongan: -${IDR.format(slip.total_deductions + slip.bpjs_employee_total + slip.pph21_amount)}
 ----------------------------------------
 *TAKE HOME PAY: ${IDR.format(slip.net_salary)}*
@@ -230,13 +234,23 @@ Status: LUNAS / DIBAYAR`;
                     {slip.period_start} s.d. {slip.period_end}
                   </div>
                 </div>
-                <div>
-                  <span className="text-slate-500">Jam Kerja:</span>
-                  <div className="font-mono text-slate-300">
-                    {slip.total_regular_hours}j (Lembur:{" "}
-                    {slip.total_overtime_hours}j)
+                {slip.salary_type === "FLAT_DAILY" ? (
+                  <div>
+                    <span className="text-slate-500">Kehadiran:</span>
+                    <div className="font-mono text-slate-300">
+                      {slip.days_present ?? 0} hari ×{" "}
+                      {IDR.format(slip.daily_rate ?? 0)}
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div>
+                    <span className="text-slate-500">Jam Kerja:</span>
+                    <div className="font-mono text-slate-300">
+                      {slip.total_regular_hours}j (Lembur:{" "}
+                      {slip.total_overtime_hours}j)
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -249,7 +263,9 @@ Status: LUNAS / DIBAYAR`;
               <div className="space-y-2 text-xs divide-y divide-slate-800/80">
                 <div className="flex justify-between items-center pt-1.5">
                   <span className="text-slate-400">
-                    Gaji Pokok ({slip.total_regular_hours} Jam)
+                    {slip.salary_type === "FLAT_DAILY"
+                      ? `Upah Harian (${slip.days_present ?? 0} Hari × ${IDR.format(slip.daily_rate ?? 0)})`
+                      : `Gaji Pokok (${slip.total_regular_hours} Jam)`}
                   </span>
                   <span className="font-mono font-semibold text-slate-200">
                     {IDR.format(slip.basic_salary)}

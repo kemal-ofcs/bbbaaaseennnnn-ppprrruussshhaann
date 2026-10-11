@@ -125,8 +125,9 @@ export async function PUT(request: NextRequest) {
             total_holiday_hours, total_holiday_overtime_index,
             rate_per_hour, basic_salary, overtime_salary, gross_salary,
             total_allowances, total_deductions, bpjs_employee_total, bpjs_company_total,
-            pph21_amount, net_salary, breakdown_snapshot, created_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            pph21_amount, net_salary, breakdown_snapshot, created_at,
+            salary_type, daily_rate, days_present
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         `,
         args: [
           `${runId}-${row.id_karyawan}`,
@@ -152,6 +153,9 @@ export async function PUT(request: NextRequest) {
           row.est_net_salary,
           row.breakdown_snapshot,
           now,
+          row.salary_type,
+          row.daily_rate,
+          row.days_present,
         ],
       };
     });

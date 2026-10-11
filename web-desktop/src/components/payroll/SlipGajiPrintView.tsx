@@ -78,6 +78,7 @@ export function SlipGajiPrintView({
   const bpjsList: BpjsItem[] = (breakdown.bpjs || []).filter(
     (b) => b.is_employee,
   );
+  const isFlatDaily = item.salary_type === "FLAT_DAILY";
 
   return (
     <div className="bg-white text-slate-900 p-8 max-w-2xl mx-auto border border-slate-300 rounded-lg shadow-sm print:border-none print:shadow-none print:p-0 print:m-0 print:max-w-full font-sans text-sm">
@@ -131,12 +132,21 @@ export function SlipGajiPrintView({
               {item.ptkp_status}
             </span>
           </div>
-          <div>
-            <span className="text-slate-500">Jam Kerja:</span>{" "}
-            <span className="font-mono text-slate-700">
-              {`${Number(item.total_regular_hours.toFixed(2))} Jam (Lembur: ${Number(item.total_overtime_hours.toFixed(2))} Jam, Hari Libur: ${Number(item.total_holiday_hours.toFixed(2))} Jam)`}
-            </span>
-          </div>
+          {isFlatDaily ? (
+            <div>
+              <span className="text-slate-500">Kehadiran:</span>{" "}
+              <span className="font-mono text-slate-700">
+                {`${item.days_present} Hari × ${IDR.format(item.daily_rate)} (harian tetap)`}
+              </span>
+            </div>
+          ) : (
+            <div>
+              <span className="text-slate-500">Jam Kerja:</span>{" "}
+              <span className="font-mono text-slate-700">
+                {`${Number(item.total_regular_hours.toFixed(2))} Jam (Lembur: ${Number(item.total_overtime_hours.toFixed(2))} Jam, Hari Libur: ${Number(item.total_holiday_hours.toFixed(2))} Jam)`}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -151,7 +161,9 @@ export function SlipGajiPrintView({
             <tbody className="divide-y divide-slate-100">
               <tr>
                 <td className="py-1 text-slate-600">
-                  {`Gaji Pokok (${Number(item.total_regular_hours.toFixed(2))}j)`}
+                  {isFlatDaily
+                    ? `Upah Harian: ${item.days_present} Hari × ${IDR.format(item.daily_rate)}`
+                    : `Gaji Pokok (${Number(item.total_regular_hours.toFixed(2))}j)`}
                 </td>
                 <td className="py-1 text-right font-mono font-medium">
                   {IDR.format(item.basic_salary)}

@@ -52,7 +52,9 @@ pub async fn mobile_get_my_payroll_slips(
                 pi.bpjs_employee_total,
                 pi.pph21_amount,
                 pi.net_salary,
-                pi.created_at
+                pi.created_at,
+                COALESCE(pi.salary_type, 'HOURLY'),
+                COALESCE(pi.days_present, 0)
             FROM payroll_items pi
             JOIN payroll_runs pr ON pr.id = pi.payroll_run_id
             WHERE pi.id_karyawan = ?1
@@ -78,6 +80,8 @@ pub async fn mobile_get_my_payroll_slips(
                 "pph21_amount": row.get::<_, i64>(11)?,
                 "net_salary": row.get::<_, i64>(12)?,
                 "created_at": row.get::<_, String>(13)?,
+                "salary_type": row.get::<_, String>(14)?,
+                "days_present": row.get::<_, i64>(15)?,
             }))
         })
         .map_err(|_| CommandError::internal())?;
@@ -128,7 +132,10 @@ pub async fn mobile_get_payroll_slip_detail(
                 pi.pph21_amount,
                 pi.net_salary,
                 pi.breakdown_snapshot,
-                pi.created_at
+                pi.created_at,
+                COALESCE(pi.salary_type, 'HOURLY'),
+                COALESCE(pi.daily_rate, 0),
+                COALESCE(pi.days_present, 0)
             FROM payroll_items pi
             JOIN payroll_runs pr ON pr.id = pi.payroll_run_id
             WHERE pi.id = ?1;
@@ -162,6 +169,9 @@ pub async fn mobile_get_payroll_slip_detail(
                     "net_salary": row.get::<_, i64>(23)?,
                     "breakdown_snapshot": row.get::<_, String>(24)?,
                     "created_at": row.get::<_, String>(25)?,
+                    "salary_type": row.get::<_, String>(26)?,
+                    "daily_rate": row.get::<_, i64>(27)?,
+                    "days_present": row.get::<_, i64>(28)?,
                 }))
             },
         )

@@ -3,13 +3,9 @@ import "server-only";
 import type { Client } from "@libsql/client";
 import {
   type BpjsRule,
-  calculateBpjs,
-  calculateComponents,
-  calculateOvertimeIndex,
-  calculatePph21Ter,
+  calculateEmployeePay,
   type OvertimeTierRule,
   type PayrollComponent,
-  roundMoney,
   type TaxRule,
 } from "@/lib/services/payroll-calculator";
 
@@ -43,6 +39,13 @@ export interface PayrollRecapRow {
   est_bpjs_employee: number;
   est_pph21: number;
   est_net_salary: number;
+  salary_type: string;
+  daily_rate: number;
+  /**
+   * Tanggal unik berstatus Hadir. Berbeda dengan `total_hadir` (jumlah baris):
+   * sesi PENGGANTI di tanggal yang sama tidak menambah hari.
+   */
+  days_present: number;
   // Extra fields (not part of the Rust PayrollRecapRow response shape, but
   // needed by run creation to build payroll_items without recomputing).
   breakdown_snapshot: string;
@@ -195,7 +198,11 @@ export async function computePayrollRecap(
             COALESCE(SUM(CASE WHEN hl.tanggal IS NULL THEN ah.jam_kerja ELSE 0 END), 0) AS total_jam_kerja_menit,
             COALESCE(SUM(CASE WHEN hl.tanggal IS NULL THEN ah.lembur ELSE 0 END), 0) AS total_lembur_menit,
             COALESCE(SUM(CASE WHEN hl.tanggal IS NOT NULL
-              THEN COALESCE(ah.jam_kerja, 0) + COALESCE(ah.lembur, 0) ELSE 0 END), 0) AS total_libur_menit
+              THEN COALESCE(ah.jam_kerja, 0) + COALESCE(ah.lembur, 0) ELSE 0 END), 0) AS total_libur_menit,
+            COALESCE(sc.salary_type, 'HOURLY') AS salary_type,
+            COALESCE(sc.daily_rate, 0) AS daily_rate,
+            -- Hari UNIK: sesi PENGGANTI di tanggal yang sama tidak menambah hari.
+            COUNT(DISTINCT CASE WHEN ah.status_kehadiran IN ('Hadir', 'PRESENT') THEN ah.tanggal END) AS days_present
           FROM master_data md
           LEFT JOIN salary_configs sc ON sc.id_karyawan = md.id_unik
             AND sc.effective_date = (
@@ -225,69 +232,46 @@ export async function computePayrollRecap(
     const ptkpStatus = String(row.ptkp_status || "TK/0");
 
     const liburMenit = Number(row.total_libur_menit || 0);
+    const salaryType = String(row.salary_type || "HOURLY");
+    const dailyRate = Number(row.daily_rate || 0);
+    const daysPresent = Number(row.days_present || 0);
 
     const regHours = jamKerjaMenit / 60;
     const otHours = lemburMenit / 60;
     const holidayHours = liburMenit / 60;
 
-    // Dua indeks, dua jenjang: jam lembur hari biasa memakai HARI_KERJA,
-    // seluruh jam pada tanggal libur memakai HARI_LIBUR. Keduanya dijumlahkan
-    // lalu dikalikan rate per jam SEKALI, supaya pembulatannya identik dengan
-    // `desktop_get_payroll_recap` di payroll/commands.rs.
-    const otIndex = calculateOvertimeIndex(otHours, overtimeTiers);
-    const holidayIndex = calculateOvertimeIndex(holidayHours, holidayTiers);
-
-    // Uang diturunkan dari MENIT BULAT, bukan dari jam yang sudah dibagi.
-    //
-    // `regHours * ratePerHour` menempuh dua operasi pecahan: menit dibagi 60
-    // lalu dikalikan tarif, dan galat pembagiannya membuat nilai yang
-    // seharusnya jatuh TEPAT di titik tengah pembulatan mendarat sedikit di
-    // bawahnya. Sebelas menit pada tarif 18.750/jam bernilai 3.437,5 persis,
-    // tetapi lewat jalur itu ia menjadi 3.437,4999… lalu dibulatkan ke 3.437.
-    //
-    // `menit * tarif` adalah bilangan bulat eksak, dan hasil baginya oleh 60
-    // hanya punya satu bit pecahan ketika ia setengah bulat — sehingga
-    // titik tengahnya terwakili persis dan `roundMoney` menjawab benar. Ini
-    // yang membuat hasilnya sama dengan `Decimal` di `payroll/commands.rs`.
-    const basicSalary = roundMoney((jamKerjaMenit * ratePerHour) / 60);
-
-    // Alasan yang sama untuk lembur: indeksnya sudah dibulatkan ke 2 desimal,
-    // jadi seratus kalinya bilangan bulat dan perkaliannya menjadi eksak.
-    const indeksRatusan = Math.round((otIndex + holidayIndex) * 100);
-    const overtimeSalary = roundMoney((indeksRatusan * ratePerHour) / 100);
-
-    const {
-      allowance,
-      deduction,
-      breakdown: compBreakdown,
-    } = calculateComponents(basicSalary, components, idKaryawan);
-
-    const gross = basicSalary + overtimeSalary + allowance;
-    const {
-      employee: bpjsEmployee,
-      company: bpjsCompany,
-      breakdown: bpjsBreakdown,
-    } = calculateBpjs(gross, bpjsRules);
-    const { pph21Amount, breakdown: taxBreakdown } = calculatePph21Ter(
-      gross,
-      ptkpStatus,
-      taxRules,
+    // Satu fungsi untuk kedua skema, cerminan `calculate_employee_pay` di
+    // payroll/engine.rs. Hasilnya dipakai pratinjau DAN pembekuan run.
+    const pay = calculateEmployeePay(
+      {
+        idKaryawan,
+        ptkpStatus,
+        salaryType,
+        ratePerHour,
+        dailyRate,
+        daysPresent,
+        regularMinutes: jamKerjaMenit,
+        overtimeMinutes: lemburMenit,
+        holidayMinutes: liburMenit,
+      },
+      { overtimeTiers, holidayTiers, components, taxRules, bpjsRules },
     );
 
-    const net = Math.max(0, gross - deduction - bpjsEmployee - pph21Amount);
-
     const breakdownSnapshot = JSON.stringify({
+      salary_type: salaryType,
+      daily_rate: dailyRate,
+      days_present: daysPresent,
       rate_per_hour: ratePerHour,
       regular_hours: regHours,
       overtime_hours: otHours,
-      overtime_index: otIndex,
+      overtime_index: pay.overtimeIndex,
       holiday_hours: holidayHours,
-      holiday_overtime_index: holidayIndex,
-      basic_salary: basicSalary,
-      overtime_salary: overtimeSalary,
-      components: compBreakdown,
-      bpjs: bpjsBreakdown,
-      tax: taxBreakdown,
+      holiday_overtime_index: pay.holidayIndex,
+      basic_salary: pay.basic,
+      overtime_salary: pay.overtime,
+      components: pay.components,
+      bpjs: pay.bpjs,
+      tax: pay.tax,
       calculated_at: new Date().toISOString(),
     });
 
@@ -301,19 +285,22 @@ export async function computePayrollRecap(
       total_terlambat_menit: Number(row.total_terlambat_menit || 0),
       total_regular_hours: regHours,
       total_overtime_hours: otHours,
-      total_overtime_index: otIndex,
+      total_overtime_index: pay.overtimeIndex,
       total_holiday_hours: holidayHours,
-      total_holiday_overtime_index: holidayIndex,
-      est_basic_salary: basicSalary,
-      est_overtime_salary: overtimeSalary,
-      est_gross_salary: gross,
-      est_total_allowance: allowance,
-      est_total_deduction: deduction,
-      est_bpjs_employee: bpjsEmployee,
-      est_pph21: pph21Amount,
-      est_net_salary: net,
+      total_holiday_overtime_index: pay.holidayIndex,
+      est_basic_salary: pay.basic,
+      est_overtime_salary: pay.overtime,
+      est_gross_salary: pay.gross,
+      est_total_allowance: pay.allowance,
+      est_total_deduction: pay.deduction,
+      est_bpjs_employee: pay.bpjsEmployee,
+      est_pph21: pay.pph21,
+      est_net_salary: pay.net,
+      salary_type: salaryType,
+      daily_rate: dailyRate,
+      days_present: daysPresent,
       breakdown_snapshot: breakdownSnapshot,
-      bpjs_company_total: bpjsCompany,
+      bpjs_company_total: pay.bpjsCompany,
     };
   });
 }

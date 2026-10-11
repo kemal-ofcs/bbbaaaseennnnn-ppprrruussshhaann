@@ -355,12 +355,21 @@ export default function RunDetailClient() {
                         {hours(item.total_regular_hours)}
                       </dd>
                     </div>
-                    <div className="rounded-lg bg-white/5 p-1.5">
-                      <dt className="text-slate-500">Lembur</dt>
-                      <dd className="font-mono font-bold text-amber-300">
-                        {hours(item.total_overtime_hours)}
-                      </dd>
-                    </div>
+                    {item.salary_type === "FLAT_DAILY" ? (
+                      <div className="rounded-lg bg-white/5 p-1.5">
+                        <dt className="text-slate-500">Harian</dt>
+                        <dd className="font-mono font-bold text-amber-200">
+                          {item.days_present} hr
+                        </dd>
+                      </div>
+                    ) : (
+                      <div className="rounded-lg bg-white/5 p-1.5">
+                        <dt className="text-slate-500">Lembur</dt>
+                        <dd className="font-mono font-bold text-amber-300">
+                          {hours(item.total_overtime_hours)}
+                        </dd>
+                      </div>
+                    )}
                     <div className="rounded-lg bg-white/5 p-1.5">
                       <dt className="text-slate-500">Hari libur</dt>
                       <dd className="font-mono font-bold text-rose-300">

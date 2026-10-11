@@ -143,22 +143,35 @@ export function VirtualPayrollTable({
                     </span>
                   </td>
                   <td className="py-3 px-4 text-center font-semibold text-slate-200">
-                    {row.total_hadir} hr
+                    {row.salary_type === "FLAT_DAILY"
+                      ? row.days_present
+                      : row.total_hadir}{" "}
+                    hr
                   </td>
                   <td className="py-3 px-4 text-right font-mono text-slate-300">
                     {row.total_regular_hours.toFixed(1)} j
                   </td>
                   <td className="py-3 px-4 text-right font-mono text-amber-400 font-semibold">
-                    {row.total_overtime_hours.toFixed(1)} j
+                    {row.salary_type === "FLAT_DAILY"
+                      ? "–"
+                      : `${row.total_overtime_hours.toFixed(1)} j`}
                   </td>
                   <td className="py-3 px-4 text-right font-mono text-slate-400">
-                    {IDR.format(row.rate_per_hour)}
+                    {row.salary_type === "FLAT_DAILY" ? (
+                      <span className="text-amber-200">
+                        {IDR.format(row.daily_rate)} / hari
+                      </span>
+                    ) : (
+                      IDR.format(row.rate_per_hour)
+                    )}
                   </td>
                   <td className="py-3 px-4 text-right font-mono text-slate-200">
                     {IDR.format(row.est_basic_salary)}
                   </td>
                   <td className="py-3 px-4 text-right font-mono text-amber-400">
-                    {IDR.format(row.est_overtime_salary)}
+                    {row.salary_type === "FLAT_DAILY"
+                      ? "–"
+                      : IDR.format(row.est_overtime_salary)}
                   </td>
                   <td className="py-3 px-4 text-right font-mono font-bold text-emerald-400">
                     {IDR.format(row.est_net_salary)}
@@ -245,7 +258,9 @@ export function VirtualPayrollTable({
                   </span>
                   <span className="font-medium text-slate-200">
                     {selectedRow.ptkp_status} ·{" "}
-                    {IDR.format(selectedRow.rate_per_hour)}/jam
+                    {selectedRow.salary_type === "FLAT_DAILY"
+                      ? `${IDR.format(selectedRow.daily_rate)}/hari (harian tetap)`
+                      : `${IDR.format(selectedRow.rate_per_hour)}/jam`}
                   </span>
                 </div>
               </div>
@@ -257,7 +272,10 @@ export function VirtualPayrollTable({
                   Total Hadir
                 </span>
                 <span className="font-bold text-white text-sm">
-                  {selectedRow.total_hadir} Hari
+                  {selectedRow.salary_type === "FLAT_DAILY"
+                    ? selectedRow.days_present
+                    : selectedRow.total_hadir}{" "}
+                  Hari
                 </span>
               </div>
               <div>
@@ -292,21 +310,27 @@ export function VirtualPayrollTable({
                 I. Penghasilan Kotor
               </div>
               <div className="flex justify-between py-1 border-b border-white/5">
-                <span className="text-slate-300">Gaji Pokok (Reguler)</span>
+                <span className="text-slate-300">
+                  {selectedRow.salary_type === "FLAT_DAILY"
+                    ? `Upah Harian (${selectedRow.days_present} hari × ${IDR.format(selectedRow.daily_rate)})`
+                    : "Gaji Pokok (Reguler)"}
+                </span>
                 <span className="font-mono font-medium text-white">
                   {IDR.format(selectedRow.est_basic_salary)}
                 </span>
               </div>
-              <div className="flex justify-between py-1 border-b border-white/5">
-                <span className="text-slate-300">
-                  Upah Lembur (Indeks Hari Kerja{" "}
-                  {selectedRow.total_overtime_index.toFixed(2)} + Hari Libur{" "}
-                  {selectedRow.total_holiday_overtime_index.toFixed(2)})
-                </span>
-                <span className="font-mono font-medium text-amber-300">
-                  {IDR.format(selectedRow.est_overtime_salary)}
-                </span>
-              </div>
+              {selectedRow.salary_type === "FLAT_DAILY" ? null : (
+                <div className="flex justify-between py-1 border-b border-white/5">
+                  <span className="text-slate-300">
+                    Upah Lembur (Indeks Hari Kerja{" "}
+                    {selectedRow.total_overtime_index.toFixed(2)} + Hari Libur{" "}
+                    {selectedRow.total_holiday_overtime_index.toFixed(2)})
+                  </span>
+                  <span className="font-mono font-medium text-amber-300">
+                    {IDR.format(selectedRow.est_overtime_salary)}
+                  </span>
+                </div>
+              )}
               {selectedRow.est_total_allowance > 0 && (
                 <div className="flex justify-between py-1 border-b border-white/5">
                   <span className="text-slate-300">Tunjangan Tambahan</span>
