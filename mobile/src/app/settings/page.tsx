@@ -50,6 +50,12 @@ import {
   providerNeedsEndpoint,
   reviewDatabaseEndpoint,
 } from "@/lib/validations/database-endpoint";
+import {
+  FACE_THRESHOLD_DEFAULT,
+  FACE_THRESHOLD_MAX,
+  FACE_THRESHOLD_MIN,
+  type FaceMode,
+} from "@/lib/validations/face-match";
 import { validateGeofenceSettings } from "@/lib/validations/geofence";
 import { validateIpAllowlistEntries } from "@/lib/validations/ip-allowlist";
 
@@ -79,6 +85,7 @@ export default function SettingsPage() {
   // Mengambil foto bukti tidak butuh izin — kewajibannya ditentukan sakelar
   // role. Yang di-RBAC adalah MELIHAT dan MENGHAPUS fotonya.
   const canViewAttendancePhoto = canAccessArea(user, "attendance_photo");
+  const canViewFaceTemplate = canAccessArea(user, "face_template");
   // Sama seperti halaman Master Operator Web/Desktop: hanya Superadmin.
   const canManageOperators = Boolean(user?.isSuperadmin);
   // Izin yang dituntut backend untuk profil instansi & nama aplikasi.
@@ -106,6 +113,9 @@ export default function SettingsPage() {
   // Sakelar induk tingkat perusahaan; sakelar per role hanya berlaku bila ini
   // hidup.
   const [scanPhotoEnabled, setScanPhotoEnabled] = useState(false);
+  const [faceVerifyEnabled, setFaceVerifyEnabled] = useState(false);
+  const [faceMode, setFaceMode] = useState<FaceMode>("pantau");
+  const [faceThreshold, setFaceThreshold] = useState(FACE_THRESHOLD_DEFAULT);
   const [scanIpEnabled, setScanIpEnabled] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
 
@@ -140,6 +150,9 @@ export default function SettingsPage() {
         const settings = await getScanSecurity();
         if (cancelled) return;
         setScanPhotoEnabled(settings.photoEnabled);
+        setFaceVerifyEnabled(settings.faceVerifyEnabled);
+        setFaceMode(settings.faceMode);
+        setFaceThreshold(settings.faceThreshold);
         setScanIpEnabled(settings.ipRestrictionEnabled);
         setIpAllowlist(settings.entries);
         setIpAllowlistDraft(settings.entries.join("\n"));
@@ -307,8 +320,14 @@ export default function SettingsPage() {
         photoEnabled: scanPhotoEnabled,
         ipRestrictionEnabled: scanIpEnabled,
         entries,
+        faceVerifyEnabled,
+        faceMode,
+        faceThreshold,
       });
       setScanPhotoEnabled(saved.photoEnabled);
+      setFaceVerifyEnabled(saved.faceVerifyEnabled);
+      setFaceMode(saved.faceMode);
+      setFaceThreshold(saved.faceThreshold);
       setScanIpEnabled(saved.ipRestrictionEnabled);
       setIpAllowlist(saved.entries);
       setIpAllowlistDraft(saved.entries.join("\n"));
@@ -800,6 +819,34 @@ export default function SettingsPage() {
           </div>
         ) : null}
 
+        {/* Pendaftaran Wajah (butuh izin face_template.view) */}
+        {canViewFaceTemplate ? (
+          <div className="rounded-3xl border border-sky-500/20 bg-gradient-to-br from-sky-950/30 via-slate-900/80 to-slate-900/90 p-4 backdrop-blur-md">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="grid size-9 place-items-center rounded-xl bg-sky-500/20 text-sky-300">
+                  <Icon name="user" className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    Pendaftaran Wajah
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Wajah yang dicocokkan dengan pemilik kartu saat scan
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/wajah"
+                onClick={() => triggerHaptic("light")}
+                className="whitespace-nowrap rounded-xl bg-sky-500 px-3.5 py-1.5 text-xs font-black text-white shadow-md transition hover:bg-sky-400 active:scale-95"
+              >
+                Buka
+              </Link>
+            </div>
+          </div>
+        ) : null}
+
         {/* Foto Bukti Absensi (butuh izin attendance_photo.view) */}
         {canViewAttendancePhoto ? (
           <div className="rounded-3xl border border-sky-500/20 bg-gradient-to-br from-sky-950/30 via-slate-900/80 to-slate-900/90 p-4 backdrop-blur-md">
@@ -1251,6 +1298,73 @@ export default function SettingsPage() {
                 serta latar orang yang absen.
               </span>
             </label>
+
+            {scanPhotoEnabled ? (
+              <div className="mt-2 space-y-3 rounded-2xl border border-white/10 bg-slate-950/40 p-3">
+                <label className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={faceVerifyEnabled}
+                    onChange={(event) =>
+                      setFaceVerifyEnabled(event.target.checked)
+                    }
+                    className="mt-0.5 size-4 shrink-0"
+                  />
+                  <span className="text-[11px] leading-5 text-slate-300">
+                    <strong className="text-white">
+                      Cocokkan wajah dengan pemilik kartu
+                    </strong>
+                    <br />
+                    Karyawan yang belum didaftarkan wajahnya tetap bisa absen.
+                  </span>
+                </label>
+                {faceVerifyEnabled ? (
+                  <>
+                    <div>
+                      <label
+                        htmlFor="face-mode"
+                        className="text-[11px] font-bold uppercase tracking-wider text-slate-400"
+                      >
+                        Bila wajah tidak cocok
+                      </label>
+                      <select
+                        id="face-mode"
+                        value={faceMode}
+                        onChange={(event) =>
+                          setFaceMode(event.target.value as FaceMode)
+                        }
+                        className="mt-1 min-h-11 w-full rounded-xl border border-white/10 bg-slate-950 px-3 text-sm text-white"
+                      >
+                        <option value="pantau">
+                          Tetap terima, tandai untuk ditinjau
+                        </option>
+                        <option value="tolak">Tolak scan</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="face-threshold"
+                        className="text-[11px] font-bold uppercase tracking-wider text-slate-400"
+                      >
+                        Ambang kemiripan ({faceThreshold.toFixed(2)})
+                      </label>
+                      <input
+                        id="face-threshold"
+                        type="range"
+                        min={FACE_THRESHOLD_MIN}
+                        max={FACE_THRESHOLD_MAX}
+                        step={0.01}
+                        value={faceThreshold}
+                        onChange={(event) =>
+                          setFaceThreshold(Number(event.target.value))
+                        }
+                        className="mt-1 min-h-11 w-full cursor-pointer"
+                      />
+                    </div>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
 
             <label className="mt-2 flex items-start gap-3 rounded-2xl border border-white/10 bg-slate-950/50 p-3">
               <input

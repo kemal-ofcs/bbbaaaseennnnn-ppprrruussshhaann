@@ -343,6 +343,38 @@ tidak ada server aplikasi) dan Rust memverifikasi urutan tantangannya terhadap
 database. Menggantinya dengan library ML berarti membundel model beberapa MB dan
 melonggarkan CSP Desktop yang hari ini `ipc:`-only.
 
+**Verifikasi wajah 1:1 saat scan (schema versi 19)** adalah fitur TERPISAH dan
+memang memakai library ML: `@vladmandic/human` 3.3.6 (backend WebGL, tanpa WASM)
+di `src/lib/client/face-engine.ts`. Kartu QR menyatakan identitas, wajah
+memastikan: terminal menghitung vektor wajah dari frame kamera foto dan
+mengirimnya sebagai `wajahModel`/`wajahVektor` di event `attendance/scan`;
+backend membandingkannya dengan vektor terdaftar yang dibaca dari DATABASE,
+tidak pernah dari payload. Vektor terdaftar hidup di tabel tersinkron
+`personil_wajah` (`SNAPSHOT_TABLES`, `delete_missing: true`, rute
+`face-template/save|delete`, ikut rencana promosi) supaya terminal offline tetap
+bisa memeriksa; isinya int8 base64 (±1,4 KB per karyawan), bukan foto. Vektor
+hasil scan TIDAK disimpan, hanya vonis dan skornya di
+`absensi_foto.wajah_vonis`/`wajah_skor`. Aturannya dieja kembar dan diuji dengan
+vektor yang sama: `validations/face-match.ts` ↔ `desktop/face_match.rs`, dan
+blok penegakannya `scanner.rs` ↔ `attendance-processor.ts`. Empat vonis:
+`Cocok`, `Tidak Cocok`, `Belum Terdaftar`, `Tidak Diperiksa`. Fitur ini
+menumpang foto bukti: berlaku hanya bila foto wajib DAN `scan_face_verify_enabled`
+hidup (bawaan mati). Mode `scan_face_mode` bawaan `pantau`; `tolak` hanya menolak
+`Tidak Cocok`, karena kamera murah atau model yang gagal dimuat tidak boleh
+menahan karyawan di gerbang. Ambang `scan_face_threshold` (0,30–0,95, bawaan
+0,55) dikalibrasi dari skor di `/foto-absensi`; mode dan ambang yang tidak sah
+ditolak saat disimpan. Mengganti versi library WAJIB mengganti `FACE_MODEL_ID`.
+Model (±9 MB) disalin dari `node_modules` ke `public/models/wajah/` oleh
+`postinstall` (`scripts/copy-face-models.ts`, di-gitignore); Dockerfile
+menjalankannya sesudah `COPY . .` karena `bun install` di tahap deps memakai
+`--ignore-scripts`, dan `next.config.ts` mengarahkan `@vladmandic/human` ke
+bundel browser karena graf SSR memilih `human.node.js` yang menuntut
+`@tensorflow/tfjs-node`. Pendaftaran di `/wajah` (`WajahWorkspace`, di
+`filesToCopy`): lewat kamera atau massal dari `personil_foto`, dengan izin
+sensitif `face_template.manage`. Kamera foto memakai kamera yang sama dengan
+kamera pemindai QR (`liveCameraId`), dan pilihan kamera diingat per perangkat
+(`kos.scanner.kamera`). Ini bukan anti-spoofing; foto bukti tetap pengamannya.
+
 2FA memakai TOTP RFC 6238 dengan SHA-1 — bukan pilihan gaya: Google
 Authenticator mengabaikan parameter `algorithm` pada URI otpauth dan selalu
 memakai SHA-1. Implementasi TypeScript (`src/lib/security/totp.ts`) dan Rust
@@ -374,8 +406,8 @@ Empat hal yang paling sering menjebak di basis kode ini:
 - **Default library menembak CDN.** Rive (runtime WASM), `detect-gpu` (berkas
   benchmark), decoder Draco, dan Spline (scene) semuanya mengunduh dari internet
   bila dibiarkan default. Semuanya wajib ditimpa ke berkas lokal.
-- **CSP memblokir aset lokal.** `connect-src` pada `web-desktop` masih
-  `ipc: http://ipc.localhost`, sehingga `fetch` ke `public/` pun ditolak; WASM
+- **CSP aset lokal.** `connect-src` pada `web-desktop` sejak v19 adalah
+  `'self' ipc: http://ipc.localhost` (disetujui untuk model wajah); WASM
   butuh `script-src` dengan `'wasm-unsafe-eval'`. Melonggarkan CSP adalah
   perubahan keamanan — minta persetujuan pemilik repositori lebih dulu, dan
   jangan pernah menambahkan host eksternal atau `'unsafe-eval'`.

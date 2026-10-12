@@ -90,6 +90,7 @@ diberikan secara sadar lewat Role & Akses. Daftar resminya ada di
 | `password_reset.approve` | Kendali sebuah akun, diserahkan kepada orang yang berdiri di depan layar |
 | `two_factor.reset` | Lapisan kedua akun orang lain |
 | `attendance_photo.delete` | Satu-satunya bukti visual bahwa sebuah scan benar dilakukan orangnya |
+| `face_template.manage` | Wajah orang lain yang didaftarkan di nama seorang karyawan meloloskan kartu yang dipinjamkan |
 | `database_backup.restore` | SELURUH data perangkat sekaligus — tidak ada operasi lain yang menghapus sebanyak ini dalam satu langkah |
 
 ### Penanganan Form Input Konfigurasi (Token Retention):

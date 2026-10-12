@@ -4,7 +4,7 @@ Dokumen ini mendefinisikan kontrak resmi komunikasi sinkronisasi dua arah antara
 
 ---
 
-## 1. 40 Route Kanonik Outbox (The 40 Canonical Hyphen Routes)
+## 1. 42 Route Kanonik Outbox (The 42 Canonical Hyphen Routes)
 
 Hanya 40 pasangan `(domain, operation)` berikut yang diizinkan untuk diproduksi oleh outbox dan diproses oleh consumer backend/Turso:
 
@@ -265,7 +265,7 @@ sudah tahu jawabannya.
 - **Dampak Fatal:** Ketika foto siswa dipotret atau diunggah di sebuah perangkat Desktop/Mobile, foto tersebut hanya tersimpan di SQLite lokal. Karena tidak ada event outbox push, foto tersebut tidak pernah sampai ke Turso Cloud. Akibatnya, dashboard Web tidak dapat menampilkan foto siswa, dan perangkat lain yang mencetak Kartu Pelajar kehilangan foto tersebut.
 
 ### Taksonomi 4 Kategori Tabel:
-1. **Fully-Synchronized Tables (21 Tabel Snapshot):**
+1. **Fully-Synchronized Tables (22 Tabel Snapshot):**
    - Terdaftar di `SNAPSHOT_TABLES` (sync.rs) DAN `SNAPSHOT_SOURCES` (turso.rs).
    - Mengikuti siklus dua arah: ditarik via pull snapshot dan didorong via push outbox.
 2. **Selective-Pull / Heavy-Payload Tables (`siswa_foto`, `absensi_foto`, `notifikasi_wa`):**

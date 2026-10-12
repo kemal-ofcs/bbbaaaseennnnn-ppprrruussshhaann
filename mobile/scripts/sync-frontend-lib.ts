@@ -23,6 +23,9 @@ const filesToCopy = [
   "components/license/LicenseBootstrapField.tsx",
   "components/license/LicenseCard.tsx",
   "components/license/LicenseNotice.tsx",
+  // Pendaftaran wajah (verifikasi 1:1): hanya bergantung pada `Modal` dan
+  // gateway tersinkron, jadi satu komponen dipakai kedua build.
+  "components/wajah/WajahWorkspace.tsx",
 ];
 
 for (const file of filesToCopy) {

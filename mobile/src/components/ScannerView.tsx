@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { audioSynth } from "@/lib/client/audio";
+import { loadFaceEngine, scanFaceVector } from "@/lib/client/face-engine";
 import {
   getCachedCoordinates,
   getCurrentCoordinates,
@@ -21,8 +22,11 @@ import {
 import {
   captureScanPhoto,
   isFaceVisible,
+  liveCameraId,
   openFaceCamera,
+  readScannerCamera,
   type ScanPhotoCapture,
+  saveScannerCamera,
   stopVideoStream,
 } from "@/lib/client/scan-photo";
 import { requestScreenWakeLock } from "@/lib/client/wakelock";
@@ -30,6 +34,7 @@ import type { ScanResult, ScanTerminalInput } from "@/lib/contracts/scanner";
 import { getScanSecurity } from "@/lib/gateways/scan-security";
 import { submitTerminalScan } from "@/lib/gateways/scanner";
 import { requestSyncNow } from "@/lib/gateways/sync-status";
+import type { FaceVector } from "@/lib/validations/face-match";
 
 type ScanLogItem = {
   id: string;
@@ -50,6 +55,15 @@ export function ScannerView() {
   // diubah tidak akan pernah terlihat sampai aplikasi ditutup.
   const [requiresScanPhoto, setRequiresScanPhoto] = useState(false);
 
+  // Verifikasi wajah menumpang foto bukti; nilainya dihitung backend
+  // (`faceRequiredForMe`), sama seperti kewajiban fotonya.
+  const [requiresFace, setRequiresFace] = useState(false);
+  const capturingRef = useRef(false);
+  useEffect(() => {
+    // Model dimuat lebih awal supaya scan pertama tidak menunggu ±9 MB dibaca.
+    if (requiresFace) void loadFaceEngine().catch(() => undefined);
+  }, [requiresFace]);
+
   // Sakelar induk hidup di setting yang ikut sinkronisasi, jadi ia dibaca ulang
   // setiap siklus sync selesai — mematikannya dari Desktop langsung berlaku di
   // ponsel ini tanpa perlu login ulang.
@@ -58,7 +72,9 @@ export function ScannerView() {
     const muat = () => {
       getScanSecurity()
         .then((settings) => {
-          if (!cancelled) setRequiresScanPhoto(settings.photoRequiredForMe);
+          if (cancelled) return;
+          setRequiresScanPhoto(settings.photoRequiredForMe);
+          setRequiresFace(settings.faceRequiredForMe);
         })
         .catch(() => undefined);
     };
@@ -99,6 +115,7 @@ export function ScannerView() {
   const faceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Kamera QR sedang hidup sebelum penahanan, jadi wajib dinyalakan lagi. */
   const resumeCameraRef = useRef(false);
+  const faceCameraIdRef = useRef<string | undefined>(undefined);
   /** Kartu yang baru ditahan tidak memicu jendela foto lagi sebelum dijauhkan. */
   const releaseGateRef = useRef(createQrReleaseGate());
   const [kartuMasihTerbaca, setKartuMasihTerbaca] = useState(false);
@@ -195,6 +212,13 @@ export function ScannerView() {
       const devices = await BrowserMultiFormatReader.listVideoInputDevices();
       setCameraDevices(devices);
       if (devices.length > 0 && !selectedDeviceId) {
+        const tersimpan = devices.find(
+          (d) => d.deviceId === readScannerCamera(),
+        );
+        if (tersimpan) {
+          setSelectedDeviceId(tersimpan.deviceId);
+          return;
+        }
         // Prefer rear camera on mobile
         const backCamera = devices.find(
           (d) =>
@@ -216,7 +240,11 @@ export function ScannerView() {
 
   // Handle Scan Submission with Audio, Haptics, and GPS
   const submitScan = useCallback(
-    async (trimmed: string, photo: ScanPhotoCapture | null) => {
+    async (
+      trimmed: string,
+      photo: ScanPhotoCapture | null,
+      wajah: FaceVector | null = null,
+    ) => {
       isSubmittingRef.current = true;
       setIsProcessing(true);
 
@@ -228,6 +256,8 @@ export function ScannerView() {
           lng: gps?.lng,
           fotoBase64: photo?.base64,
           fotoMime: photo?.mime,
+          wajahModel: wajah?.model,
+          wajahVektor: wajah?.vektor,
         };
 
         const result = await submitTerminalScan(payload);
@@ -370,6 +400,10 @@ export function ScannerView() {
       // state, kamera pemindai tidak pernah menyala lagi setelah foto diambil.
       const qrCameraLive = scannerControlsRef.current !== null;
       resumeCameraRef.current = qrCameraLive;
+      // Foto diambil dari kamera yang barusan membaca kartu (lihat
+      // `openFaceCamera`); tanpa kamera pemindai hidup, pakai pilihan terakhir.
+      faceCameraIdRef.current =
+        liveCameraId(videoRef.current) ?? (readScannerCamera() || undefined);
       if (qrCameraLive) stopCamera();
       // Kameranya dibuka pada effect di bawah, bukan di sini: elemen <video>
       // baru ada di DOM setelah React merender panel penahanan.
@@ -388,7 +422,10 @@ export function ScannerView() {
         // karyawan — persis kamera yang dipakai memindai QR. Memaksa kamera
         // depan di sini akan memotret ke arah operator/tembok di belakang
         // ponsel, bukan wajah karyawan yang absen.
-        const stream = await openFaceCamera("environment");
+        const stream = await openFaceCamera(
+          "environment",
+          faceCameraIdRef.current,
+        );
         const video = faceVideoRef.current;
         if (cancelled || !video) {
           for (const track of stream.getTracks()) track.stop();
@@ -436,18 +473,34 @@ export function ScannerView() {
   const capturePhotoAndSubmit = useCallback(async () => {
     const qr = pendingScan;
     if (!qr) return;
+    // Menghitung vektor wajah bisa makan beberapa detik; selama itu pemotretan
+    // otomatis maupun tombol tidak boleh mengirim scan yang sama dua kali.
+    if (capturingRef.current) return;
     const photo = captureScanPhoto(faceVideoRef.current);
     if (!photo) {
       setFaceMessage("Foto belum terambil. Coba lagi.");
       return;
     }
+    capturingRef.current = true;
+    let wajah: FaceVector | null = null;
+    try {
+      if (requiresFace && faceVideoRef.current) {
+        setFaceMessage("Mencocokkan wajah…");
+        wajah = await scanFaceVector(faceVideoRef.current);
+      }
+    } finally {
+      capturingRef.current = false;
+    }
+    // Dibatalkan selagi wajah dihitung: Batal mematikan kamera foto, dan scan
+    // yang sudah dibatalkan tidak boleh tetap terkirim.
+    if (!faceVideoRef.current?.srcObject) return;
     stopFaceCamera();
     setPendingScan(null);
-    await submitScan(qr, photo);
+    await submitScan(qr, photo, wajah);
     // Kamera pemindai baru dinyalakan SETELAH absensi terkirim, supaya kartu
     // yang masih menempel di lensa tidak terbaca ulang selagi permintaan jalan.
     resumeQrCamera(qr);
-  }, [pendingScan, stopFaceCamera, resumeQrCamera, submitScan]);
+  }, [pendingScan, stopFaceCamera, resumeQrCamera, submitScan, requiresFace]);
 
   // Fase membidik lalu menahan diam sejenak sebelum memotret sendiri.
   //
@@ -793,7 +846,10 @@ export function ScannerView() {
               {cameraDevices.length > 1 && (
                 <select
                   value={selectedDeviceId}
-                  onChange={(e) => setSelectedDeviceId(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedDeviceId(e.target.value);
+                    saveScannerCamera(e.target.value);
+                  }}
                   className="rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-400"
                 >
                   {cameraDevices.map((dev, index) => (

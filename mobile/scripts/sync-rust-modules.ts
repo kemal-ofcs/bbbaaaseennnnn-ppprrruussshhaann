@@ -9,6 +9,8 @@ const filesToSync = [
   "operational.rs",
   "administration.rs",
   "scanner.rs",
+  // Verifikasi wajah 1:1: aturan vonis wajib identik dengan Desktop dan TS.
+  "face_match.rs",
   "commands.rs",
   // Tarif default payroll: satu sumber untuk SQLite lokal dan Turso cloud, di
   // kedua workspace. Perbedaan sekecil apa pun di sini membuat baris seed lokal

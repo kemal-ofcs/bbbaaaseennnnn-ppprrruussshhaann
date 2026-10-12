@@ -1,6 +1,7 @@
 mod administration;
 pub mod commands;
 pub mod config;
+pub mod face_match;
 // Lisensi offline Ed25519: SALINAN `desktop/license.rs` oleh sync-rust-modules.ts.
 pub mod license;
 pub mod models;
