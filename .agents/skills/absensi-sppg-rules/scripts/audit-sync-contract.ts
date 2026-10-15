@@ -6,6 +6,11 @@ const errors: string[] = [];
 const notes: string[] = [];
 
 const expectedRoutes = [
+  "accounting-account/save",
+  "accounting-close/create",
+  "accounting-close/decide",
+  "accounting-close/reopen",
+  "accounting-journal/post",
   "attendance/create",
   "attendance/delete",
   "attendance/scan",
@@ -30,7 +35,14 @@ const expectedRoutes = [
   "holiday/update",
   "id-card-template/save",
   "id-card/update",
+  "inventory-item/save",
+  "inventory-mutation/create",
+  "inventory-unit/save",
   "log-scan/delete",
+  "loan/save",
+  "loan-deferral/delete",
+  "loan-deferral/save",
+  "loan-mutation/create",
   "offline-import/delete",
   "offline-import/row",
   "payroll/bpjs-rule",
@@ -73,6 +85,16 @@ const expectedSnapshotTriples = [
   "payrollRuns|payroll|payroll_runs",
   "payrollItems|payroll|payroll_items",
   "payrollAuditLogs|payroll|payroll_audit_logs",
+  "inventoryItems|inventory-item|inventory_barang",
+  "inventoryMutations|inventory-mutation|inventory_mutasi",
+  "inventoryUnits|inventory-unit|inventory_unit",
+  "accountingAccounts|accounting-account|keu_akun",
+  "accountingJournals|accounting-journal|keu_jurnal",
+  "accountingJournalLines|accounting-journal-line|keu_jurnal_baris",
+  "employeeLoans|loan|keu_pinjaman",
+  "employeeLoanMutations|loan-mutation|keu_pinjaman_mutasi",
+  "employeeLoanDeferrals|loan-deferral|keu_pinjaman_tunda",
+  "bookClosings|accounting-close|keu_tutup_buku",
 ].sort();
 
 // Tabel DDL lokal (storage.rs) yang memang TIDAK ikut snapshot sync.

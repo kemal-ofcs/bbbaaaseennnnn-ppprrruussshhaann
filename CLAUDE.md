@@ -469,6 +469,85 @@ di `web-desktop/src/components/visual/` dengan store di
 `mobile/scripts/sync-frontend-lib.ts` karena script itu tidak menyalin
 `src/components` secara default.
 
+## Inventaris (schema versi 20)
+
+Diport dari aplikasi manajemen sekolah (`inventory-prd.md` di repo itu),
+lalu disesuaikan untuk perusahaan. Tiga tabel tersinkron (`inventory_barang`,
+`inventory_mutasi`, `inventory_unit`) dan view `inventory_saldo`; logika di
+`desktop/inventory.rs` (disalin ke Mobile) dan kembarannya
+`validations/inventory.ts` + `services/inventory.ts`.
+
+- **Stok tidak pernah disimpan.** Stok = jumlah mutasi. Kolom stok yang ikut
+  sync ditimpa siapa terakhir menang saat dua perangkat offline.
+- **Mutasi append-only.** Koreksi lewat `Pembatalan` berid `batal-<id>`, jadi
+  dua perangkat yang membatalkan mutasi yang sama menghasilkan PK yang sama.
+- **Cloud tidak pernah menolak karena stok.** Saldo minus diterima dan muncul
+  sebagai peringatan "Stok minus"; opname yang membetulkannya.
+- **Penerima `Divisi`** menggantikan `Rombel` milik versi sekolah. Tidak ada
+  tabel master divisi: namanya diambil dari `master_data.divisi` personil
+  aktif, disimpan di `penerima_nama` dengan ejaan yang ada di data personil,
+  dan `penerima_id` kosong. Aturannya kembar di Rust dan TS.
+- `inventory.adjust` (opname, pembatalan, Rusak/Hilang/Kedaluwarsa) sensitif
+  dan tidak ikut paket bawaan Admin. `dicatat_oleh` selalu dari sesi.
+- Mutasi ditarik utuh setiap ada pulsa (tanpa tarikan inkremental seperti
+  versi sekolah). Bila suatu saat terasa lambat, tambahkan cache saldo lokal
+  yang tidak ikut sync, jangan kolom stok.
+
+## Pembukuan (schema versi 21)
+
+Fase 1 dari port modul Keuangan sekolah (`nilai-keuangan-prd.md` di repo itu),
+disesuaikan ke standar perusahaan: kelompok `Ekuitas` (bukan `Aset Neto`),
+laporan Laba Rugi, Neraca, dan Arus Kas. Tabel tersinkron `keu_akun`,
+`keu_jurnal`, `keu_jurnal_baris`; logika di `desktop/accounting.rs` (disalin ke
+Mobile) dan kembarannya `validations/accounting.ts` + `services/accounting.ts`.
+
+- **Bagan akun bawaan** hanya di `src/lib/validations/akun-bawaan.json`, dibaca
+  Rust lewat `include_str!` dan TS lewat import. Seed `INSERT OR IGNORE` di
+  ketiga lapis, jadi akun yang diganti nama tidak ditimpa. Akun `sistem`
+  dipakai jurnal otomatis (kasbon dan payroll, Fase 2): boleh diganti nama,
+  tidak boleh dinonaktifkan. Akun tidak pernah dihapus; menonaktifkan adalah
+  "hapus"-nya, karena jurnal lama tetap merujuknya.
+- **Saldo tidak pernah disimpan**, jurnal append-only, pembatalan = jurnal
+  pembalik `batal-<id>` (`accounting.reverse`, sensitif).
+- Header dan seluruh baris jurnal dikirim dalam SATU event
+  `accounting-journal/post`; `keu_jurnal_baris` punya domain snapshot sendiri
+  (`accounting-journal-line`) tanpa rute push.
+- Rumus laporan belum mendukung akun kontra (misalnya Akumulasi Penyusutan):
+  akun seperti itu akan menambah, bukan mengurangi, total kelompoknya.
+- Belum ada: ekspor PDF (butuh `jspdf` + `jspdf-autotable`, belum disetujui).
+- **Tutup buku (schema versi 23, `desktop/tutup_buku.rs`, `services/tutup-buku.ts`).**
+  Hanya kunci periode, TANPA jurnal penutup ke Laba Ditahan (keputusan
+  pengguna). Gerbangnya satu: `accounting::tulis_jurnal_tx` /
+  `assertPeriodeTerbuka`, jadi jurnal manual, kasbon, dan gaji ikut terkunci;
+  cloud tidak pernah menolak jurnal karena tanggal. Tahap 2 ikut: dua
+  perangkat yang menutup tanggal sama dengan potret saldo berbeda menghasilkan
+  versi `Menunggu` untuk diputuskan; jurnal telat menandai tutup buku "perlu
+  ditinjau". `diterima_cloud` selalu jam database cloud. Pemberitahuan WA versi
+  sekolah TIDAK diport (modul WA tidak ada). `accounting.close` sensitif.
+
+## Kasbon karyawan (schema versi 22)
+
+Fase 2 port Keuangan. Tabel tersinkron `keu_pinjaman`, `keu_pinjaman_mutasi`
+(append-only), `keu_pinjaman_tunda`; logika `desktop/loan.rs` (disalin ke
+Mobile) dan kembarannya `validations/loan.ts` + `services/loan.ts`.
+
+- **Cicilan adalah jatah per BULAN**, bukan per proses gaji seperti versi
+  sekolah, karena di sini ada gaji harian/mingguan. `pinjaman_aktif` /
+  `pinjamanAktif` mengembalikan sisa jatah bulan itu (`TERPOTONG_BULAN_SQL`):
+  proses gaji kedua di bulan yang sama hanya memotong kekurangan proses
+  sebelumnya, dan proses yang `REJECTED` mengembalikan jatahnya. Bulan sebuah
+  proses gaji = bulan `period_start` (sama dengan `mulai_potong` dan penundaan).
+- Kasbon dipotong TERAKHIR dari gaji bersih (`potong_kasbon` / `potongKasbon`),
+  jadi gaji bersih tidak pernah negatif; kekurangannya ditandai "dipotong
+  sebagian". Titik kaitnya: rekap dan pembekuan di `payroll/commands.rs`, dan
+  `computePayrollRecap` di Web. Rumus gaji, pajak, dan BPJS tidak disentuh.
+- Saat proses gaji menjadi `PAID`, angsuran (`ang-<item>-<pinjaman>`) dan satu
+  jurnal gaji (`pay-<run>`) ditulis di transaksi yang SAMA dengan perubahan
+  status, di Rust (`catat_pembayaran_payroll_tx`) dan di PATCH
+  `/api/payroll/runs`. Akun sumber pembayaran (Kas/Bank) dipilih di dialog
+  Dibayar; parameter `idAkunBayar` opsional dan bawaannya `akun-kas`.
+- `loan.approve` sensitif: menyetujui berarti mencairkan uang.
+
 ## Domain contoh
 
 `master_item` dan `log_aktivitas` adalah tabel peraga yang memperagakan pola

@@ -153,10 +153,14 @@ Dokumen ini adalah **standar tertinggi (Golden Standard)** pengembangan pada pro
   2. DDL SQLite di `storage.rs` (Rust)
   3. Skema Server di `db-schema.ts` & `db-migrations.ts` (LibSQL)
   4. `SNAPSHOT_SOURCES` di `turso.rs` (Rust): sumber query snapshot dan trigger `sync_pulse` cloud. (Validator Zod `sync-schema.ts` yang dulu menjadi layer ini sudah dihapus bersama jalur server aplikasi.)
-- Daftar 22 tabel snapshot terdistribusi (identik di `web-desktop` dan `mobile`):
+- Daftar 32 tabel snapshot terdistribusi (identik di `web-desktop` dan `mobile`):
   - 12 Operasional Inti: `master_data`, `id_card`, `tbl_shift`, `tbl_hari_libur`, `setting_gex_system`, `company_profile`, `id_card_template`, `backup_karyawan`, `koreksi_admin`, `import_offline`, `absensi_harian`, `log_scan`.
   - 1 Whitelist Libur: `hari_libur_whitelist`.
   - 8 Payroll Engine: `salary_configs`, `overtime_tier_rules`, `payroll_components`, `tax_rules`, `bpjs_rules`, `payroll_runs`, `payroll_items`, `payroll_audit_logs`.
+  - 3 Inventaris: `inventory_barang`, `inventory_mutasi`, `inventory_unit` (stok tidak disimpan; dihitung dari mutasi lewat view `inventory_saldo`).
+  - 3 Pembukuan: `keu_akun`, `keu_jurnal`, `keu_jurnal_baris` (saldo tidak disimpan; jurnal append-only, koreksi lewat jurnal pembalik `batal-<id>`).
+  - 3 Kasbon: `keu_pinjaman`, `keu_pinjaman_mutasi`, `keu_pinjaman_tunda` (sisa tidak disimpan; cicilan adalah jatah per bulan menurut bulan `period_start` proses gaji).
+  - 1 Tutup buku: `keu_tutup_buku` (baris tidak pernah dihapus; status berubah lewat buka kembali dan keputusan bentrokan).
   - 7 Entitas Akademik: `akademik_tahun_ajaran`, `akademik_jurusan`, `akademik_rombel`, `akademik_mapel`, `akademik_guru_mapel`, `guru_data`, `siswa_data`.
 - `SNAPSHOT_SOURCES` di `turso.rs` WAJIB memuat ke-28 tabel ini secara identik dengan `SNAPSHOT_TABLES` di `sync.rs`.
 - `master_operator` dikelola terpisah sebagai data autentikasi/RBAC cloud dan bukan bagian dari snapshot operasional perangkat.
@@ -300,7 +304,7 @@ Dokumen ini adalah **standar tertinggi (Golden Standard)** pengembangan pada pro
 
 ### 4.31 Paritas SNAPSHOT_SOURCES (turso.rs) & SNAPSHOT_TABLES (sync.rs)
 - `SNAPSHOT_SOURCES` di `turso.rs:625` adalah sumber tunggal untuk query SELECT snapshot Turso DAN pemasangan trigger SQLite `sync_pulse` di cloud.
-- Seluruh 22 tabel snapshot WAJIB terdaftar di `SNAPSHOT_SOURCES` di `turso.rs` dan `SNAPSHOT_TABLES` di `sync.rs`.
+- Seluruh 32 tabel snapshot WAJIB terdaftar di `SNAPSHOT_SOURCES` di `turso.rs` dan `SNAPSHOT_TABLES` di `sync.rs`.
 - Tabel yang tertinggal di `SNAPSHOT_SOURCES` mengakibatkan klien tidak pernah menarik data (`pull_snapshot_tables` tidak memancarkan payload key) dan penulisan dari Web tidak pernah memicu pulsa sinkronisasi karena ketiadaan trigger.
 
 ### 4.32 Kontrak Payload Scanner & Token Personil (id|token)
@@ -403,8 +407,8 @@ Dokumen ini adalah **standar tertinggi (Golden Standard)** pengembangan pada pro
 
 Untuk detail implementasi teknis setiap area, rujuk file referensi berikut:
 1. [references/01-bootstrap-and-security.md](references/01-bootstrap-and-security.md) — Vault Argon2id, AES-GCM, Zero-Secret Build, RBAC, & Rate Limiting.
-2. [references/02-sync-canonical-and-outbox.md](references/02-sync-canonical-and-outbox.md) — 42 Route Kanonik, Idempotensi, Atomic Receipt, & Empty-Cloud Safety.
-3. [references/03-schema-4layer-consistency.md](references/03-schema-4layer-consistency.md) — 22 Snapshot Tables, DDL vs Zod vs Rust, & Shift Rekonsiliasi.
+2. [references/02-sync-canonical-and-outbox.md](references/02-sync-canonical-and-outbox.md) — 54 Route Kanonik, Idempotensi, Atomic Receipt, & Empty-Cloud Safety.
+3. [references/03-schema-4layer-consistency.md](references/03-schema-4layer-consistency.md) — 32 Snapshot Tables, DDL vs Zod vs Rust, & Shift Rekonsiliasi.
 4. [references/04-hardware-and-android-lifecycle.md](references/04-hardware-and-android-lifecycle.md) — Lifecycle Kamera Android WebView, WebPki TLS, ProGuard R8, & GPS Cache.
 5. [references/05-business-logic-edge-cases.md](references/05-business-logic-edge-cases.md) — Shift Malam Lintas Hari, Auto-Alfa, Koreksi Admin, & Geofence.
 6. [references/06-payroll-and-system-hardening.md](references/06-payroll-and-system-hardening.md) — Payroll Engine, PPh 21 TER, BPJS, rust_decimal, Layered Guards, & Platform Hardening.
@@ -421,7 +425,7 @@ flowchart TD
     
     subgraph Phase1 [Tahap 1: Investigasi Tanpa Asumsi]
         A1[Periksa DDL storage.rs, turso.rs, db-schema.ts]
-        A2[Periksa 42 Canonical Routes & 22 Snapshot Tables]
+        A2[Periksa 54 Canonical Routes & 32 Snapshot Tables]
         A3[Reuse fungsi di gateways/ dan backend Rust]
     end
     

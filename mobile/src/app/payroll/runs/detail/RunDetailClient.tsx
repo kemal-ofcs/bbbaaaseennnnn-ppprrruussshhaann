@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { PilihAkunBayar } from "@/components/keuangan/PilihAkunBayar";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import {
   RunStatusBadge,
@@ -63,6 +64,7 @@ export default function RunDetailClient() {
   } | null>(null);
   const [transition, setTransition] = useState<Transition | null>(null);
   const [notes, setNotes] = useState("");
+  const [akunBayar, setAkunBayar] = useState("akun-kas");
   const [saving, setSaving] = useState(false);
   const isSubmittingRef = useRef(false);
 
@@ -182,6 +184,7 @@ export default function RunDetailClient() {
         runId,
         transition.target,
         notes || undefined,
+        akunBayar,
       );
       triggerHaptic("success");
       setFeedback({
@@ -466,6 +469,20 @@ export default function RunDetailClient() {
               </strong>
               ?
             </p>
+            {transition.target === "PAID" ? (
+              <div className="space-y-2">
+                <PilihAkunBayar
+                  id="payroll-akun-bayar"
+                  label="Gaji dibayar dari akun"
+                  value={akunBayar}
+                  onChange={setAkunBayar}
+                />
+                <p className="text-[11px] leading-4 text-slate-400">
+                  Saat dibayar, cicilan kasbon di slip tercatat sebagai angsuran
+                  dan satu jurnal gaji dicatat di pembukuan.
+                </p>
+              </div>
+            ) : null}
             {transition.warning ? (
               <p className="rounded-xl border border-amber-500/25 bg-amber-500/10 p-2.5 text-[11px] leading-4 text-amber-100">
                 {transition.warning}

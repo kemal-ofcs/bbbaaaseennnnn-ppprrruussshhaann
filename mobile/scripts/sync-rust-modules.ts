@@ -11,6 +11,19 @@ const filesToSync = [
   "scanner.rs",
   // Verifikasi wajah 1:1: aturan vonis wajib identik dengan Desktop dan TS.
   "face_match.rs",
+  // Inventaris: validasi, normalisasi tempat, dan rumus saldo wajib identik
+  // dengan Desktop dan TS, karena ketiganya membaca mutasi yang sama.
+  "inventory.rs",
+  // Pembukuan: aturan jurnal seimbang, nomor jurnal, dan rumus laporan wajib
+  // identik dengan Desktop dan TS. Bagan akun bawaannya dibaca dari
+  // `src/lib/validations/akun-bawaan.json`, yang disalin sync-frontend-lib.ts.
+  "accounting.rs",
+  // Kasbon: rumus potong cicilan dan jurnal gaji wajib identik dengan Desktop
+  // dan TS, karena payroll_admin (salinan payroll Desktop) memanggilnya.
+  "loan.rs",
+  // Tutup buku: gerbang periode di `accounting::tulis_jurnal_tx` dan aturan
+  // bentrokan wajib identik dengan Desktop dan TS.
+  "tutup_buku.rs",
   "commands.rs",
   // Tarif default payroll: satu sumber untuk SQLite lokal dan Turso cloud, di
   // kedua workspace. Perbedaan sekecil apa pun di sini membuat baris seed lokal

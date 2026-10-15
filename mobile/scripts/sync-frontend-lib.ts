@@ -26,6 +26,27 @@ const filesToCopy = [
   // Pendaftaran wajah (verifikasi 1:1): hanya bergantung pada `Modal` dan
   // gateway tersinkron, jadi satu komponen dipakai kedua build.
   "components/wajah/WajahWorkspace.tsx",
+  // UI inventaris: satu komponen untuk ketiga build. Hanya bergantung pada
+  // kontrak `Modal` yang sama dan gateway tersinkron; pesan sukses/galat ditulis
+  // di dalamnya karena `FeedbackBanner` kedua workspace berbeda props.
+  "components/inventory/InventarisWorkspace.tsx",
+  "components/inventory/PanelPemantauan.tsx",
+  "components/inventory/gaya.ts",
+  "components/inventory/beritaAcara.ts",
+  "components/inventory/ekspor.ts",
+  // Pemindai label (kamera + pemindai USB) dan dialog cetak label QR.
+  "components/inventory/LabelQr.tsx",
+  // Registri aset per unit: daftarkan unit dan ubah nomor seri.
+  "components/inventory/UnitAset.tsx",
+  // Pembukuan: satu UI untuk kedua build, bergantung pada `Modal` dan gaya
+  // `components/inventory/gaya.ts` yang juga disalin.
+  "components/keuangan/KeuanganWorkspace.tsx",
+  "components/keuangan/LaporanKeuangan.tsx",
+  "components/keuangan/eksporKeuangan.ts",
+  "components/keuangan/KasbonWorkspace.tsx",
+  // Pemilih akun Kas/Bank: dipakai Kasbon dan detail proses gaji.
+  "components/keuangan/PilihAkunBayar.tsx",
+  "components/keuangan/TutupBukuPanel.tsx",
 ];
 
 for (const file of filesToCopy) {

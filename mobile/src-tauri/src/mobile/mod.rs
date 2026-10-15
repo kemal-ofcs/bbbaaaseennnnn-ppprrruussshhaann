@@ -2,6 +2,14 @@ mod administration;
 pub mod commands;
 pub mod config;
 pub mod face_match;
+// Inventaris: SALINAN `desktop/inventory.rs` oleh sync-rust-modules.ts.
+mod inventory;
+// Pembukuan: SALINAN `desktop/accounting.rs` oleh sync-rust-modules.ts.
+mod accounting;
+// Kasbon: SALINAN `desktop/loan.rs` oleh sync-rust-modules.ts.
+mod loan;
+// Tutup buku: SALINAN `desktop/tutup_buku.rs` oleh sync-rust-modules.ts.
+mod tutup_buku;
 // Lisensi offline Ed25519: SALINAN `desktop/license.rs` oleh sync-rust-modules.ts.
 pub mod license;
 pub mod models;

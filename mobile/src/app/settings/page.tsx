@@ -86,6 +86,9 @@ export default function SettingsPage() {
   // role. Yang di-RBAC adalah MELIHAT dan MENGHAPUS fotonya.
   const canViewAttendancePhoto = canAccessArea(user, "attendance_photo");
   const canViewFaceTemplate = canAccessArea(user, "face_template");
+  const canViewInventaris = canAccessArea(user, "inventaris");
+  const canViewKeuangan = canAccessArea(user, "keuangan");
+  const canViewKasbon = canAccessArea(user, "kasbon");
   // Sama seperti halaman Master Operator Web/Desktop: hanya Superadmin.
   const canManageOperators = Boolean(user?.isSuperadmin);
   // Izin yang dituntut backend untuk profil instansi & nama aplikasi.
@@ -814,6 +817,86 @@ export default function SettingsPage() {
                 className="rounded-xl bg-violet-500 px-3.5 py-1.5 text-xs font-black text-white shadow-md transition hover:bg-violet-400 active:scale-95 whitespace-nowrap"
               >
                 Lihat &rarr;
+              </Link>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Kasbon (butuh izin loan.view) */}
+        {canViewKasbon ? (
+          <div className="rounded-3xl border border-sky-500/20 bg-gradient-to-br from-sky-950/30 via-slate-900/80 to-slate-900/90 p-4 backdrop-blur-md">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="grid size-9 place-items-center rounded-xl bg-sky-500/20 text-sky-300">
+                  <Icon name="users" className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    Kasbon Karyawan
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Pengajuan, pencairan, dan cicilan potong gaji
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/kasbon"
+                onClick={() => triggerHaptic("light")}
+                className="whitespace-nowrap rounded-xl bg-sky-500 px-3.5 py-1.5 text-xs font-black text-white shadow-md transition hover:bg-sky-400 active:scale-95"
+              >
+                Buka
+              </Link>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Pembukuan (butuh izin accounting.view) */}
+        {canViewKeuangan ? (
+          <div className="rounded-3xl border border-sky-500/20 bg-gradient-to-br from-sky-950/30 via-slate-900/80 to-slate-900/90 p-4 backdrop-blur-md">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="grid size-9 place-items-center rounded-xl bg-sky-500/20 text-sky-300">
+                  <Icon name="document" className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Pembukuan</h3>
+                  <p className="text-[11px] text-slate-400">
+                    Jurnal, buku besar, dan laporan keuangan
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/keuangan"
+                onClick={() => triggerHaptic("light")}
+                className="whitespace-nowrap rounded-xl bg-sky-500 px-3.5 py-1.5 text-xs font-black text-white shadow-md transition hover:bg-sky-400 active:scale-95"
+              >
+                Buka
+              </Link>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Inventaris (butuh izin inventory.view) */}
+        {canViewInventaris ? (
+          <div className="rounded-3xl border border-sky-500/20 bg-gradient-to-br from-sky-950/30 via-slate-900/80 to-slate-900/90 p-4 backdrop-blur-md">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="grid size-9 place-items-center rounded-xl bg-sky-500/20 text-sky-300">
+                  <Icon name="box" className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Inventaris</h3>
+                  <p className="text-[11px] text-slate-400">
+                    Stok barang, peminjaman, dan opname gudang
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/inventaris"
+                onClick={() => triggerHaptic("light")}
+                className="whitespace-nowrap rounded-xl bg-sky-500 px-3.5 py-1.5 text-xs font-black text-white shadow-md transition hover:bg-sky-400 active:scale-95"
+              >
+                Buka
               </Link>
             </div>
           </div>

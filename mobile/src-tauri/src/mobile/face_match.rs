@@ -239,7 +239,8 @@ fn template_json(connection: &Connection, id_unik: &str) -> Result<Option<Value>
 /// ini cukup menuntut `face_template.view`, bukan juga `employees.view`.
 /// Wajah milik karyawan nonaktif tetap tampil supaya masih bisa dihapus.
 /// Query-nya kembar dengan `listFaceTemplates` di `face-template.ts`.
-pub const LIST_TEMPLATES_SQL: &str = "SELECT m.id_unik, COALESCE(m.nama, '') AS nama, COALESCE(m.jabatan_status, '') AS jabatan,
+pub const LIST_TEMPLATES_SQL: &str =
+    "SELECT m.id_unik, COALESCE(m.nama, '') AS nama, COALESCE(m.jabatan_status, '') AS jabatan,
                     COALESCE(m.divisi, '') AS divisi, w.model, w.jumlah_sampel, w.sumber,
                     w.dibuat_oleh, w.updated_at
              FROM master_data m
