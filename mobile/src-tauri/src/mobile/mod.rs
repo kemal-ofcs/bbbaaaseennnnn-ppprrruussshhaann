@@ -2,6 +2,8 @@ mod administration;
 pub mod commands;
 pub mod config;
 pub mod face_match;
+// Hari kerja shift: SALINAN `desktop/hari_kerja.rs` oleh sync-rust-modules.ts.
+mod hari_kerja;
 // Inventaris: SALINAN `desktop/inventory.rs` oleh sync-rust-modules.ts.
 mod inventory;
 // Pembukuan: SALINAN `desktop/accounting.rs` oleh sync-rust-modules.ts.

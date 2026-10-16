@@ -82,6 +82,7 @@ pub fn run() {
             mobile::commands::desktop_accounting_close_review,
             mobile::commands::desktop_accounting_close_decide,
             mobile::commands::desktop_accounting_close_revise,
+            mobile::commands::desktop_create_holidays_bulk,
             mobile::commands::desktop_loan_list,
             mobile::commands::desktop_loan_detail,
             mobile::commands::desktop_loan_people,

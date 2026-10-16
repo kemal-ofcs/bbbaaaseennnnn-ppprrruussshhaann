@@ -548,6 +548,30 @@ Mobile) dan kembarannya `validations/loan.ts` + `services/loan.ts`.
   Dibayar; parameter `idAkunBayar` opsional dan bawaannya `akun-kas`.
 - `loan.approve` sensitif: menyetujui berarti mencairkan uang.
 
+## Hari kerja shift dan hari libur massal (schema versi 24)
+
+Diport dari aplikasi sekolah (`hari_kerja.rs` / `validations/hari-kerja.ts`,
+kembar dengan vektor uji yang sama).
+
+- **Libur mingguan adalah ATURAN, bukan baris `tbl_hari_libur`.** Kolom
+  `tbl_shift.hari_kerja` menyimpan teks kanonik `"1,2,3,4,5"` (1 = Senin);
+  kosong atau rusak berarti tujuh hari, dan bawaan kolomnya tujuh hari supaya
+  shift lama tidak tiba-tiba punya hari libur.
+- `wajib_masuk` / `wajibMasuk` dipakai Generate Alfa dan audit absensi di
+  Rust dan Web. Pada tanggal libur aktif, karyawan yang masuk
+  `hari_libur_whitelist` DIJADWALKAN masuk dan bisa kena Alfa; whitelist
+  kosong berarti tidak ada yang dijadwalkan. Audit absensi tidak menilai
+  tanggal libur sama sekali.
+- Rekap payroll (Rust dan `payroll-recap.ts`): jam di luar hari kerja shift
+  baris absensinya dihitung jam hari libur (tarif HARI_LIBUR, PP 35/2021).
+  Gaji harian (FLAT_DAILY) tidak terpengaruh. Bila tidak ada jenjang
+  HARI_LIBUR yang aktif, `apply_holiday_fallback` / `applyHolidayFallback`
+  membayar jam hari libur seperti hari biasa; tanpa itu jamnya tidak dibayar.
+- Tambah hari libur massal hanya lewat rentang tanggal
+  (`desktop_create_holidays_bulk`, `POST /api/holidays/bulk`), memakai rute
+  `holiday/create` yang sudah ada per tanggal; tanggal yang sudah terdaftar
+  dilewati. Data libur nasional bawaan versi sekolah sengaja TIDAK diport.
+
 ## Domain contoh
 
 `master_item` dan `log_aktivitas` adalah tabel peraga yang memperagakan pola

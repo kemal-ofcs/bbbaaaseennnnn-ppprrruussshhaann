@@ -11,6 +11,9 @@ const filesToSync = [
   "scanner.rs",
   // Verifikasi wajah 1:1: aturan vonis wajib identik dengan Desktop dan TS.
   "face_match.rs",
+  // Hari kerja shift dan libur massal: aturan wajib masuk dipakai Generate
+  // Alfa dan audit absensi, dan wajib identik dengan Desktop dan TS.
+  "hari_kerja.rs",
   // Inventaris: validasi, normalisasi tempat, dan rumus saldo wajib identik
   // dengan Desktop dan TS, karena ketiganya membaca mutasi yang sama.
   "inventory.rs",

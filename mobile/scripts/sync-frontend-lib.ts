@@ -47,6 +47,9 @@ const filesToCopy = [
   // Pemilih akun Kas/Bank: dipakai Kasbon dan detail proses gaji.
   "components/keuangan/PilihAkunBayar.tsx",
   "components/keuangan/TutupBukuPanel.tsx",
+  // Hari kerja shift dan tambah hari libur massal.
+  "components/shift/PilihHariKerja.tsx",
+  "components/holiday/LiburMassalDialog.tsx",
 ];
 
 for (const file of filesToCopy) {
