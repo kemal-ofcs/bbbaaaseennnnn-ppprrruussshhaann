@@ -493,6 +493,59 @@ lalu disesuaikan untuk perusahaan. Tiga tabel tersinkron (`inventory_barang`,
   versi sekolah). Bila suatu saat terasa lambat, tambahkan cache saldo lokal
   yang tidak ikut sync, jangan kolom stok.
 
+### Impor Excel dan kolom tambahan barang (schema versi 25)
+
+Diport dari versi sekolah (v53 di sana).
+
+- **Impor** (`validations/inventory-import.ts`, tombol di tab Barang, juga di
+  tampilan kosong) menyimpan per baris lewat `simpanBarangInventaris` dan, untuk
+  barang BARU bersaldo, `catatMutasiInventaris` Masuk "Saldo Awal". Tidak ada
+  command atau rute kedua. Kode yang cocok dengan barang lama mengubah barang
+  itu dan TIDAK PERNAH menambah stok (impor ulang berkas yang sama akan
+  menggandakan saldo). Judul kolom yang tidak ada di file = nilai lama
+  dipertahankan, sel kosong = dikosongkan; judul asing diabaikan dan dilaporkan.
+- **Pembaca Excel** satu-satunya: `lib/client/xlsx.ts` (`readWorkbookTable`),
+  dipakai impor barang DAN impor karyawan. XML dibaca dengan pola, bukan
+  `DOMParser`, supaya teruji di `bun test`. Sheet pertama dari urutan tab
+  `xl/workbook.xml`; CSV menerima BOM, pemisah titik koma, dan kutip ganda;
+  `selAngka` menandai sel bertipe Angka (titik = desimal). Penulisan tetap di
+  `excel-export.ts`, yang menyimpan semua sel sebagai teks.
+- **Kolom tambahan**: tabel tersinkron `inventory_kolom` (rute
+  `inventory-column/save`, `delete_missing: false`, ikut dibuang saat pindah
+  database) menyimpan definisi; isinya di `inventory_barang.atribut` (JSON objek
+  teks berkunci `id_kolom`). Tidak ada hapus: nonaktif menyembunyikan kolom
+  tanpa menyentuh isinya. Tipe `Teks`/`Angka` terkunci sejak dibuat; nama unik
+  di aplikasi (DB tanpa UNIQUE, kembaran offline ditandai `nama_ganda`) dan tidak
+  boleh sama dengan `NAMA_KOLOM_BAWAAN`; maksimal 20 kolom aktif.
+- **Angka** disimpan sebagai teks baku (`is_angka_kanonik` ↔ `isAngkaKanonik`),
+  bukan float. Ketikan dan sel Teks dibaca berformat Indonesia (koma desimal,
+  titik ribuan, `2.5` DITOLAK bukan ditebak).
+- Handler cloud hanya menimpa `atribut` bila payload membawa kuncinya dan
+  isinya objek teks (`payload_atribut`), karena perangkat lama tidak mengenal
+  kolom itu. Sentinel skema cloud Rust kini `-2021`.
+- **Hapus permanen (schema versi 26)**: kolom ditandai `dihapus_pada`, BUKAN
+  dibuang barisnya (snapshot `delete_missing: false` tidak menyebarkan baris
+  yang hilang). Cloud memakai `dihapus_pada = COALESCE(lama, baru)` dan memaksa
+  `is_aktif = 0`, jadi perangkat yang belum sinkron tidak bisa menghidupkannya.
+  `delete_column` ↔ `deleteColumn` membuang isinya dari setiap barang di
+  transaksi yang sama; isi yang masih terkirim dari perangkat lain dibuang
+  `validate_atribut` saat barang disimpan. Izin sensitif `inventory.column.delete`
+  (di `NOT IN` seed Admin Rust dan `SENSITIVE_MUTATION_PERMISSIONS`); UI meminta
+  mengetik `Hapus Permanen`. Sentinel kini `-2022`.
+- **Jumlah desimal per barang (schema versi 27)**: `inventory_barang.desimal`
+  (0/1, hanya Habis Pakai) berarti SETIAP jumlah barang itu (mutasi, saldo,
+  opname, stok minimum) tersimpan ×100 (`SKALA_DESIMAL`): 10,25 kg = 1025.
+  Kolom `INTEGER` dan data lama tidak berubah; kontrak TS ↔ Rust tetap bilangan
+  bulat, konversi hanya di UI dan Excel (`jumlahDariKetikan`,
+  `jumlahDariSelAngka`, `formatJumlah`; isian jumlah selalu teks lewat
+  `isianJumlah`/`bacaJumlah` di `gaya.ts`). Terkunci sejak mutasi pertama
+  (`punya_mutasi`); impor mempertahankan nilai lama barang bermutasi dan
+  melaporkannya. Harga satuan per 1 satuan, jadi nilai = `NILAI_MUTASI_SQL`
+  (dibagi 100, dibulatkan ke rupiah terdekat per baris). Cloud hanya menimpa
+  `desimal` bila payload membawa kuncinya. Ekspor inventaris menulis sel Angka
+  sungguhan lewat penanda opt-in `AngkaExcel` di `lib/client/excel-export.ts`;
+  pemanggil lain tetap teks. Sentinel kini `-2023`.
+
 ## Pembukuan (schema versi 21)
 
 Fase 1 dari port modul Keuangan sekolah (`nilai-keuangan-prd.md` di repo itu),

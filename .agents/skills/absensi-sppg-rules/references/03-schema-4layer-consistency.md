@@ -100,7 +100,7 @@ Setiap perubahan kolom atau tabel wajib diselaraskan pada **4 layer sekaligus**:
 
 ---
 
-## 2. Daftar 32 Tabel Snapshot Terdistribusi
+## 2. Daftar 33 Tabel Snapshot Terdistribusi
 
 Terdapat **32 tabel** yang termasuk dalam siklus snapshot klien (identik di `web-desktop` dan `mobile`):
 
