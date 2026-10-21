@@ -50,6 +50,11 @@ const filesToCopy = [
   // Hari kerja shift dan tambah hari libur massal.
   "components/shift/PilihHariKerja.tsx",
   "components/holiday/LiburMassalDialog.tsx",
+  // Pemilih karyawan halaman Operasional dan bilah "Ubah massal" Karyawan.
+  "components/operational/PilihPersonil.tsx",
+  "components/operational/aturanPilihPersonil.ts",
+  "components/personnel/UbahMassal.tsx",
+  "components/personnel/aturanUbahMassal.ts",
 ];
 
 for (const file of filesToCopy) {

@@ -4,6 +4,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
+import {
+  BATAS_IMPORT_MASSAL,
+  BATAS_KOREKSI_MASSAL,
+  jalankanBerurutan,
+  ringkasHasil,
+} from "@/components/operational/aturanPilihPersonil";
+import { PilihPersonil } from "@/components/operational/PilihPersonil";
 import { Icon } from "@/components/ui/Icon";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
@@ -42,7 +49,7 @@ const JENIS_KOREKSI_OPTIONS = [
 ] as const;
 
 const STATUS_ABSEN_MANUAL_OPTIONS = [
-  { value: "", label: "✨ Otomatis (Generate Sistem Sesuai Jam)" },
+  { value: "", label: "Otomatis (Generate Sistem Sesuai Jam)" },
   { value: "Lengkap", label: "Lengkap (Masuk & Pulang)" },
   { value: "Belum Pulang", label: "Belum Pulang (Hanya Masuk)" },
   { value: "Perlu Verifikasi", label: "Perlu Verifikasi (Hanya Pulang)" },
@@ -78,9 +85,12 @@ export default function OperationalPage() {
     message: string;
   } | null>(null);
   const [busy, setBusy] = useState<boolean>(false);
+  // Penjaga klik ganda: state `busy` baru terlihat setelah render berikutnya,
+  // sehingga dua ketukan cepat sama-sama membacanya `false`.
+  const isSubmittingRef = useRef(false);
 
   // Form State: Koreksi Admin
-  const [korKaryawanId, setKorKaryawanId] = useState<string>("");
+  const [korIds, setKorIds] = useState<string[]>([]);
   const [korJenis, setKorJenis] =
     useState<(typeof JENIS_KOREKSI_OPTIONS)[number]>("Sakit");
   const [korJam, setKorJam] = useState<string>("08:00");
@@ -94,7 +104,7 @@ export default function OperationalPage() {
   const [bckCatatan, setBckCatatan] = useState<string>("");
 
   // Form State: Entri Manual
-  const [manKaryawanId, setManKaryawanId] = useState<string>("");
+  const [manIds, setManIds] = useState<string[]>([]);
   const [manJamMasuk, setManJamMasuk] = useState<string>("08:00");
   const [manJamPulang, setManJamPulang] = useState<string>("16:00");
   const [manStatusKehadiran, setManStatusKehadiran] = useState<string>("Hadir");
@@ -122,19 +132,8 @@ export default function OperationalPage() {
         if (!cancelled) {
           setEmployees(empData || []);
           setShifts(shiftData || []);
-          if (empData && empData.length > 0) {
-            const firstId = String(
-              empData[0].id_karyawan || empData[0].id_unik || "",
-            );
-            setKorKaryawanId(firstId);
-            setBckAsalId(firstId);
-            setManKaryawanId(firstId);
-            if (empData.length > 1) {
-              setBckPenggantiId(
-                String(empData[1].id_karyawan || empData[1].id_unik || ""),
-              );
-            }
-          }
+          // Sengaja tanpa pilihan awal: karyawan pertama yang terpilih otomatis
+          // membuat koreksi tersimpan untuk orang yang salah bila lupa diganti.
           if (shiftData && shiftData.length > 0) {
             setBckShiftId(Number(shiftData[0].id_shift || 1));
           }
@@ -216,16 +215,39 @@ export default function OperationalPage() {
     );
   }
 
+  const cariKaryawan = (idKaryawan: string) =>
+    employees.find((row) => String(row.id_unik) === idKaryawan);
+  const namaKaryawan = (idKaryawan: string) =>
+    String(cariKaryawan(idKaryawan)?.nama || idKaryawan);
+
   // Handle Form Submit: Koreksi Admin
   const handleSubmitKoreksi = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!korKaryawanId) {
+    const ids = korIds;
+    if (ids.length === 0) {
       setFeedback({
         type: "error",
-        message: "Pilih karyawan terlebih dahulu.",
+        message: "Pilih minimal satu karyawan terlebih dahulu.",
       });
       return;
     }
+    const sudahAda = ids.filter((idKaryawan) =>
+      corrections.some((item) => String(item.id_karyawan) === idKaryawan),
+    );
+    if (
+      (ids.length > 1 || sudahAda.length > 0) &&
+      !confirm(
+        `${korJenis} pada tanggal ${date} untuk ${ids.length} karyawan.${
+          sudahAda.length > 0
+            ? ` ${sudahAda.length} di antaranya sudah punya koreksi pada tanggal ini dan akan diperbarui.`
+            : ""
+        } Lanjutkan?`,
+      )
+    ) {
+      return;
+    }
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setBusy(true);
     setFeedback(null);
     try {
@@ -237,29 +259,28 @@ export default function OperationalPage() {
         "Terlambat",
       ].includes(korJenis);
 
-      const result = await prosesKoreksiAdmin({
-        tanggal: date,
-        id_karyawan: korKaryawanId,
-        jenis_koreksi: korJenis,
-        jam_koreksi: needsTime ? korJam : undefined,
-        keterangan_admin: korKeterangan || undefined,
-      });
+      const hasil = await jalankanBerurutan(ids, (idKaryawan) =>
+        prosesKoreksiAdmin({
+          tanggal: date,
+          id_karyawan: idKaryawan,
+          jenis_koreksi: korJenis,
+          jam_koreksi: needsTime ? korJam : undefined,
+          keterangan_admin: korKeterangan || undefined,
+        }),
+      );
 
-      if (result.sukses) {
-        triggerHaptic("success");
-        setFeedback({
-          type: "success",
-          message: result.pesan || "Koreksi admin berhasil disimpan.",
-        });
-        setKorKeterangan("");
-        void loadTabRecords(date, "koreksi");
-      } else {
-        triggerHaptic("error");
-        setFeedback({
-          type: "error",
-          message: result.pesan || "Gagal menyimpan koreksi.",
-        });
-      }
+      triggerHaptic(hasil.gagal.length === 0 ? "success" : "error");
+      setFeedback({
+        type: hasil.gagal.length === 0 ? "success" : "error",
+        message:
+          ids.length === 1
+            ? (hasil.gagal[0]?.pesan ?? "Koreksi admin berhasil disimpan.")
+            : `Koreksi admin: ${ringkasHasil(hasil, namaKaryawan)}`,
+      });
+      // Yang gagal tetap terpilih supaya bisa langsung dicoba lagi.
+      setKorIds(hasil.gagal.map((item) => item.id));
+      if (hasil.gagal.length === 0) setKorKeterangan("");
+      if (hasil.berhasil.length > 0) void loadTabRecords(date, "koreksi");
     } catch (err: unknown) {
       triggerHaptic("error");
       setFeedback({
@@ -269,6 +290,7 @@ export default function OperationalPage() {
       });
     } finally {
       setBusy(false);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -289,6 +311,8 @@ export default function OperationalPage() {
       });
       return;
     }
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setBusy(true);
     setFeedback(null);
     try {
@@ -308,6 +332,8 @@ export default function OperationalPage() {
           message: result.pesan || "Penugasan backup berhasil dibuat.",
         });
         setBckCatatan("");
+        setBckAsalId("");
+        setBckPenggantiId("");
         void loadTabRecords(date, "backup");
       } else {
         triggerHaptic("error");
@@ -325,56 +351,72 @@ export default function OperationalPage() {
       });
     } finally {
       setBusy(false);
+      isSubmittingRef.current = false;
     }
   };
 
   // Handle Form Submit: Entri Manual
   const handleSubmitManual = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!manKaryawanId) {
+    const ids = manIds;
+    if (ids.length === 0) {
       setFeedback({
         type: "error",
-        message: "Pilih karyawan terlebih dahulu.",
+        message: "Pilih minimal satu karyawan terlebih dahulu.",
       });
       return;
     }
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setBusy(true);
     setFeedback(null);
     try {
-      const targetEmp = employees.find(
-        (emp) =>
-          emp.id_karyawan === manKaryawanId || emp.id_unik === manKaryawanId,
+      const result = await prosesImportOffline(
+        ids.map((idKaryawan) => {
+          const targetEmp = cariKaryawan(idKaryawan);
+          return {
+            tanggal: date,
+            id_unik: idKaryawan,
+            nama: targetEmp?.nama ? String(targetEmp.nama) : undefined,
+            divisi: targetEmp?.divisi ? String(targetEmp.divisi) : undefined,
+            jam_masuk: manJamMasuk || undefined,
+            jam_pulang: manJamPulang || undefined,
+            status_kehadiran: manStatusKehadiran,
+            status_absen: manStatusAbsen,
+            keterangan: manKeterangan || undefined,
+          };
+        }),
       );
+      // `results` berurutan sama dengan baris yang dikirim.
+      const hasil = {
+        berhasil: ids.filter((_, index) => result.results[index]?.sukses),
+        gagal: ids.flatMap((idKaryawan, index) =>
+          result.results[index]?.sukses
+            ? []
+            : [
+                {
+                  id: idKaryawan,
+                  pesan:
+                    result.results[index]?.pesan ||
+                    "Gagal menyimpan entri manual.",
+                },
+              ],
+        ),
+      };
 
-      const result = await prosesImportOffline([
-        {
-          tanggal: date,
-          id_unik: manKaryawanId,
-          nama: String(targetEmp?.nama || ""),
-          divisi: String(targetEmp?.divisi || ""),
-          jam_masuk: manJamMasuk || undefined,
-          jam_pulang: manJamPulang || undefined,
-          status_kehadiran: manStatusKehadiran,
-          status_absen: manStatusAbsen,
-          keterangan: manKeterangan || undefined,
-        },
-      ]);
-
-      if (result.berhasil > 0) {
-        triggerHaptic("success");
-        setFeedback({
-          type: "success",
-          message: `Entri manual berhasil disimpan (${result.berhasil} baris).`,
-        });
-        setManKeterangan("");
-        void loadTabRecords(date, "manual");
-      } else {
-        triggerHaptic("error");
-        setFeedback({
-          type: "error",
-          message: result.results[0]?.pesan || "Gagal menyimpan entri manual.",
-        });
-      }
+      triggerHaptic(hasil.gagal.length === 0 ? "success" : "error");
+      setFeedback({
+        type: hasil.gagal.length === 0 ? "success" : "error",
+        message:
+          ids.length === 1
+            ? hasil.gagal.length === 0
+              ? "Entri manual berhasil disimpan."
+              : hasil.gagal[0].pesan
+            : `Entri manual: ${ringkasHasil(hasil, namaKaryawan)}`,
+      });
+      setManIds(hasil.gagal.map((item) => item.id));
+      if (hasil.gagal.length === 0) setManKeterangan("");
+      if (hasil.berhasil.length > 0) void loadTabRecords(date, "manual");
     } catch (err: unknown) {
       triggerHaptic("error");
       setFeedback({
@@ -384,12 +426,15 @@ export default function OperationalPage() {
       });
     } finally {
       setBusy(false);
+      isSubmittingRef.current = false;
     }
   };
 
   // Delete Action Handlers
   const handleDeleteKoreksi = async (idReferensi: string) => {
     if (!confirm("Batalkan dan hapus data koreksi admin ini?")) return;
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setFeedback(null);
     try {
       const res = await hapusKoreksiAdmin(idReferensi);
@@ -414,6 +459,8 @@ export default function OperationalPage() {
         message:
           err instanceof Error ? err.message : "Koreksi admin gagal dihapus.",
       });
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
@@ -430,6 +477,8 @@ export default function OperationalPage() {
     )
       return;
 
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setBusy(true);
     setFeedback(null);
     try {
@@ -459,11 +508,14 @@ export default function OperationalPage() {
       });
     } finally {
       setBusy(false);
+      isSubmittingRef.current = false;
     }
   };
 
   const handleCancelBackup = async (idBackup: string) => {
     if (!confirm("Batalkan penugasan backup ini?")) return;
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setFeedback(null);
     try {
       const res = await batalkanPenugasanBackup(idBackup);
@@ -493,11 +545,15 @@ export default function OperationalPage() {
             ? err.message
             : "Penugasan backup gagal dibatalkan.",
       });
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
   const handleDeleteImport = async (eventKey: string) => {
     if (!confirm("Hapus entri manual ini?")) return;
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setFeedback(null);
     try {
       const res = await hapusImportOffline(eventKey);
@@ -522,6 +578,8 @@ export default function OperationalPage() {
         message:
           err instanceof Error ? err.message : "Entri manual gagal dihapus.",
       });
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
@@ -645,31 +703,15 @@ export default function OperationalPage() {
                 Formulir Koreksi Absensi
               </h3>
 
-              {/* Karyawan Dropdown */}
-              <div>
-                <label
-                  htmlFor="kor-karyawan"
-                  className="block text-[11px] font-semibold text-slate-400 mb-1"
-                >
-                  Pilih Karyawan
-                </label>
-                <select
-                  id="kor-karyawan"
-                  value={korKaryawanId}
-                  onChange={(e) => setKorKaryawanId(e.target.value)}
-                  disabled={loadingMaster}
-                  className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-xs text-white outline-none focus:border-sky-400"
-                >
-                  {employees.map((emp) => {
-                    const id = String(emp.id_karyawan || emp.id_unik || "");
-                    return (
-                      <option key={id} value={id}>
-                        {String(emp.nama)} ({String(emp.divisi || "-")}) - {id}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
+              <PilihPersonil
+                id="kor-karyawan"
+                label="Pilih karyawan (bisa lebih dari satu)"
+                personil={employees}
+                terpilih={korIds}
+                onChange={setKorIds}
+                batas={BATAS_KOREKSI_MASSAL}
+                disabled={loadingMaster || busy}
+              />
 
               {/* Jenis Koreksi */}
               <div>
@@ -807,55 +849,27 @@ export default function OperationalPage() {
                 Formulir Penugasan Backup
               </h3>
 
-              {/* Karyawan Asal */}
-              <div>
-                <label
-                  htmlFor="bck-asal"
-                  className="block text-[11px] font-semibold text-slate-400 mb-1"
-                >
-                  Karyawan Asal (Yang Berhalangan)
-                </label>
-                <select
-                  id="bck-asal"
-                  value={bckAsalId}
-                  onChange={(e) => setBckAsalId(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-xs text-white outline-none focus:border-sky-400"
-                >
-                  {employees.map((emp) => {
-                    const id = String(emp.id_karyawan || emp.id_unik || "");
-                    return (
-                      <option key={id} value={id}>
-                        {String(emp.nama)} ({String(emp.divisi || "-")})
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
+              <PilihPersonil
+                id="bck-asal"
+                label="Karyawan asal (yang berhalangan)"
+                personil={employees}
+                terpilih={bckAsalId ? [bckAsalId] : []}
+                onChange={(ids) => {
+                  setBckAsalId(ids[0] ?? "");
+                  const found = ids[0] ? cariKaryawan(ids[0]) : undefined;
+                  if (found?.id_shift) setBckShiftId(Number(found.id_shift));
+                }}
+                disabled={loadingMaster || busy}
+              />
 
-              {/* Karyawan Pengganti */}
-              <div>
-                <label
-                  htmlFor="bck-pengganti"
-                  className="block text-[11px] font-semibold text-slate-400 mb-1"
-                >
-                  Karyawan Pengganti (Backup)
-                </label>
-                <select
-                  id="bck-pengganti"
-                  value={bckPenggantiId}
-                  onChange={(e) => setBckPenggantiId(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-xs text-white outline-none focus:border-sky-400"
-                >
-                  {employees.map((emp) => {
-                    const id = String(emp.id_karyawan || emp.id_unik || "");
-                    return (
-                      <option key={id} value={id}>
-                        {String(emp.nama)} ({String(emp.divisi || "-")})
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
+              <PilihPersonil
+                id="bck-pengganti"
+                label="Karyawan pengganti"
+                personil={employees}
+                terpilih={bckPenggantiId ? [bckPenggantiId] : []}
+                onChange={(ids) => setBckPenggantiId(ids[0] ?? "")}
+                disabled={loadingMaster || busy}
+              />
 
               {/* Shift Target */}
               <div>
@@ -1006,30 +1020,15 @@ export default function OperationalPage() {
                 Formulir Entri Absensi Darurat / Manual
               </h3>
 
-              {/* Karyawan */}
-              <div>
-                <label
-                  htmlFor="man-karyawan"
-                  className="block text-[11px] font-semibold text-slate-400 mb-1"
-                >
-                  Pilih Karyawan
-                </label>
-                <select
-                  id="man-karyawan"
-                  value={manKaryawanId}
-                  onChange={(e) => setManKaryawanId(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-xs text-white outline-none focus:border-sky-400"
-                >
-                  {employees.map((emp) => {
-                    const id = String(emp.id_karyawan || emp.id_unik || "");
-                    return (
-                      <option key={id} value={id}>
-                        {String(emp.nama)} ({String(emp.divisi || "-")})
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
+              <PilihPersonil
+                id="man-karyawan"
+                label="Pilih karyawan (bisa lebih dari satu)"
+                personil={employees}
+                terpilih={manIds}
+                onChange={setManIds}
+                batas={BATAS_IMPORT_MASSAL}
+                disabled={loadingMaster || busy}
+              />
 
               {/* Jam Masuk & Pulang */}
               <div className="grid grid-cols-2 gap-2">
