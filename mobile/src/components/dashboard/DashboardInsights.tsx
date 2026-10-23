@@ -313,9 +313,8 @@ export function DashboardInsights() {
       ) : (
         <>
           <p className="px-1 text-[11px] text-slate-400">
-            {TOP_LIMIT} karyawan dengan hari hadir terbanyak dari seluruh
-            riwayat; bila seri, yang total terlambatnya paling sedikit lebih
-            dulu.
+            {TOP_LIMIT} karyawan aktif dengan hari hadir terbanyak bulan ini;
+            bila seri, yang total terlambatnya paling sedikit lebih dulu.
           </p>
           {top.length === 0 ? (
             <div className="rounded-2xl border border-white/10 bg-slate-950/40 p-6 text-center text-xs text-slate-500">

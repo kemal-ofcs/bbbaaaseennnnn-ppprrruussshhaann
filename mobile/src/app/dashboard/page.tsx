@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { DashboardInsights } from "@/components/dashboard/DashboardInsights";
+import { EksporLaporanKehadiran } from "@/components/dashboard/EksporLaporanKehadiran";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { Icon } from "@/components/ui/Icon";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -23,6 +24,7 @@ export default function DashboardPage() {
   const clock = useClock();
 
   const canViewMetrics = hasPermission(user, "dashboard.view");
+  const canExport = canViewMetrics && hasPermission(user, "dashboard.export");
   // Riwayat scan terbaru dijaga `home.view` di backend. Tanpa izin itu
   // bagiannya disembunyikan, bukan dimuat lalu gagal menjadi pesan error.
   const canViewRecentScans = canAccessArea(user, "home");
@@ -33,6 +35,8 @@ export default function DashboardPage() {
   const [recentScans, setRecentScans] = useState<Record<string, unknown>[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [eksporTerbuka, setEksporTerbuka] = useState(false);
+  const [pesanEkspor, setPesanEkspor] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -120,6 +124,34 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {canExport ? (
+          <button
+            type="button"
+            onClick={() => {
+              setPesanEkspor(null);
+              setEksporTerbuka(true);
+            }}
+            className="flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-sm font-semibold text-emerald-100"
+          >
+            <Icon name="document" className="size-4" />
+            Ekspor Laporan Kehadiran (Excel)
+          </button>
+        ) : null}
+        {pesanEkspor ? (
+          <output className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-3 text-xs text-emerald-100">
+            {pesanEkspor}
+          </output>
+        ) : null}
+        {eksporTerbuka ? (
+          <EksporLaporanKehadiran
+            onClose={() => setEksporTerbuka(false)}
+            onTersimpan={(namaBerkas) => {
+              setEksporTerbuka(false);
+              setPesanEkspor(`Laporan Excel tersimpan: ${namaBerkas}`);
+            }}
+          />
+        ) : null}
 
         {/* Quick Launch QR Scanner Hero Button */}
         <Link

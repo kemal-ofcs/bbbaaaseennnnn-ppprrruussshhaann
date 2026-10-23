@@ -26,6 +26,9 @@ const filesToCopy = [
   // Pendaftaran wajah (verifikasi 1:1): hanya bergantung pada `Modal` dan
   // gateway tersinkron, jadi satu komponen dipakai kedua build.
   "components/wajah/WajahWorkspace.tsx",
+  // Ekspor laporan kehadiran per karyawan × tanggal dari dasbor.
+  "components/dashboard/EksporLaporanKehadiran.tsx",
+  "components/dashboard/laporanKehadiranExcel.ts",
   // UI inventaris: satu komponen untuk ketiga build. Hanya bergantung pada
   // kontrak `Modal` yang sama dan gateway tersinkron; pesan sukses/galat ditulis
   // di dalamnya karena `FeedbackBanner` kedua workspace berbeda props.
