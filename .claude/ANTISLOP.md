@@ -1,25 +1,23 @@
-# ANTISLOP.md: hasil antislop
+# ANTISLOP.md — hasil antislop
 
-- Waktu: 2026-10-21 02:14 WIB
-- Commit: 102c63f (+ 17 berkas berubah/baru, belum commit)
-- Berkas disunting: 7
-- Cakupan: hanya baris yang berubah untuk fitur pemilih karyawan dan Ubah massal
+- Waktu: 26 Oktober 2026, 06:11 WIB
+- Commit: c470d22 (+ 21 berkas berubah, belum commit)
+- Berkas disunting: 0
 
 ## Disunting
-- `web-desktop/src/lib/validations/stabilization.ts`: komentar: doc `draftKaryawanDariBaris`: tiga baris jadi dua, "DAN" kapital dihapus
-- `web-desktop/src/components/personnel/aturanUbahMassal.ts`: komentar: contoh field sekolah (`id_rombel`, `unit`) diganti `divisi`, `id_shift`; baris pembuka dirapikan
-- `web-desktop/src/app/karyawan/page.tsx`: teks UI: label shift Ubah massal memakai " - " (bukan en dash), sama dengan /operational
-- `mobile/src/app/karyawan/page.tsx`: teks UI + komentar: label shift sama; separator dekoratif `// ─── Ubah massal ───` dihapus
-- `mobile/src/components/personnel/aturanUbahMassal.ts`: salinan hasil `sync:mobile` dari padanan web-desktop
-
-- `web-desktop/src/app/operational/page.tsx`: teks UI: emoji di tab, judul, dan tombol (🛠️ 👥 📥 💾 ➕ 📁 ✨) dihapus; ⚠️ di dua dialog diganti `<Icon name="alert">`
-- `mobile/src/app/operational/page.tsx`: teks UI: ✨ di opsi "Otomatis" dihapus
-- `web-desktop/src/lib/validations/stabilization.ts`: teks UI: pesan validasi shift "antara X–Y menit" jadi "antara X dan Y menit", sama dengan pesan lain
+Tidak ada berkas yang perlu disunting. Seluruh komentar baru bersifat ringkas, menjelaskan alasan keamanan/arsitektur, dan teks UI sudah bersih dari AI-slop.
 
 ## Dilewati
-- `*.test.ts`: fixture adalah data
-- `mobile/src/components/**`, `mobile/src/lib/**`: salinan hasil sinkronisasi (diperbarui lewat `bun run sync:mobile`)
-- `mobile/scripts/sync-frontend-lib.ts`, kedua halaman /operational, `PilihPersonil.tsx`, `UbahMassal.tsx`, `aturanPilihPersonil.ts`: tidak ada temuan
+- `.agents/**`, `.claude/**` — berkas konfigurasi, workflow, dan log agent.
+- `web-desktop/src-tauri/Cargo.toml`, `mobile/src-tauri/Cargo.toml` — manifest build/dependensi.
+- `mobile/src-tauri/src/mobile/**`, `mobile/src/lib/**` — salinan Mobile turunan yang disinkronkan.
+- `*.test.ts` — berkas test suite.
+- `web-desktop/src-tauri/src/desktop/commands.rs` — komentar keamanan & batas waktu sudah ringkas.
+- `web-desktop/src-tauri/src/desktop/scanner.rs` — doc comment fungsi sudah ringkas.
+- `web-desktop/src/lib/contracts/scanner.ts` — doc comment tipe sudah ringkas.
+- `web-desktop/src/lib/services/attendance-processor.ts` — komentar penanganan error sudah ringkas.
+- `web-desktop/src/app/scanner/page.tsx` — teks UI & atribut alt gambar sudah bersih.
+- `mobile/src/components/ScannerView.tsx` — teks UI & atribut alt gambar sudah bersih.
 
 ## Perlu tindakan
-- Tidak ada. `sync:mobile` sudah dijalankan; `bun run check:quick` ulang lulus (exit 0) setelah semua suntingan.
+Tidak ada.

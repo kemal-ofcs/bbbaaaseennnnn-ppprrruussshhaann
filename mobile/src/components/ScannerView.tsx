@@ -88,7 +88,7 @@ export function ScannerView() {
 
   const [cameraActive, setCameraActive] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [_lastResult, setLastResult] = useState<ScanResult | null>(null);
+  const [lastResult, setLastResult] = useState<ScanResult | null>(null);
   const [scanHistory, setScanHistory] = useState<ScanLogItem[]>([]);
   const [cameraDevices, setCameraDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
@@ -321,6 +321,7 @@ export function ScannerView() {
       } catch (err: unknown) {
         const message =
           err instanceof Error ? err.message : "Gagal memproses absensi";
+        setLastResult(null);
         if (hapticFeedback) triggerHaptic("error");
         if (audioFeedback) audioSynth.playErrorBeep();
 
@@ -951,6 +952,25 @@ export function ScannerView() {
           </button>
         </form>
       </div>
+
+      {lastResult?.fotoPersonil ? (
+        <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-900/40 p-3">
+          {/* biome-ignore lint/performance/noImgElement: data URI dari database */}
+          <img
+            src={lastResult.fotoPersonil}
+            alt={`Foto ${lastResult.nama}`}
+            className="h-20 w-20 shrink-0 rounded-xl border border-white/10 object-cover"
+          />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-white">
+              {lastResult.nama}
+            </p>
+            <p className="truncate text-xs text-slate-400">
+              {lastResult.divisi}
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       {/* Live Scan History Feed */}
       <div className="flex flex-col gap-2">
