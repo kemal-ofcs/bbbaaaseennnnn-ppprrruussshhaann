@@ -3,9 +3,9 @@ const path = require('path');
 const { execSync } = require('child_process');
 const { marked } = require('marked');
 
-const mdPath = path.resolve('E:/Freelance/absensi-sppg-app/PANDUAN_LENGKAP_APLIKASI_SPPG.md');
-const htmlPath = path.resolve('E:/Freelance/absensi-sppg-app/PANDUAN_LENGKAP_APLIKASI_SPPG.html');
-const pdfPath = path.resolve('E:/Freelance/absensi-sppg-app/PANDUAN_LENGKAP_APLIKASI_SPPG.pdf');
+const mdPath = path.resolve(__dirname, '../PANDUAN_LENGKAP_APLIKASI_SPPG.md');
+const htmlPath = path.resolve(__dirname, '../PANDUAN_LENGKAP_APLIKASI_SPPG.html');
+const pdfPath = path.resolve(__dirname, '../PANDUAN_LENGKAP_APLIKASI_SPPG.pdf');
 
 const mdContent = fs.readFileSync(mdPath, 'utf8');
 

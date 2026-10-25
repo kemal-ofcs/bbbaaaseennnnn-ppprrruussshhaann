@@ -393,7 +393,7 @@ variabel lingkungan, supaya pemilik aplikasi bisa menggantinya tanpa build ulang
 Memakai format `LIS1` yang sama dengan aplikasi KOS lain, tetapi dengan
 produk dan kunci sendiri: `kos-absensi-perusahaan`,
 public key di `PRODUCT_PUBLIC_KEY_HEX` (`desktop/license.rs`, tersalin ke
-Mobile) dan `server/license.ts`. Penerbitnya di luar repo (`E:\Freelance\lisensi`).
+Mobile) dan `server/license.ts`. Penerbitnya di luar repo (`C:\dev\lisensi`).
 Lisensi produk lain ditolak ("diterbitkan untuk produk lain"), dan kode
 perangkat PC yang sama berbeda dengan kode untuk aplikasi KOS lain karena nama
 produk ikut di-hash.

@@ -2,6 +2,7 @@
   "name": "absensi-sppg-root",
   "private": true,
   "scripts": {
+    "setup": "bun install && cd web-desktop && bun install && cd ../mobile && bun install",
     "sync:mobile": "cd mobile && bun scripts/sync-frontend-lib.ts && bun scripts/sync-rust-modules.ts",
     "audit:schema": "bun scripts/schema-audit.ts",
     "audit:contract": "bun .agents/skills/absensi-sppg-rules/scripts/audit-sync-contract.ts",
