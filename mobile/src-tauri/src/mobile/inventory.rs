@@ -75,7 +75,7 @@ pub const MAKS_BARIS_PINJAMAN: usize = 500;
 /// (keputusan User, PRD §4.7). Cermin `INVENTORY_EXPIRY_WARNING_DAYS`.
 pub const INVENTORY_EXPIRY_WARNING_DAYS: i64 = 30;
 
-// ── Jurnal pengadaan (v28, `inventaris-lanjutan-prd.md` proyek sekolah Fase A) ─────────────
+// Jurnal pengadaan (v28)
 
 /// Baris paling banyak dalam satu tekan "Catat ke jurnal". Cermin `MAKS_JURNAL_INVENTARIS`.
 pub const MAKS_JURNAL_INVENTARIS: usize = 200;
@@ -201,7 +201,7 @@ pub const KELOMPOK_DEBIT_INVENTARIS: [&str; 2] = ["Aset", "Beban"];
 pub const KELOMPOK_KREDIT_BAYAR: [&str; 2] = ["Aset", "Kewajiban"];
 pub const KELOMPOK_KREDIT_HIBAH: [&str; 1] = ["Pendapatan"];
 
-// ── Servis aset (v29, `inventaris-lanjutan-prd.md` proyek sekolah Fase B) ──────────────────
+// Servis aset (v29)
 
 /// Hasil penutupan servis. Cermin `HASIL_SERVIS`.
 pub const HASIL_SERVIS: [&str; 4] = ["Baik", "Rusak Ringan", "Rusak Berat", "Tidak Bisa Diperbaiki"];
@@ -3866,7 +3866,7 @@ pub fn journal_post(state: &MobileState, operator: &str, draft: Value) -> Result
 /// Cermin `KETERANGAN_BALIK_INVENTARIS`.
 pub const KETERANGAN_BALIK_INVENTARIS: &str = "Pembatalan mutasi inventaris";
 
-// ── Servis aset: I/O ────────────────────────────────────────────────────────
+// Servis aset: I/O
 
 /// Kolom daftar servis, bersama nama barang dan kode unit. `lama_hari` dihitung
 /// SQLite dengan tanggal WIB. Cermin `KOLOM_SERVIS_SQL`.
@@ -4458,7 +4458,7 @@ pub fn stock_card(
     Ok(json!({ "saldo_awal": saldo_awal, "baris": baris, "terpotong": false }))
 }
 
-// ── Cloud ───────────────────────────────────────────────────────────────────
+// Cloud
 
 pub(crate) fn payload_text(row: &Value, key: &str) -> Option<String> {
     row.get(key)

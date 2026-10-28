@@ -1511,7 +1511,7 @@ export function formatJumlah(nilai: number, desimal: boolean): string {
   return nilai < 0 ? `-${teks}` : teks;
 }
 
-// ── Jurnal pengadaan (v28, `inventaris-lanjutan-prd.md` proyek sekolah Fase A) ─────────────
+// Jurnal pengadaan (v28)
 
 /** Cermin `MAKS_JURNAL_INVENTARIS`: baris paling banyak dalam satu tekan. */
 export const MAKS_JURNAL_INVENTARIS = 200;
@@ -1683,7 +1683,7 @@ export interface DaftarJurnalInventaris {
   batas_tutup: string | null;
 }
 
-// ── Servis aset (v29, `inventaris-lanjutan-prd.md` proyek sekolah Fase B) ──────────────────
+// Servis aset (v29)
 
 /** Cermin `HASIL_SERVIS`. */
 export const HASIL_SERVIS = [

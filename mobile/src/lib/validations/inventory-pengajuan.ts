@@ -398,7 +398,7 @@ export interface DaftarPengajuan {
   hari_ini: string;
 }
 
-// ── Penerimaan (langkah 2) ──────────────────────────────────────────────────
+// Penerimaan (langkah 2)
 
 /** Cermin `MAKS_FOTO_PENERIMAAN`. */
 export const MAKS_FOTO_PENERIMAAN = 5;

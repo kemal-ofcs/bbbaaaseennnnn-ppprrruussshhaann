@@ -1877,7 +1877,7 @@ export async function journalPost(
   });
 }
 
-// ── Servis aset (v29) ───────────────────────────────────────────────────────
+// Servis aset (v29)
 
 /** Cermin `KOLOM_SERVIS_SQL` di `inventory.rs`. */
 const KOLOM_SERVIS_SQL = `s.id_servis, s.id_barang, b.kode_barang, b.nama_barang, s.id_unit, u.kode_unit,

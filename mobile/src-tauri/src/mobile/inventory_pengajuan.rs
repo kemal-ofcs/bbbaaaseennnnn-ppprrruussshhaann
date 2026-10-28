@@ -40,7 +40,7 @@ pub const MAKS_SATUAN: usize = 20;
 /// Cermin `MAKS_DAFTAR_PENGAJUAN`.
 pub const MAKS_DAFTAR_PENGAJUAN: usize = 500;
 
-// ── Aturan murni ────────────────────────────────────────────────────────────
+// Aturan murni
 
 /// Cermin `formatNomorPengajuan`. Seri mengikuti nomor jurnal (`seri_perangkat`,
 /// Web `WEB`), jadi dua perangkat offline tidak pernah berebut nomor.
@@ -388,7 +388,7 @@ pub fn validate_keputusan(draft: &KeputusanDraft) -> Result<KeputusanValid, Stri
     }
 }
 
-// ── Penerimaan (langkah 2) ──────────────────────────────────────────────────
+// Penerimaan (langkah 2)
 
 /// Cermin `MAKS_FOTO_PENERIMAAN`.
 pub const MAKS_FOTO_PENERIMAAN: usize = 5;
@@ -583,7 +583,7 @@ pub fn validate_penerimaan(
     })
 }
 
-// ── SQL bersama ─────────────────────────────────────────────────────────────
+// SQL bersama
 
 /// Jumlah yang sudah diterima satu baris pengajuan (alias `r`): Masuk
 /// Pengadaan ber-`id_ref` = id baris yang belum dibatalkan. Cermin
@@ -646,7 +646,7 @@ const KOLOM_PENGAJUAN: &[&str] = &[
     "updated_at",
 ];
 
-// ── I/O lokal ───────────────────────────────────────────────────────────────
+// I/O lokal
 
 fn header_json(row: &rusqlite::Row<'_>) -> rusqlite::Result<Value> {
     let mut objek = serde_json::Map::new();
@@ -1570,7 +1570,7 @@ pub fn receipt_photo_local(
         .map_err(|_| CommandError::internal())
 }
 
-// ── Cloud ───────────────────────────────────────────────────────────────────
+// Cloud
 
 /// Mengajukan, atau mengubah selama cloud masih Menunggu. Cermin
 /// `CLOUD_UPSERT_PENGAJUAN_SQL`.

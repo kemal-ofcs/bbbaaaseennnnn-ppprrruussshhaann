@@ -171,6 +171,23 @@ export const PROMOTION_PLAN: readonly PromotionTable[] = [
     uniqueColumns: [],
     dependsOn: ["inventory_barang", "inventory_unit"],
   },
+  // v30 — pengajuan pembelian, barisnya, penerimaan, dan foto penerimaan.
+  { table: "inventory_pengajuan", uniqueColumns: [], dependsOn: [] },
+  {
+    table: "inventory_pengajuan_baris",
+    uniqueColumns: [],
+    dependsOn: ["inventory_pengajuan"],
+  },
+  {
+    table: "inventory_penerimaan",
+    uniqueColumns: [],
+    dependsOn: ["inventory_pengajuan"],
+  },
+  {
+    table: "inventory_penerimaan_foto",
+    uniqueColumns: [],
+    dependsOn: ["inventory_penerimaan"],
+  },
 
   // Lapisan 7 — pembukuan (v21). Kunci TEXT buatan klien, tanpa UNIQUE.
   { table: "keu_akun", uniqueColumns: [], dependsOn: [] },
