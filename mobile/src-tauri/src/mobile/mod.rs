@@ -6,6 +6,8 @@ pub mod face_match;
 mod hari_kerja;
 // Inventaris: SALINAN `desktop/inventory.rs` oleh sync-rust-modules.ts.
 mod inventory;
+// Pengajuan pembelian: SALINAN `desktop/inventory_pengajuan.rs` oleh sync-rust-modules.ts.
+mod inventory_pengajuan;
 // Pembukuan: SALINAN `desktop/accounting.rs` oleh sync-rust-modules.ts.
 mod accounting;
 // Kasbon: SALINAN `desktop/loan.rs` oleh sync-rust-modules.ts.

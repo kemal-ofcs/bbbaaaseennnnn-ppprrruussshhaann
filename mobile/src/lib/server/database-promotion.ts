@@ -165,6 +165,12 @@ export const PROMOTION_PLAN: readonly PromotionTable[] = [
   },
   // v25 — definisi kolom tambahan barang; isinya ikut `inventory_barang`.
   { table: "inventory_kolom", uniqueColumns: [], dependsOn: [] },
+  // v29 — servis aset; merujuk barang dan unitnya.
+  {
+    table: "inventory_servis",
+    uniqueColumns: [],
+    dependsOn: ["inventory_barang", "inventory_unit"],
+  },
 
   // Lapisan 7 — pembukuan (v21). Kunci TEXT buatan klien, tanpa UNIQUE.
   { table: "keu_akun", uniqueColumns: [], dependsOn: [] },

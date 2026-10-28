@@ -38,6 +38,16 @@ const expectedRoutes = [
   "inventory-item/save",
   "inventory-mutation/create",
   "inventory-unit/save",
+  "inventory-service/save",
+  "inventory-service/close",
+  "inventory-service/cancel",
+  "inventory-request/save",
+  "inventory-request/approve",
+  "inventory-request/reject",
+  "inventory-request/cancel",
+  "inventory-request/close",
+  "inventory-receipt/create",
+  "inventory-receipt-photo/save",
   "inventory-column/save",
   "log-scan/delete",
   "loan/save",
@@ -89,6 +99,10 @@ const expectedSnapshotTriples = [
   "inventoryItems|inventory-item|inventory_barang",
   "inventoryMutations|inventory-mutation|inventory_mutasi",
   "inventoryUnits|inventory-unit|inventory_unit",
+  "inventoryServices|inventory-service|inventory_servis",
+  "inventoryRequests|inventory-request|inventory_pengajuan",
+  "inventoryRequestLines|inventory-request-line|inventory_pengajuan_baris",
+  "inventoryReceipts|inventory-receipt|inventory_penerimaan",
   "inventoryColumns|inventory-column|inventory_kolom",
   "accountingAccounts|accounting-account|keu_akun",
   "accountingJournals|accounting-journal|keu_jurnal",
@@ -107,6 +121,9 @@ const expectedLocalOnlyTables = [
   // Foto ikut event 'attendance/scan' saat push, lalu dibaca satu per satu dari
   // cloud oleh halaman peninjauan.
   "absensi_foto",
+  // Foto penerimaan barang (v30), pola yang sama: didorong satu per satu lewat
+  // 'inventory-receipt-photo/save', ditarik per id saat diketuk.
+  "inventory_penerimaan_foto",
   "audit_absensi",
   "desktop_client_identity",
   "desktop_credential_alias",
@@ -128,6 +145,8 @@ const expectedLocalOnlyTables = [
 const expectedCloudOnlyTables = [
   // Lihat catatan pada expectedLocalOnlyTables: foto tidak pernah ikut snapshot.
   "absensi_foto",
+  // Foto penerimaan barang (v30): ditarik per id, tidak ikut snapshot.
+  "inventory_penerimaan_foto",
   "app_bootstrap_state",
   "app_mail_config",
   "app_permission",

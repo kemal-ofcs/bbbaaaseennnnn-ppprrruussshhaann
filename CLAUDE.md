@@ -578,6 +578,92 @@ Mobile) dan kembarannya `validations/accounting.ts` + `services/accounting.ts`.
   ditinjau". `diterima_cloud` selalu jam database cloud. Pemberitahuan WA versi
   sekolah TIDAK diport (modul WA tidak ada). `accounting.close` sensitif.
 
+## Jurnal pengadaan inventaris (schema versi 28)
+
+Port Fase A `inventaris-lanjutan-prd.md` dari repo sekolah (di sana v62).
+Sumber jurnal baru `Inventaris`; CHECK `keu_jurnal.sumber` dibangun ulang di
+keempat lapis (`ensure_journal_source_values`, blok v28 `db-migrations.ts`).
+Indeks dan trigger tabel dipasang ulang dari definisinya sendiri di
+`sqlite_master` SETELAH baris disalin: trigger pulse cloud hanya dibuat Rust,
+dan rebuild dari Web tanpa ini membuat perangkat tidak tahu ada jurnal baru.
+
+- Satu baris Masuk `Pengadaan`/`Hibah` berharga = satu jurnal
+  `jrn-inv-<id_mutasi>`, bertanggal tanggal mutasi. "Sudah dijurnal" tidak
+  disimpan di mutasi, diturunkan dari keberadaan id itu
+  (`SYARAT_JURNAL_INVENTARIS_SQL`, kembar `inventory.rs` ↔ `services/inventory.ts`).
+- Penjurnalan hanya dari tab "Dari Inventaris" di Keuangan
+  (`components/keuangan/JurnalInventaris.tsx`, di `filesToCopy`; daftar
+  `accounting.view`, catat `accounting.manage`). Nilai dihitung ulang dari
+  mutasi; semua baris satu transaksi, jadi satu baris di periode tertutup
+  menolak seluruh tekan. Akun bawaan: Aset → Peralatan, Habis Pakai → Beban
+  ATK, Pengadaan dibayar dari Kas, Hibah → Pendapatan Lain-lain (bagan akun
+  perusahaan tidak punya Sumbangan).
+- `cancel_mutation` ↔ `cancelMutation` membalik jurnalnya di transaksi yang
+  sama. Jurnal yang mutasinya dibatalkan perangkat lain sebelum jurnalnya
+  tertarik muncul sebagai "perlu dibalik". Jurnal `Inventaris` tidak bisa
+  dibatalkan dari layar Keuangan; akun salah dikoreksi jurnal manual.
+- Perangkat lama (CHECK lama) gagal menarik snapshot begitu ada jurnal
+  `Inventaris`; semua perangkat wajib diperbarui.
+
+## Servis aset (schema versi 29)
+
+Port Fase B `inventaris-lanjutan-prd.md` dari repo sekolah (di sana v63).
+Tabel tersinkron `inventory_servis` (rute `inventory-service/save|close|cancel`,
+`delete_missing: false`, ikut dibuang saat pindah database). Hanya barang Aset;
+barang yang dilacak per unit wajib memilih `id_unit` (tempat dan kondisinya
+diturunkan dari `inventory_saldo`), barang lain per tempat × kondisi dengan
+jumlah dibatasi saldo dikurangi servis yang masih terbuka di posisi itu.
+
+- Status TIDAK disimpan: `Dibatalkan` dari `dibatalkan_pada`, `Selesai` dari
+  `tanggal_selesai`. Selama servis stok tidak berubah.
+- Menutup servis dengan kondisi lain menulis mutasi Pindah `Perubahan Kondisi`
+  berid tetap `<id_servis>-kondisi` di transaksi yang sama; mutasi itu tidak
+  bisa dibatalkan (`is_mutasi_servis` ↔ `isMutasiServis`). "Tidak Bisa
+  Diperbaiki" tidak mengubah stok; afkir tetap lewat Keluar ber-izin
+  `inventory.adjust`. Servis yang ditutup final; selama terbuka hanya tanggal
+  dibawa, penyedia, dan keluhan yang bisa diubah.
+- Handler cloud menulis hanya selama servis masih terbuka, jadi penutupan atau
+  pembatalan yang pertama sampai di cloud yang berlaku; event yang kalah
+  dilewati, tidak ditolak.
+- Servis terbuka ikut `list_inventory` (`servis`) untuk tanda di rincian barang,
+  Catat Mutasi (diperingatkan, tidak ditolak), Ringkasan, dan opname (unit yang
+  sedang diservis tidak ikut "dicatat tidak ditemukan").
+- Biaya servis > 0 masuk tab "Dari Inventaris" sebagai jurnal `jrn-<id_servis>`
+  (bawaan Beban Pemeliharaan / Kas), bertanggal tanggal selesai.
+- Beda dari sekolah: perusahaan tidak punya hapus barang, jadi pemeriksaan
+  barang hanya `status_aktif` (tidak ada `inventory_barang.dihapus_pada`).
+
+## Pengajuan pembelian (schema versi 30)
+
+Port `inventaris-pengajuan-prd.md` dari repo sekolah (di sana v64). Modul
+`desktop/inventory_pengajuan.rs` ↔ `validations/services/gateways
+inventory-pengajuan.ts`, UI `components/inventory/Pengajuan.tsx` (di
+`filesToCopy`). Tabel tersinkron `inventory_pengajuan`,
+`inventory_pengajuan_baris`, `inventory_penerimaan`; foto
+`inventory_penerimaan_foto` di luar snapshot (pola `absensi_foto`, didorong per
+foto, ditarik per id). Rute `inventory-request/save|approve|reject|cancel|close`,
+`inventory-receipt/create`, `inventory-receipt-photo/save`. Sentinel `-2026`.
+
+- Status TIDAK disimpan: berurutan Dibatalkan, Ditolak, Menunggu, Selesai
+  (ditutup atau semua baris diterima penuh), Diterima sebagian, Disetujui.
+  "Diterima" = Masuk `Pengadaan` ber-`id_ref` = id baris tanpa `batal-<id>`.
+- ACC hanya atas isi yang dilihat: `sidik_baris` (SHA-256 baris kanonik, kembar
+  Rust ↔ TS) harus sama di cloud; suntingan offline yang lebih dulu sampai
+  menggugurkan ACC versi lama tanpa event ditolak. Pengaju tidak memutuskan
+  pengajuannya sendiri kecuali Superadmin (`validate_pemutus` ↔
+  `validatePemutus`).
+- Penerimaan memakai inti yang sudah ada dalam satu transaksi: barang baru lewat
+  `save_item_tx` ↔ `saveItemTx` berid tetap `brg-<id_baris>`, Masuk lewat
+  `record_mutation_tx`. Jumlah tidak boleh melebihi sisa ACC, hanya diperiksa
+  di perangkat. Foto 1–5, MIME sesuai CHECK, maks 600.000 karakter base64,
+  diperiksa juga oleh handler cloud.
+- Beda dari sekolah: perusahaan tidak punya tombstone, jadi baris pengajuan
+  `delete_missing: true` dan `PendingGuard::induk_tertunda` melindunginya di
+  upsert DAN di blok hapus selama event header belum terkirim. Tidak ada
+  `APPEND_ONLY_TABLES`, jadi penerimaan tabel snapshot biasa. Daftar butuh
+  `inventory.view` atau `accounting.view` (`requireAnyWebPermission`, dinilai
+  lisensinya sekali memakai izin yang dipegang).
+
 ## Kasbon karyawan (schema versi 22)
 
 Fase 2 port Keuangan. Tabel tersinkron `keu_pinjaman`, `keu_pinjaman_mutasi`

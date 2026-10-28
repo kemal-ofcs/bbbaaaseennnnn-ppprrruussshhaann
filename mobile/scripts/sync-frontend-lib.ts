@@ -45,6 +45,10 @@ const filesToCopy = [
   "components/inventory/UnitAset.tsx",
   // Kolom tambahan barang (v25): tambah, ganti nama, nonaktifkan.
   "components/inventory/KolomTambahan.tsx",
+  // Servis aset (v29): tab Servis, rincian barang, dan dialognya.
+  "components/inventory/Servis.tsx",
+  // Pengajuan pembelian (v30): tab Pengajuan dan bagian persetujuan di Keuangan.
+  "components/inventory/Pengajuan.tsx",
   // Pembukuan: satu UI untuk kedua build, bergantung pada `Modal` dan gaya
   // `components/inventory/gaya.ts` yang juga disalin.
   "components/keuangan/KeuanganWorkspace.tsx",
@@ -54,6 +58,8 @@ const filesToCopy = [
   // Pemilih akun Kas/Bank: dipakai Kasbon dan detail proses gaji.
   "components/keuangan/PilihAkunBayar.tsx",
   "components/keuangan/TutupBukuPanel.tsx",
+  // Jurnal pengadaan dan hibah inventaris (v28), tab "Dari Inventaris".
+  "components/keuangan/JurnalInventaris.tsx",
   // Hari kerja shift dan tambah hari libur massal.
   "components/shift/PilihHariKerja.tsx",
   "components/holiday/LiburMassalDialog.tsx",
