@@ -18,6 +18,7 @@ const filesToSync = [
   // dengan Desktop dan TS, karena ketiganya membaca mutasi yang sama.
   "inventory.rs",
   "inventory_pengajuan.rs",
+  "cicilan.rs",
   // Pembukuan: aturan jurnal seimbang, nomor jurnal, dan rumus laporan wajib
   // identik dengan Desktop dan TS. Bagan akun bawaannya dibaca dari
   // `src/lib/validations/akun-bawaan.json`, yang disalin sync-frontend-lib.ts.

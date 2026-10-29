@@ -96,6 +96,7 @@ diberikan secara sadar lewat Role & Akses. Daftar resminya ada di
 | `accounting.reverse` | Efek sebuah transaksi hilang dari seluruh laporan lewat jurnal pembalik, tanpa uang yang benar-benar kembali |
 | `loan.approve` | Uang perusahaan dicairkan ke seorang karyawan dan kemudian dipotong dari gajinya |
 | `accounting.close` | Jurnal seluruh perangkat terkunci untuk periode itu, dan keputusan bentrokan menentukan potret saldo mana yang berlaku |
+| `installment.cancel` | Membatalkan pembayaran cicilan membalik jurnalnya, dan menutup kontrak membuat sisa utangnya hanya bisa dibereskan dengan jurnal manual |
 
 ### Penanganan Form Input Konfigurasi (Token Retention):
 - Token yang sudah tersimpan di vault TIDAK PERNAH diekspos kembali ke frontend dalam bentuk plaintext.

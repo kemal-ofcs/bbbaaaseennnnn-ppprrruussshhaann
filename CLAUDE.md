@@ -653,7 +653,8 @@ foto, ditarik per id). Rute `inventory-request/save|approve|reject|cancel|close`
   pengajuannya sendiri kecuali Superadmin (`validate_pemutus` ↔
   `validatePemutus`).
 - Penerimaan memakai inti yang sudah ada dalam satu transaksi: barang baru lewat
-  `save_item_tx` ↔ `saveItemTx` berid tetap `brg-<id_baris>`, Masuk lewat
+  `save_item_tx` ↔ `saveItemTx` berid tetap `brg-<id_baris>` (nama dan satuannya boleh
+  dirapikan saat diterima; baris pengajuan tetap ejaan aslinya), Masuk lewat
   `record_mutation_tx`. Jumlah tidak boleh melebihi sisa ACC, hanya diperiksa
   di perangkat. Foto 1–5, MIME sesuai CHECK, maks 600.000 karakter base64,
   diperiksa juga oleh handler cloud.
@@ -663,6 +664,53 @@ foto, ditarik per id). Rute `inventory-request/save|approve|reject|cancel|close`
   `APPEND_ONLY_TABLES`, jadi penerimaan tabel snapshot biasa. Daftar butuh
   `inventory.view` atau `accounting.view` (`requireAnyWebPermission`, dinilai
   lisensinya sekali memakai izin yang dipegang).
+
+## Pembelian cicilan (schema versi 31)
+
+Port dari Manajemen Sekolah v65 (`inventaris-cicilan-prd.md` di repo sekolah).
+Logika `desktop/cicilan.rs` (disalin ke Mobile) dan kembarannya
+`validations/cicilan.ts` + `services/cicilan.ts`, UI
+`components/keuangan/CicilanWorkspace.tsx` (tab Cicilan di Keuangan) dan
+`components/inventory/SyaratCicilan.tsx` (isian syarat di pengajuan dan
+penerimaan), keduanya di `filesToCopy`. Kontrak selalu lahir dari pengajuan
+v30 bercara bayar `Cicilan` (`inventory_pengajuan.cara_bayar`, bawaan
+`Tunai`), berid `cil-<id_pengajuan>`. Tabel tersinkron `keu_cicilan`,
+`keu_cicilan_jadwal` (ke-0 = DP), `keu_cicilan_bayar`,
+`keu_cicilan_bayar_batal`. Rute `installment/activate|reapprove|close`,
+`installment-payment/create`, `installment-payment-cancel/create`; syarat Draf
+dan ACC menumpang `inventory-request/save|approve`. Sentinel `-2027`.
+
+- Status, sisa, dan angsuran ke berapa TIDAK disimpan (`status_cicilan` ↔
+  `statusCicilan`): Dibatalkan, Ditutup, Draf, Menunggu barang, Menunggu ACC
+  ulang, Lunas, Menunggak, Berjalan. "Tertutup" = nominal + potongan
+  pembayaran `Bayar` yang tidak dibatalkan, dialokasikan dari `ke` terkecil.
+- Bunga tidak pernah dari persen: total bayar − harga tunai (nilai barang yang
+  diterima). Pokok/bunga dibagi proporsional dengan pembulatan kumulatif
+  (`bunga_kumulatif`, i128 ↔ BigInt); potongan mengurangi bunga dulu, sisanya
+  Pendapatan Lain-lain (`susun_jurnal_cicilan` ↔ `susunJurnalCicilan`).
+- ACC pengajuan kini juga mensyaratkan `cara_bayar` dan `sidik_syarat` yang
+  dilihat; akuntansi memilih akun utang/bunga/denda kontrak (bawaan
+  `akun-utang-cicilan` 2-1600, `akun-beban-bunga` 5-1700, `akun-beban-denda`
+  5-1800, `sistem: false`; kode sekolah 5-1500/5-1600 sudah dipakai di sini).
+- Penerimaan Cicilan wajib penuh dan membawa syarat final (event
+  `installment/activate`); total bayar final > yang di-ACC → ACC ulang
+  (`validate_pemutus`). Cloud menimpa syarat final hanya selama kontrak belum
+  punya pembayaran, jadi mutasi penerimaan yang dibatalkan sebelum ada
+  pembayaran mengembalikan kontrak ke Menunggu barang.
+- Jurnal penerimaan di tab Dari Inventaris berkredit tetap akun utang kontrak.
+  Pembayaran (satu jurnal `jrn-<id_bayar>` bersumber baru `Cicilan`) baru bisa
+  dicatat setelah semua mutasi penerimaan berharga dijurnal, ditolak di
+  perangkat bila melebihi sisa jadwal, dan tidak pernah ditolak cloud;
+  pelunasan kembar tampil "lebih bayar" di bagian Perlu ditinjau.
+- `installment.cancel` sensitif: membatalkan pembayaran (Bayar hanya yang
+  terakhir, denda kapan saja) dan menutup kontrak. `cancel_mutation` menolak
+  mutasi penerimaan yang kontraknya sudah punya pembayaran.
+- Beda dari sekolah: tanpa tombstone, jadi `keu_cicilan_jadwal`
+  `delete_missing: true` dan `PendingGuard::induk_tertunda` melindungi kontrak
+  serta jadwal selama event `inventory-request`/`installment` induknya
+  tertunda; tanpa `APPEND_ONLY_TABLES`. CHECK `keu_jurnal.sumber` di semua
+  lapis kini `Manual, Kasbon, Payroll, Inventaris, Cicilan, Pembatalan` (DDL
+  rebuild v28 sebelumnya ikut memuat `Pembayaran`/`Tagihan` sisa sekolah).
 
 ## Kasbon karyawan (schema versi 22)
 

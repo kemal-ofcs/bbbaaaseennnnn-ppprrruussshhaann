@@ -1,7 +1,7 @@
 # HASIL.md — hasil `bun run check`
 
-- Waktu: 28 Oktober 2026, 18:07 WIB
-- Commit: d3144fa (+ 1 berkas log berubah, belum commit)
+- Waktu: 29 Oktober 2026, 06:53 WIB
+- Commit: f03610e (+ 95 berkas berubah, belum commit)
 - Perintah: `bun run check` (root)
 - Exit code: 0
 - Status: **LULUS**
@@ -20,7 +20,8 @@
 Tidak ada.
 
 ## Catatan
-- Seluruh 4 lapisan skema konsisten: 439 kolom pada 37 tabel snapshot hadir di sisi lokal dan cloud.
-- Kontrak sync kanonik valid (65 route kanonik, 199 command web-desktop, 204 command mobile).
-- `web-desktop`: Biome check bersih, TypeScript check bersih, Bun test lulus, Cargo test 315 lulus (0 gagal).
-- `mobile`: Biome check bersih (357 files), TypeScript check bersih, Bun test lulus, Cargo test 318 lulus (0 gagal).
+- Skema 4 lapisan konsisten: 483 kolom pada 41 tabel snapshot hadir di sisi lokal dan cloud (57 tabel operasional terverifikasi).
+- Kontrak sinkronisasi valid: 70 rute kanonik, 41 tabel snapshot, 204 command web-desktop, 209 command mobile.
+- Dokumentasi sinkron: 70 rute kanonik, 41 tabel snapshot, 16 izin sensitif, 3 provider database.
+- `web-desktop`: Biome check bersih, TypeScript check bersih, Bun test lulus, Cargo test 327 lulus (0 gagal).
+- `mobile`: Biome check bersih (363 berkas), TypeScript check bersih, Bun test lulus, Cargo test 330 lulus (0 gagal).

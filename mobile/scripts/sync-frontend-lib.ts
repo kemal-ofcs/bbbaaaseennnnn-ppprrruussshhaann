@@ -49,6 +49,8 @@ const filesToCopy = [
   "components/inventory/Servis.tsx",
   // Pengajuan pembelian (v30): tab Pengajuan dan bagian persetujuan di Keuangan.
   "components/inventory/Pengajuan.tsx",
+  // Pembelian cicilan (v31): isian syarat di pengajuan dan tab Cicilan.
+  "components/inventory/SyaratCicilan.tsx",
   // Pembukuan: satu UI untuk kedua build, bergantung pada `Modal` dan gaya
   // `components/inventory/gaya.ts` yang juga disalin.
   "components/keuangan/KeuanganWorkspace.tsx",
@@ -57,6 +59,8 @@ const filesToCopy = [
   "components/keuangan/KasbonWorkspace.tsx",
   // Pemilih akun Kas/Bank: dipakai Kasbon dan detail proses gaji.
   "components/keuangan/PilihAkunBayar.tsx",
+  // Tab Cicilan di Keuangan (v31).
+  "components/keuangan/CicilanWorkspace.tsx",
   "components/keuangan/TutupBukuPanel.tsx",
   // Jurnal pengadaan dan hibah inventaris (v28), tab "Dari Inventaris".
   "components/keuangan/JurnalInventaris.tsx",
