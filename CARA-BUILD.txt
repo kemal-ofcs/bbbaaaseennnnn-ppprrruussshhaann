@@ -1,0 +1,128 @@
+CARA BUILD ABSENSI PERUSAHAAN
+=============================
+Semua perintah dijalankan dari folder root repo: C:\dev\absensi-perusahaan
+kecuali disebut lain.
+
+
+0. PERSIAPAN (sekali per komputer, atau setelah git pull)
+---------------------------------------------------------
+  bun run setup          pasang dependensi kedua workspace
+  bun run sync:mobile    salin kode bersama web-desktop -> mobile
+                         (WAJIB sebelum build mobile)
+  bun run check          gerbang kualitas, jalankan sebelum rilis
+
+Naikkan versi sebelum rilis, di tiga tempat dengan angka yang sama:
+  web-desktop/src-tauri/tauri.conf.json   "version"
+  web-desktop/src-tauri/Cargo.toml        version
+  mobile/src-tauri/tauri.conf.json        "version"
+
+
+1. WEBSITE (STANDALONE / SELF-HOSTED)
+-------------------------------------
+Ada dua bentuk paket untuk diserahkan ke klien. Hasilnya masuk folder rilis/.
+
+a) Paket Windows TANPA Docker (zip, berisi node.exe + caddy.exe)
+     bun run paket:build --versi 1.0.0
+   Hasil : rilis/absensi-perusahaan-1.0.0-windows.zip
+   Syarat: harus dibuild di Windows 64-bit, dan butuh internet (unduh Node
+           dan Caddy).
+   Klien : ekstrak, isi .env, klik Mulai.cmd (panduan ada di README.md di
+           dalam zip, sumbernya deploy/windows/README.md).
+
+b) Image Docker (untuk server Linux / NAS / VPS)
+     bun run image:build --versi 1.0.0
+   Hasil : rilis/absensi-perusahaan-1.0.0/  (berkas .tar + docker-compose.yml
+           + Caddyfile + .env.example + README.md)
+   Syarat: Docker Desktop menyala.
+   Klien : docker load -i <berkas>.tar, isi .env, docker compose up -d
+           (panduan: deploy/README.md).
+
+Keduanya MENEGAKKAN lisensi secara otomatis.
+
+c) Vercel (bukan standalone, sekadar catatan)
+   Push ke GitHub, project Vercel membuild sendiri (bun run build).
+   Untuk klien SEWA: isi env KOS_LICENSE_ENFORCED=1 di project Vercel
+   SEBELUM build. Project demo milik sendiri dibiarkan mati.
+
+d) Coba jalankan di komputer sendiri (bukan untuk klien)
+     cd web-desktop
+     bun run build
+     bun run start         -> http://localhost:3000
+
+
+2. DESKTOP (WINDOWS / LINUX / MAC)
+----------------------------------
+Tauri TIDAK bisa cross-compile: installer Windows dibuild di Windows, Linux
+di Linux, Mac di Mac.
+
+  cd web-desktop
+  bun run tauri:build
+
+Perintah ini otomatis menjalankan build frontend (build:desktop) dulu.
+Hasil ada di web-desktop/src-tauri/target/release/bundle/
+
+  Windows : nsis/Absensi Perusahaan_<versi>_x64-setup.exe   <- yang dibagikan
+            msi/Absensi Perusahaan_<versi>_x64_en-US.msi
+  Linux   : deb/*.deb, rpm/*.rpm, appimage/*.AppImage
+  Mac     : dmg/*.dmg, macos/*.app
+
+Prasyarat per OS:
+  Windows : Rust, Bun, Microsoft C++ Build Tools, WebView2 (sudah ada di Win 10/11).
+  Linux   : Rust, Bun, lalu (Ubuntu/Debian):
+            sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget \
+              file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+  Mac     : Rust, Bun, Xcode Command Line Tools (xcode-select --install).
+            Tanpa sertifikat Apple Developer, Mac akan bilang "aplikasi dari
+            developer tak dikenal": klien klik kanan > Open.
+
+Catatan: tanpa code signing, Windows SmartScreen menampilkan "Windows
+protected your PC". Klien klik "More info" > "Run anyway".
+
+
+3. MOBILE ANDROID
+-----------------
+  bun run sync:mobile                       (dari root, wajib dulu)
+  cd mobile
+  bun run tauri:android:build:arm64         <- yang biasa dipakai (HP modern)
+
+Hasil:
+  mobile/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk
+  (nama foldernya "universal" walau isinya hanya arm64; itu normal)
+
+Varian lain:
+  bun run tauri:android:build           semua arsitektur dalam satu APK (besar)
+  bun run tauri:android:build:split     satu APK per arsitektur
+
+Tanda tangan APK memakai mobile/src-tauri/keystore.properties (kunci rilis,
+di-gitignore). Simpan keystore dan kata sandinya baik-baik: kalau hilang,
+APK baru tidak bisa meng-update APK lama di HP klien, harus uninstall dulu.
+
+Prasyarat: Android Studio (SDK + NDK), JAVA_HOME diarahkan ke JDK bawaan
+Android Studio, ANDROID_HOME dan NDK_HOME terisi, lalu sekali saja:
+  rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+
+Kalau folder mobile/src-tauri/gen/android terhapus:
+  bun run tauri:android:init
+
+Install ke HP: kalau ikon/tampilan masih versi lama, uninstall dulu aplikasi
+lamanya, baru install APK baru. Pastikan antrean sinkronisasi sudah kosong.
+
+
+4. MOBILE iOS
+-------------
+WAJIB di Mac dengan Xcode. Tidak bisa dari Windows sama sekali.
+
+  bun run sync:mobile
+  cd mobile
+  bun run tauri:ios:init          (sekali saja, membuat gen/apple)
+  bun run tauri:ios:build
+
+Untuk memasang di iPhone orang lain (TestFlight / App Store / ad-hoc) butuh
+akun Apple Developer berbayar (sekitar USD 99 per tahun). Tanpa itu, aplikasi
+hanya bisa dicoba di iPhone sendiri lewat Xcode dan kedaluwarsa tiap 7 hari.
+
+
+5. GANTI LOGO / IKON
+--------------------
+Lihat web-desktop/src-tauri/icons/sumber/README.md. Setelah generate ulang,
+build ulang Desktop dan Android.
