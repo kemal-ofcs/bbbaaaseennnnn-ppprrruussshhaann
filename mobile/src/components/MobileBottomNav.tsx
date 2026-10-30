@@ -31,25 +31,26 @@ export function MobileBottomNav() {
   if (canKaryawan) {
     navItems.push({ href: "/karyawan", icon: "users", label: "Karyawan" });
   }
+  if (canHistory) {
+    navItems.push({ href: "/history", icon: "clock", label: "Riwayat" });
+  }
+  navItems.push({ href: "/settings", icon: "settings", label: "Pengaturan" });
+  // Jumlah menu mengikuti izin role, jadi posisi Scanner dihitung, bukan ditulis tetap.
   if (canScanner) {
-    navItems.push({
+    navItems.splice(Math.floor(navItems.length / 2), 0, {
       href: "/scanner",
       icon: "scanner",
       label: "Scanner",
       isElevated: true,
     });
   }
-  if (canHistory) {
-    navItems.push({ href: "/history", icon: "clock", label: "Riwayat" });
-  }
-  navItems.push({ href: "/settings", icon: "settings", label: "Pengaturan" });
 
   return (
     <nav
       aria-label="Navigasi Bawah Mobile"
       className="fixed inset-x-0 bottom-0 z-50 border-t border-white/10 bg-slate-950/95 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 backdrop-blur-2xl nav-elevation"
     >
-      <div className="mx-auto flex w-full max-w-lg items-center justify-around px-2">
+      <div className="mx-auto flex w-full max-w-lg items-end justify-around px-2">
         {navItems.map((item) => {
           const isActive =
             item.href === "/dashboard"
@@ -63,10 +64,10 @@ export function MobileBottomNav() {
                 href={item.href}
                 onClick={() => triggerHaptic("success")}
                 aria-label="Buka Scanner QR"
-                className="group relative -top-4 flex flex-col items-center"
+                className="group flex min-w-12 flex-1 flex-col items-center gap-1 pb-1"
               >
                 <div
-                  className={`grid size-14 place-items-center rounded-2xl shadow-xl transition-all active:scale-90 ${
+                  className={`-mt-5 grid size-14 place-items-center rounded-2xl shadow-xl transition-all active:scale-90 ${
                     isActive
                       ? "bg-gradient-to-tr from-sky-400 via-sky-500 to-blue-600 text-slate-950 shadow-sky-500/40 ring-4 ring-slate-950 ring-offset-2 ring-offset-sky-500/30"
                       : "bg-gradient-to-tr from-sky-500 to-blue-700 text-on-accent shadow-sky-950/60 ring-4 ring-slate-950 hover:brightness-110"
@@ -75,8 +76,8 @@ export function MobileBottomNav() {
                   <Icon name="scanner" className="size-7 stroke-[2.2]" />
                 </div>
                 <span
-                  className={`mt-1 text-[11px] font-black tracking-tight transition-colors ${
-                    isActive ? "text-sky-300" : "text-slate-400"
+                  className={`text-[10px] font-semibold leading-none transition-colors ${
+                    isActive ? "text-sky-300 font-bold" : "text-slate-400"
                   }`}
                 >
                   {item.label}
