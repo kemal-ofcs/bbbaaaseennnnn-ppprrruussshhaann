@@ -4,7 +4,9 @@ import type { FormEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
+import { konfirmasiData } from "@/components/ui/KonfirmasiData";
 import { Modal } from "@/components/ui/Modal";
+import { PilihCari } from "@/components/ui/PilihCari";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { getDaftarKaryawan } from "@/lib/gateways/employee";
 import {
@@ -170,6 +172,14 @@ export function HolidayWhitelistPanel({ canManage }: { canManage: boolean }) {
       return;
     }
 
+    const lanjut = await konfirmasiData([
+      {
+        label: "Berlaku untuk",
+        nilai: draft.scope_type === "SHIFT" ? "Shift" : "Divisi",
+      },
+      { label: "Nilai", nilai: draft.scope_value },
+    ]);
+    if (!lanjut) return;
     isSubmittingRef.current = true;
     setSaving(true);
     setFeedback(null);
@@ -430,7 +440,7 @@ export function HolidayWhitelistPanel({ canManage }: { canManage: boolean }) {
               {draft.scope_type === "SHIFT" ? "Shift" : "Nama Divisi"}
             </label>
             {draft.scope_type === "SHIFT" ? (
-              <select
+              <PilihCari
                 id="whitelist-scope-value"
                 value={draft.scope_value}
                 onChange={(event) =>
@@ -447,7 +457,7 @@ export function HolidayWhitelistPanel({ canManage }: { canManage: boolean }) {
                     {shift.kode} - {shift.nama}
                   </option>
                 ))}
-              </select>
+              </PilihCari>
             ) : (
               <>
                 <input

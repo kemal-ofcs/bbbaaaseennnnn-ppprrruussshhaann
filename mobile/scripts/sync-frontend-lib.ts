@@ -14,6 +14,10 @@ if (existsSync(desktopIcons)) {
 }
 
 const filesToCopy = [
+  // Dropdown dengan kotak cari dan dialog konfirmasi: bergantung pada `Modal`
+  // dan `components/inventory/gaya.ts` yang juga disalin.
+  "components/ui/PilihCari.tsx",
+  "components/ui/KonfirmasiData.tsx",
   "lib/db.ts",
   "lib/db-schema.ts",
   "lib/db-migrations.ts",

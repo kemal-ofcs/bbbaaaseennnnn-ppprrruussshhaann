@@ -19,6 +19,7 @@ import {
 } from "@/components/payroll/ConfigShared";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
+import { konfirmasiData } from "@/components/ui/KonfirmasiData";
 import { hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -28,6 +29,7 @@ import {
   getBpjsRules,
   saveBpjsRule,
 } from "@/lib/gateways/payroll";
+import { tanggalTampil } from "@/lib/validations/tutup-buku";
 
 /*
  * Aturan iuran BPJS untuk Mobile — padanan
@@ -192,6 +194,17 @@ export default function MobileBpjsRulesPage() {
       return;
     }
 
+    const lanjut = await konfirmasiData([
+      { label: "Kode", nilai: code },
+      { label: "Nama program", nilai: name },
+      { label: "Tarif", nilai: `${rate}%` },
+      {
+        label: "Batas upah",
+        nilai: wageCap === null ? "Tanpa batas" : String(wageCap),
+      },
+      { label: "Berlaku mulai", nilai: tanggalTampil(draft.effective_date) },
+    ]);
+    if (!lanjut) return;
     isSubmittingRef.current = true;
     setSaving(true);
     setFormError(null);

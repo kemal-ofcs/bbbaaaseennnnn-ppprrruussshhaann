@@ -11,6 +11,7 @@ import {
 } from "@/components/payroll/RunStatusBadge";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
+import { konfirmasiData } from "@/components/ui/KonfirmasiData";
 import { Modal } from "@/components/ui/Modal";
 import { hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
@@ -176,6 +177,12 @@ export default function RunDetailClient() {
 
   const executeTransition = async () => {
     if (!transition || isSubmittingRef.current) return;
+    const lanjut = await konfirmasiData([
+      { label: "Batch", nilai: runId },
+      { label: "Status baru", nilai: transition.target },
+      { label: "Catatan", nilai: notes },
+    ]);
+    if (!lanjut) return;
     isSubmittingRef.current = true;
     setSaving(true);
     setFeedback(null);

@@ -17,6 +17,7 @@ import {
 } from "@/components/payroll/ConfigShared";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
+import { konfirmasiData } from "@/components/ui/KonfirmasiData";
 import { hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -227,6 +228,16 @@ export default function MobileOvertimeRulesPage() {
       return;
     }
 
+    const lanjut = await konfirmasiData([
+      { label: "Urutan", nilai: String(tierOrder) },
+      { label: "Jam mulai", nilai: String(startDisplay) },
+      {
+        label: "Jam akhir",
+        nilai: hourEnd === null ? "Tanpa batas" : String(hourEnd),
+      },
+      { label: "Pengali", nilai: String(multiplier) },
+    ]);
+    if (!lanjut) return;
     isSubmittingRef.current = true;
     setSaving(true);
     setFormError(null);

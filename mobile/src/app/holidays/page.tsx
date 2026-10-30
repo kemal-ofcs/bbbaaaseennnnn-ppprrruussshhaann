@@ -8,6 +8,7 @@ import { LiburMassalDialog } from "@/components/holiday/LiburMassalDialog";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
+import { konfirmasiData } from "@/components/ui/KonfirmasiData";
 import { Modal } from "@/components/ui/Modal";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
@@ -22,6 +23,7 @@ import {
 } from "@/lib/gateways/holiday";
 import { subscribeSyncCompleted } from "@/lib/gateways/sync-status";
 import { useDebounce } from "@/lib/hooks/useDebounce";
+import { tanggalTampil } from "@/lib/validations/tutup-buku";
 
 /*
  * Cerminan Mobile dari `web-desktop/src/app/holidays/page.tsx`. Logikanya
@@ -229,6 +231,13 @@ export default function MobileHolidaysPage() {
       return;
     }
 
+    const lanjut = await konfirmasiData([
+      { label: "Tanggal", nilai: tanggalTampil(draft.tanggal) },
+      { label: "Nama libur", nilai: draft.nama_libur },
+      { label: "Jenis", nilai: draft.jenis_libur },
+      { label: "Keterangan", nilai: draft.keterangan },
+    ]);
+    if (!lanjut) return;
     isSubmittingRef.current = true;
     setSaving(true);
     setFeedback(null);

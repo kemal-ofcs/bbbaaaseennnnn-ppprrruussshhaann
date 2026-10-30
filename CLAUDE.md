@@ -388,6 +388,25 @@ Email dikirim lewat HTTP API (Resend atau Brevo), tidak pernah SMTP, dan
 kuncinya dikonfigurasi dari dalam aplikasi lewat tabel `app_mail_config` — bukan
 variabel lingkungan, supaya pemilik aplikasi bisa menggantinya tanpa build ulang.
 
+## Dropdown dan konfirmasi data
+
+`components/ui/PilihCari.tsx` menggantikan `<select>` untuk daftar yang isinya
+dari data atau panjang (barang, tempat, akun, personil, divisi, shift): satu
+baris kotak cari + tombol daftar, tinggi daftar dibatasi, paling banyak 200
+baris dirender. Props dan anak `<option>`-nya sama dengan `<select>`, jadi
+cukup ganti nama tag; `e.target.value` tetap berlaku. Enum tetap yang pendek
+(Kondisi, Tipe, Status) sengaja tetap `<select>` native. Daftarnya lewat portal
+karena panel Modal memotong anak ber-`position: fixed`.
+
+`konfirmasiData(rincian)` (`components/ui/KonfirmasiData.tsx`) adalah dialog
+"Apakah data yang dicatat sudah benar?" sebelum data manual disimpan, dipasang
+di form data manual semua modul. Panggil setelah validasi lokal dan SEBELUM
+`isSubmittingRef.current = true`. Keduanya di `filesToCopy`. Halaman Web dan
+Mobile yang kodenya terpisah wajib dipasangi keduanya. Sengaja tidak dipasang
+pada scan QR, alur masuk (login, lupa password, setup, aktivasi), filter,
+ekspor, impor berkas, dan aksi yang sudah punya konfirmasi sendiri. Password,
+token, dan API key tidak pernah tampil di ringkasan, cukup "Diubah".
+
 ## Lisensi offline Ed25519 (Desktop, Mobile, Web)
 
 Memakai format `LIS1` yang sama dengan aplikasi KOS lain, tetapi dengan

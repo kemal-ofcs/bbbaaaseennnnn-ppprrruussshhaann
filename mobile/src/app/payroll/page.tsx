@@ -7,6 +7,7 @@ import { MobileAppShell } from "@/components/MobileAppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { Modal } from "@/components/ui/Modal";
+import { PilihCari } from "@/components/ui/PilihCari";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { shareText } from "@/lib/client/share";
@@ -401,9 +402,13 @@ Status: Estimasi Real-Time ${companyName}`;
         {/* Pemilih Personil Karyawan */}
         {employees.length > 0 && (
           <div className="space-y-1">
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            <label
+              htmlFor="payroll-personil-select"
+              className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400"
+            >
               <span>Pilih Personil:</span>
-              <select
+              <PilihCari
+                id="payroll-personil-select"
                 value={selectedKaryawanId}
                 onChange={(e) => {
                   triggerHaptic();
@@ -417,7 +422,7 @@ Status: Estimasi Real-Time ${companyName}`;
                     {emp.divisi ? String(emp.divisi) : "Divisi -"})
                   </option>
                 ))}
-              </select>
+              </PilihCari>
             </label>
           </div>
         )}

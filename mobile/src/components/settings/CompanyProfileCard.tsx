@@ -4,6 +4,7 @@ import type { ChangeEvent, FormEvent, ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
+import { konfirmasiData } from "@/components/ui/KonfirmasiData";
 import { Modal } from "@/components/ui/Modal";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { formatBytes, optimizeImageFile } from "@/lib/client/image-optimizer";
@@ -167,6 +168,17 @@ export function CompanyProfileCard() {
       });
       return;
     }
+    const lanjut = await konfirmasiData([
+      { label: "Nama instansi", nilai: draft.company_name },
+      { label: "Cabang", nilai: draft.branch_name },
+      { label: "Alamat", nilai: draft.address },
+      { label: "Telepon", nilai: draft.phone },
+      { label: "Email", nilai: draft.email },
+      { label: "Website", nilai: draft.website },
+      { label: "Pimpinan", nilai: draft.leader_name },
+      { label: "Zona waktu", nilai: draft.timezone },
+    ]);
+    if (!lanjut) return;
     isSubmittingRef.current = true;
     setSaving(true);
     setFormFeedback(null);

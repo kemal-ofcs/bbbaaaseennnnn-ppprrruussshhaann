@@ -7,6 +7,7 @@ import { MobileAppShell } from "@/components/MobileAppShell";
 import { RunStatusBadge } from "@/components/payroll/RunStatusBadge";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
+import { konfirmasiData } from "@/components/ui/KonfirmasiData";
 import { Modal } from "@/components/ui/Modal";
 import { hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
@@ -17,6 +18,7 @@ import {
   listPayrollRuns,
   type PayrollRunRow,
 } from "@/lib/gateways/payroll";
+import { tanggalTampil } from "@/lib/validations/tutup-buku";
 
 /*
  * Daftar batch payroll + pembuatan batch baru untuk Mobile — padanan
@@ -173,6 +175,13 @@ export default function MobilePayrollRunsPage() {
   const handleCreate = async () => {
     if (isSubmittingRef.current || !estimate || estimate.employees === 0)
       return;
+    const lanjut = await konfirmasiData([
+      { label: "Tindakan", nilai: "Buat proses gaji baru" },
+      { label: "Periode mulai", nilai: tanggalTampil(periodStart) },
+      { label: "Periode akhir", nilai: tanggalTampil(periodEnd) },
+      { label: "Karyawan", nilai: String(estimate.employees) },
+    ]);
+    if (!lanjut) return;
     isSubmittingRef.current = true;
     setCreating(true);
     setCreateError(null);

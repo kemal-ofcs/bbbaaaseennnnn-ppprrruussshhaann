@@ -7,7 +7,9 @@ import {
   type StagedPhotoData,
 } from "@/components/PersonnelPhotoField";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
+import { konfirmasiData } from "@/components/ui/KonfirmasiData";
 import { Modal } from "@/components/ui/Modal";
+import { PilihCari } from "@/components/ui/PilihCari";
 import { triggerHaptic } from "@/lib/client/haptics";
 import {
   type KaryawanInput,
@@ -127,6 +129,20 @@ export function EmployeeFormModal({
       return;
     }
 
+    const lanjut = await konfirmasiData([
+      { label: "ID", nilai: formData.id_unik },
+      { label: "Kode", nilai: formData.kode_karyawan },
+      { label: "Nama", nilai: formData.nama },
+      { label: "Divisi", nilai: formData.divisi },
+      {
+        label: "Shift",
+        nilai: String(
+          shifts.find((s) => Number(s.id_shift) === Number(formData.id_shift))
+            ?.nama_shift ?? "",
+        ),
+      },
+    ]);
+    if (!lanjut) return;
     isSubmittingRef.current = true;
     setIsSubmitting(true);
     setErrorMsg(null);
@@ -351,7 +367,7 @@ export function EmployeeFormModal({
             >
               Shift Kerja:
             </label>
-            <select
+            <PilihCari
               id="employee-shift"
               value={formData.id_shift}
               onChange={(e) =>
@@ -370,7 +386,7 @@ export function EmployeeFormModal({
                   {String(s.jam_pulang ?? "15:00")})
                 </option>
               ))}
-            </select>
+            </PilihCari>
           </div>
           <div>
             <label

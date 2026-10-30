@@ -4,6 +4,7 @@ import type { FormEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
+import { konfirmasiData } from "@/components/ui/KonfirmasiData";
 import { triggerHaptic } from "@/lib/client/haptics";
 import {
   getScannerSafetySettings,
@@ -81,6 +82,17 @@ export function ScannerSafetyCard() {
       setFeedback({ type: "error", message: validationMessage });
       return;
     }
+    const lanjut = await konfirmasiData([
+      {
+        label: "Jeda scan ganda",
+        nilai: `${settings.antiDoubleScanSeconds} detik`,
+      },
+      {
+        label: "Batas multi-scan",
+        nilai: `${settings.batasMultiScanMenit} menit`,
+      },
+    ]);
+    if (!lanjut) return;
     isSubmittingRef.current = true;
     setSaving(true);
     setFeedback(null);

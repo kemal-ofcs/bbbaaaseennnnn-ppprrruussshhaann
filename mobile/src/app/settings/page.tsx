@@ -13,6 +13,7 @@ import { ScannerSafetyCard } from "@/components/settings/ScannerSafetyCard";
 import { ThemeSettingsCard } from "@/components/ThemeSettingsCard";
 import { TwoFactorCard } from "@/components/TwoFactorCard";
 import { Icon } from "@/components/ui/Icon";
+import { konfirmasiData } from "@/components/ui/KonfirmasiData";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import {
   calculateDistanceMeters,
@@ -280,6 +281,13 @@ export default function SettingsPage() {
       setTimeout(() => setSaveMessage(""), 3000);
       return;
     }
+    const lanjut = await konfirmasiData([
+      { label: "Geofence", nilai: geofence.enabled ? "Aktif" : "Nonaktif" },
+      { label: "Latitude", nilai: String(geofence.latitude) },
+      { label: "Longitude", nilai: String(geofence.longitude) },
+      { label: "Radius", nilai: `${geofence.radiusMeter} meter` },
+    ]);
+    if (!lanjut) return;
     setGeofenceBusy(true);
     triggerHaptic("light");
     isSubmittingRef.current = true;
@@ -316,6 +324,28 @@ export default function SettingsPage() {
       setIpAllowlistMessage(validationMessage);
       return;
     }
+    const lanjut = await konfirmasiData([
+      { label: "Foto bukti", nilai: scanPhotoEnabled ? "Aktif" : "Nonaktif" },
+      { label: "Pembatasan IP", nilai: scanIpEnabled ? "Aktif" : "Nonaktif" },
+      { label: "Daftar IP", nilai: `${entries.length} alamat` },
+      {
+        label: "Verifikasi wajah",
+        nilai: faceVerifyEnabled ? "Aktif" : "Nonaktif",
+      },
+      {
+        label: "Mode wajah",
+        nilai: faceVerifyEnabled
+          ? faceMode === "tolak"
+            ? "Tolak scan"
+            : "Tetap terima, tandai"
+          : null,
+      },
+      {
+        label: "Ambang wajah",
+        nilai: faceVerifyEnabled ? String(faceThreshold) : null,
+      },
+    ]);
+    if (!lanjut) return;
     setIpAllowlistBusy(true);
     isSubmittingRef.current = true;
     try {
@@ -470,6 +500,15 @@ export default function SettingsPage() {
       setTimeout(() => setSaveMessage(""), 4000);
       return;
     }
+    const lanjut = await konfirmasiData([
+      { label: "Jenis database", nilai: describeProvider(tursoProvider).label },
+      { label: "Alamat", nilai: needsEndpoint ? tursoUrl.trim() : null },
+      {
+        label: "Auth token",
+        nilai: needsEndpoint && tursoToken.trim() ? "Diubah" : null,
+      },
+    ]);
+    if (!lanjut) return;
     setTursoBusy(true);
     triggerHaptic("light");
     isSubmittingRef.current = true;

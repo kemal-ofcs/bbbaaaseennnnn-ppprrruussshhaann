@@ -1,10 +1,11 @@
-﻿"use client";
+"use client";
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
+import { konfirmasiData } from "@/components/ui/KonfirmasiData";
 import { Modal } from "@/components/ui/Modal";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
@@ -19,6 +20,7 @@ import {
   hapusLogScan,
 } from "@/lib/gateways/report";
 import { useDebounce } from "@/lib/hooks/useDebounce";
+import { tanggalTampil } from "@/lib/validations/tutup-buku";
 import { buildDailyExport, buildScanLogExport } from "./history-export";
 
 type HistoryTab = "daily" | "scan-logs";
@@ -303,6 +305,16 @@ export default function HistoryPage() {
       });
       return;
     }
+    const lanjut = await konfirmasiData([
+      { label: "Karyawan", nilai: editData.nama },
+      { label: "Tanggal", nilai: tanggalTampil(editData.tanggal) },
+      { label: "Jam masuk", nilai: editData.jam_masuk },
+      { label: "Jam pulang", nilai: editData.jam_pulang },
+      { label: "Status kehadiran", nilai: editData.status_kehadiran },
+      { label: "Status absen", nilai: editData.status_absen },
+      { label: "Keterangan", nilai: editData.keterangan },
+    ]);
+    if (!lanjut) return;
     isSubmittingRef.current = true;
     setActionBusy(true);
     setFeedback(null);

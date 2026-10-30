@@ -6,7 +6,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { PilihHariKerja } from "@/components/shift/PilihHariKerja";
 import { Icon } from "@/components/ui/Icon";
+import { konfirmasiData } from "@/components/ui/KonfirmasiData";
 import { Modal } from "@/components/ui/Modal";
+import { PilihCari } from "@/components/ui/PilihCari";
 import {
   hitungJamKerjaNormalMenit,
   isShiftFleksibel,
@@ -370,6 +372,13 @@ export default function MobileShiftPage() {
       return;
     }
 
+    const lanjut = await konfirmasiData([
+      { label: "Kode", nilai: String(formData.kode_shift) },
+      { label: "Nama shift", nilai: formData.nama_shift },
+      { label: "Jam masuk", nilai: formData.jam_masuk },
+      { label: "Jam pulang", nilai: formData.jam_pulang },
+    ]);
+    if (!lanjut) return;
     setSaving(true);
     triggerHaptic("light");
     isSubmittingRef.current = true;
@@ -1194,7 +1203,7 @@ export default function MobileShiftPage() {
                   >
                     Lanjut ke Shift
                   </label>
-                  <select
+                  <PilihCari
                     id="shift-lanjutan-input"
                     value={formData.shift_lanjutan_id ?? 0}
                     onChange={(e) =>
@@ -1219,7 +1228,7 @@ export default function MobileShiftPage() {
                           {String(row.jam_pulang)})
                         </option>
                       ))}
-                  </select>
+                  </PilihCari>
                   <p className="mt-1 text-[10px] leading-4 text-slate-400">
                     Kolom shift karyawan ikut dipindahkan ke shift tujuan saat
                     sesi lanjutan dimulai.

@@ -19,6 +19,7 @@ import {
 } from "@/components/payroll/ConfigShared";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
+import { konfirmasiData } from "@/components/ui/KonfirmasiData";
 import { hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -28,6 +29,7 @@ import {
   saveTaxRule,
   type TaxRuleRow,
 } from "@/lib/gateways/payroll";
+import { tanggalTampil } from "@/lib/validations/tutup-buku";
 
 /*
  * Lapisan tarif PPh 21 (Pasal 17 & TER A/B/C) untuk Mobile — padanan
@@ -214,6 +216,17 @@ export default function MobileTaxRulesPage() {
       return;
     }
 
+    const lanjut = await konfirmasiData([
+      { label: "Kategori", nilai: String(draft.category) },
+      { label: "Batas bawah", nilai: String(bracketMin) },
+      {
+        label: "Batas atas",
+        nilai: bracketMax === null ? "Tanpa batas" : String(bracketMax),
+      },
+      { label: "Tarif", nilai: `${rate}%` },
+      { label: "Berlaku mulai", nilai: tanggalTampil(draft.effective_date) },
+    ]);
+    if (!lanjut) return;
     isSubmittingRef.current = true;
     setSaving(true);
     setFormError(null);

@@ -1,7 +1,7 @@
 # HASIL.md — hasil `bun run check`
 
-- Waktu: 30 Oktober 2026, 18:20 WIB
-- Commit: 9c37fda (+ 2 berkas berubah, belum commit)
+- Waktu: 30 Oktober 2026, 21:26 WIB
+- Commit: 0eff931 (+ 73 berkas berubah, belum commit)
 - Perintah: `bun run check` (root)
 - Exit code: 0
 - Status: **LULUS**
@@ -19,4 +19,4 @@ Tidak ada (semua gate LULUS):
 Tidak ada galat.
 
 ## Catatan
-- Seluruh pengujian integritas skema, kontrak outbox, lint, typecheck, dan unit test (termasuk 657 cargo test di kedua workspace) lolos 100%.
+- Seluruh 73 berkas perubahan (termasuk implementasi komponen PilihCari dan konfirmasiData baru) lolos uji audit skema, kontrak outbox, lint, typecheck, dan 657 pengujian Rust tanpa galat.

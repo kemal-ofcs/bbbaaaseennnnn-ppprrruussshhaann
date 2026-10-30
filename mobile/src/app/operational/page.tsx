@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -12,6 +12,8 @@ import {
 } from "@/components/operational/aturanPilihPersonil";
 import { PilihPersonil } from "@/components/operational/PilihPersonil";
 import { Icon } from "@/components/ui/Icon";
+import { konfirmasiData } from "@/components/ui/KonfirmasiData";
+import { PilihCari } from "@/components/ui/PilihCari";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -33,6 +35,7 @@ import {
   prosesImportOffline,
 } from "@/lib/gateways/offline-import";
 import { getDaftarShift } from "@/lib/gateways/shift";
+import { tanggalTampil } from "@/lib/validations/tutup-buku";
 
 type OperationalTab = "koreksi" | "backup" | "manual";
 
@@ -247,6 +250,17 @@ export default function OperationalPage() {
       return;
     }
     if (isSubmittingRef.current) return;
+    // Banyak karyawan atau koreksi yang ditimpa sudah ditanyakan di atas.
+    if (ids.length === 1 && sudahAda.length === 0) {
+      const lanjut = await konfirmasiData([
+        { label: "Tanggal", nilai: tanggalTampil(date) },
+        { label: "Karyawan", nilai: namaKaryawan(ids[0] as string) },
+        { label: "Jenis koreksi", nilai: korJenis },
+        { label: "Jam", nilai: korJam },
+        { label: "Keterangan", nilai: korKeterangan },
+      ]);
+      if (!lanjut) return;
+    }
     isSubmittingRef.current = true;
     setBusy(true);
     setFeedback(null);
@@ -312,6 +326,21 @@ export default function OperationalPage() {
       return;
     }
     if (isSubmittingRef.current) return;
+    const lanjut = await konfirmasiData([
+      { label: "Tanggal", nilai: tanggalTampil(date) },
+      { label: "Karyawan asal", nilai: namaKaryawan(bckAsalId) },
+      { label: "Pengganti", nilai: namaKaryawan(bckPenggantiId) },
+      {
+        label: "Shift",
+        nilai: String(
+          shifts.find((s) => Number(s.id_shift) === Number(bckShiftId))
+            ?.nama_shift ?? "",
+        ),
+      },
+      { label: "Alasan", nilai: bckAlasan },
+      { label: "Catatan", nilai: bckCatatan },
+    ]);
+    if (!lanjut) return;
     isSubmittingRef.current = true;
     setBusy(true);
     setFeedback(null);
@@ -367,6 +396,16 @@ export default function OperationalPage() {
       return;
     }
     if (isSubmittingRef.current) return;
+    const lanjut = await konfirmasiData([
+      { label: "Tanggal", nilai: tanggalTampil(date) },
+      { label: "Karyawan", nilai: ids.map(namaKaryawan).join(", ") },
+      { label: "Jam masuk", nilai: manJamMasuk },
+      { label: "Jam pulang", nilai: manJamPulang },
+      { label: "Status kehadiran", nilai: manStatusKehadiran },
+      { label: "Status absen", nilai: manStatusAbsen },
+      { label: "Keterangan", nilai: manKeterangan },
+    ]);
+    if (!lanjut) return;
     isSubmittingRef.current = true;
     setBusy(true);
     setFeedback(null);
@@ -721,7 +760,7 @@ export default function OperationalPage() {
                 >
                   Jenis Koreksi
                 </label>
-                <select
+                <PilihCari
                   id="kor-jenis"
                   value={korJenis}
                   onChange={(e) =>
@@ -736,7 +775,7 @@ export default function OperationalPage() {
                       {opt}
                     </option>
                   ))}
-                </select>
+                </PilihCari>
               </div>
 
               {/* Jam Koreksi (Kondisional) */}
@@ -879,7 +918,7 @@ export default function OperationalPage() {
                 >
                   Shift Penugasan
                 </label>
-                <select
+                <PilihCari
                   id="bck-shift"
                   value={bckShiftId}
                   onChange={(e) => setBckShiftId(Number(e.target.value))}
@@ -891,7 +930,7 @@ export default function OperationalPage() {
                       {String(s.jam_pulang)})
                     </option>
                   ))}
-                </select>
+                </PilihCari>
               </div>
 
               {/* Alasan */}
@@ -1093,7 +1132,7 @@ export default function OperationalPage() {
                   >
                     Status Absen
                   </label>
-                  <select
+                  <PilihCari
                     id="man-absen"
                     value={manStatusAbsen}
                     onChange={(e) => setManStatusAbsen(e.target.value)}
@@ -1104,7 +1143,7 @@ export default function OperationalPage() {
                         {opt.label}
                       </option>
                     ))}
-                  </select>
+                  </PilihCari>
                 </div>
               </div>
 

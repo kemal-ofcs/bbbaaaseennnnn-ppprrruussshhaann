@@ -19,6 +19,8 @@ import {
 } from "@/components/payroll/ConfigShared";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
+import { konfirmasiData } from "@/components/ui/KonfirmasiData";
+import { PilihCari } from "@/components/ui/PilihCari";
 import { hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import {
@@ -39,6 +41,7 @@ import {
   savePayrollComponent,
   saveSalaryConfig,
 } from "@/lib/gateways/payroll";
+import { tanggalTampil } from "@/lib/validations/tutup-buku";
 
 /*
  * Konfigurasi penggajian untuk Mobile — padanan
@@ -303,6 +306,21 @@ export default function MobilePayrollConfigPage() {
       setFormError("Tidak ada karyawan aktif pada cakupan ini.");
       return;
     }
+    const lanjut = await konfirmasiData([
+      { label: "Tindakan", nilai: "Terapkan gaji harian tetap" },
+      {
+        label: "Cakupan",
+        nilai: bulkDraft.divisi
+          ? `Divisi ${bulkDraft.divisi}`
+          : "Semua karyawan aktif",
+      },
+      { label: "Tarif", nilai: `${IDR.format(rate)}/hari` },
+      {
+        label: "Berlaku mulai",
+        nilai: tanggalTampil(bulkDraft.effective_date),
+      },
+    ]);
+    if (!lanjut) return;
     isSubmittingRef.current = true;
     setSaving(true);
     setFormError(null);
@@ -372,6 +390,25 @@ export default function MobilePayrollConfigPage() {
             cfg.id_karyawan === salaryDraft.id_karyawan &&
             cfg.effective_date === salaryDraft.effective_date,
         );
+    const lanjut = await konfirmasiData([
+      {
+        label: "Karyawan",
+        nilai:
+          employeeNames.get(salaryDraft.id_karyawan)?.nama ??
+          salaryDraft.id_karyawan,
+      },
+      { label: "Skema", nilai: isFlat ? "Gaji harian tetap" : "Per jam" },
+      {
+        label: "Tarif",
+        nilai: `${IDR.format(rate)}/${isFlat ? "hari" : "jam"}`,
+      },
+      { label: "Status PTKP", nilai: salaryDraft.ptkp_status },
+      {
+        label: "Berlaku mulai",
+        nilai: tanggalTampil(salaryDraft.effective_date),
+      },
+    ]);
+    if (!lanjut) return;
     isSubmittingRef.current = true;
     setSaving(true);
     setFormError(null);
@@ -452,6 +489,30 @@ export default function MobilePayrollConfigPage() {
       setFormError("Persentase tidak boleh melebihi 100%.");
       return;
     }
+    const lanjut = await konfirmasiData([
+      { label: "Nama komponen", nilai: name },
+      {
+        label: "Kategori",
+        nilai:
+          componentDraft.category === "ALLOWANCE" ? "Tunjangan" : "Potongan",
+      },
+      {
+        label: "Nilai",
+        nilai:
+          componentDraft.calc_type === "FIXED"
+            ? IDR.format(value)
+            : `${value}%`,
+      },
+      {
+        label: "Penerima",
+        nilai:
+          componentDraft.applies_to === "ALL"
+            ? "Semua karyawan"
+            : (employeeNames.get(componentDraft.applies_to)?.nama ??
+              componentDraft.applies_to),
+      },
+    ]);
+    if (!lanjut) return;
     isSubmittingRef.current = true;
     setSaving(true);
     setFormError(null);
@@ -842,7 +903,7 @@ export default function MobilePayrollConfigPage() {
                   placeholder="Saring nama / ID..."
                   className={CONFIG_INPUT_CLASS}
                 />
-                <select
+                <PilihCari
                   value={salaryDraft.id_karyawan}
                   onChange={(event) =>
                     setSalaryDraft((prev) =>
@@ -867,7 +928,7 @@ export default function MobilePayrollConfigPage() {
                       {emp.divisi ? String(emp.divisi) : "Divisi -"}
                     </option>
                   ))}
-                </select>
+                </PilihCari>
               </div>
             )}
 
@@ -936,7 +997,7 @@ export default function MobilePayrollConfigPage() {
                 <label htmlFor="salary-ptkp" className={CONFIG_LABEL_CLASS}>
                   Status PTKP
                 </label>
-                <select
+                <PilihCari
                   id="salary-ptkp"
                   value={salaryDraft.ptkp_status}
                   onChange={(event) =>
@@ -953,7 +1014,7 @@ export default function MobilePayrollConfigPage() {
                       {option.label}
                     </option>
                   ))}
-                </select>
+                </PilihCari>
               </div>
             </div>
 
@@ -1006,7 +1067,7 @@ export default function MobilePayrollConfigPage() {
               <label htmlFor="bulk-scope" className={CONFIG_LABEL_CLASS}>
                 Cakupan
               </label>
-              <select
+              <PilihCari
                 id="bulk-scope"
                 value={bulkDraft.divisi}
                 onChange={(event) =>
@@ -1022,7 +1083,7 @@ export default function MobilePayrollConfigPage() {
                     Divisi {divisi}
                   </option>
                 ))}
-              </select>
+              </PilihCari>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="min-w-0">

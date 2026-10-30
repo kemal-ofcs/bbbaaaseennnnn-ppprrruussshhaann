@@ -6,7 +6,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
+import { konfirmasiData } from "@/components/ui/KonfirmasiData";
 import { Modal } from "@/components/ui/Modal";
+import { PilihCari } from "@/components/ui/PilihCari";
 import { hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -259,6 +261,27 @@ export default function MobileMasterOperatorPage() {
   const submitOperator = async (event: FormEvent) => {
     event.preventDefault();
     if (!user || isSubmittingRef.current) return;
+    const lanjut = await konfirmasiData([
+      { label: "Kode", nilai: operatorDraft.kodeOperator },
+      { label: "Nama", nilai: operatorDraft.name },
+      { label: "Username", nilai: operatorDraft.username },
+      { label: "Email", nilai: operatorDraft.email },
+      { label: "No. HP", nilai: operatorDraft.noHp },
+      {
+        label: "Role",
+        nilai: roles.find((role) => role.id === operatorDraft.roleId)?.name,
+      },
+      { label: "Status", nilai: operatorDraft.status },
+      {
+        label: "Password",
+        nilai: operatorDraft.password
+          ? editingOperator
+            ? "Diubah"
+            : "Diisi"
+          : null,
+      },
+    ]);
+    if (!lanjut) return;
     isSubmittingRef.current = true;
     setSaving(true);
     setFeedback(null);
@@ -334,6 +357,13 @@ export default function MobileMasterOperatorPage() {
   const submitRole = async (event: FormEvent) => {
     event.preventDefault();
     if (!user || isSubmittingRef.current) return;
+    const lanjut = await konfirmasiData([
+      { label: "Nama role", nilai: roleDraft.name },
+      { label: "Deskripsi", nilai: roleDraft.description },
+      { label: "Status", nilai: roleDraft.status },
+      { label: "Jumlah izin", nilai: `${selectedPermissions.size} izin` },
+    ]);
+    if (!lanjut) return;
     isSubmittingRef.current = true;
     setSaving(true);
     setFeedback(null);
@@ -921,7 +951,7 @@ function OperatorFormModal({
                 </p>
               </div>
             ) : (
-              <select
+              <PilihCari
                 id="operator-role"
                 value={draft.roleId}
                 onChange={(event) =>
@@ -940,7 +970,7 @@ function OperatorFormModal({
                       {role.name}
                     </option>
                   ))}
-              </select>
+              </PilihCari>
             )}
           </FormField>
           <FormField label="Status" htmlFor="operator-status">
