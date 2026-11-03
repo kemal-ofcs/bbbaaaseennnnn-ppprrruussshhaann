@@ -731,6 +731,38 @@ dan ACC menumpang `inventory-request/save|approve`. Sentinel `-2027`.
   lapis kini `Manual, Kasbon, Payroll, Inventaris, Cicilan, Pembatalan` (DDL
   rebuild v28 sebelumnya ikut memuat `Pembayaran`/`Tagihan` sisa sekolah).
 
+## Label box dan draf opname (tanpa perubahan skema)
+
+Port dari repo sekolah (di sana disebut "dus"). Pengguna melihat kata "Box";
+nama di kode (`isiLabelDus`, `aksi "dus-ganda"`, `dusTerhitung`) sengaja sama
+dengan sekolah supaya perubahan berikutnya mudah diport. Tanpa tabel, rute
+sync, atau Rust: aturan murninya hanya di `validations/inventory.ts` karena
+hanya UI yang membaca label, dan `record_opname` tetap menerima angka akhir.
+
+- Label box berisi `INV:<id_barang>#<isi>#<kode cetak>-<nomor>`, hanya untuk
+  barang tanpa kedaluwarsa dan bukan per unit, karena box tidak menunjuk batch
+  atau unit. Isi tersimpan apa adanya (barang desimal ×100) dan tetap tanpa
+  `|`, sehingga terminal absensi menolaknya. Kode cetak acak per sekali cetak:
+  tanpa itu "Box 7" dari cetakan baru ditolak sebagai box yang sudah terhitung.
+- Pindai box langsung menambah isinya; pindaian pertama mulai dari isi, kecuali
+  barisnya sudah diketik (box terbuka), lalu ditambahkan. Box yang sama ditolak
+  dalam satu draf, tidak antarperangkat. Barang yang tidak tercatat di tempat
+  itu tetap dihitung sebagai baris di luar catatan (`fisik_awal` kosong). Isi
+  label bisa salah setelah box dibuka: label dilepas dan sisanya diketik, ini
+  prosedur petugas, bukan sesuatu yang bisa dicegah aplikasi.
+- Label rak membuka `IsianPindai` di dialog pindai tanpa menutup kamera. Pindaian
+  lain ditolak selama isian terbuka supaya ketikan tidak hilang, dan teks `INV:`
+  di kolom jumlah ditolak karena pemindai USB mengetik ke elemen yang fokus.
+- Draf otomatis di `localStorage` (`kos.inventaris.opname-draf:<id pengguna>:<tempat>`),
+  tidak pernah menyentuh stok, outbox, atau tabel tersinkron, dan hanya memuat
+  baris yang disentuh supaya baris lain mengikuti saldo terbaru. Dibuang setelah
+  simpan berhasil. Draf dari tanggal lain tetap bisa dilanjutkan dengan
+  peringatan: saldo sistem dihitung ulang saat disimpan, sehingga mutasi sesudah
+  hitungan bisa menjadi selisih palsu.
+- Beda dari sekolah: layar cek ulang (`Periksa hasil`) menggantikan
+  `konfirmasiData` untuk opname, karena sudah termasuk "aksi yang punya
+  konfirmasi sendiri"; jangan dipasang lagi di sana.
+
 ## Kasbon karyawan (schema versi 22)
 
 Fase 2 port Keuangan. Tabel tersinkron `keu_pinjaman`, `keu_pinjaman_mutasi`

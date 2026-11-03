@@ -1,16 +1,16 @@
 # ANTISLOP.md — hasil antislop
 
-- Waktu: 30 Oktober 2026, 21:18 WIB
-- Commit: 0eff931 (+ 73 berkas berubah, belum commit)
+- Waktu: 3 November 2026, 22:22 WIB
+- Commit: 279b30d (+ 50 berkas berubah, belum commit)
 - Berkas disunting: 0
 
 ## Disunting
-- (tidak ada — implementasi PilihCari, konfirmasiData, dan styling CSS sudah bersih dan bebas slop)
+- (tidak ada — seluruh komentar, teks antarmuka, dan aksesibilitas ARIA pada fitur label box dan draf opname sudah bersih dan bebas slop)
 
 ## Dilewati
-- `CLAUDE.md` — berkas panduan arsitektur (dikecualikan dari cakupan).
-- `web-desktop/src/components/ui/PilihCari.test.ts` & `gaya.test.ts` — berkas tes (dikecualikan).
-- `mobile/src/components/ui/PilihCari.tsx` & `KonfirmasiData.tsx` — berkas turunan sinkronisasi.
-- 70 berkas halaman & komponen `web-desktop` serta `mobile` — integrasi `PilihCari` dan `konfirmasiData` memakai komentar arsitektural esensial dan label UI bahasa Indonesia yang ringkas serta baku.
+- `CLAUDE.md` — berkas dokumentasi/panduan repo (dikecualikan).
+- 10 berkas unit test (`*.test.ts`) di `web-desktop` dan `mobile` — berkas tes (dikecualikan).
+- 13 berkas salinan Mobile turunan di `mobile/src/lib/**` dan `mobile/src-tauri/src/mobile/**` — salinan dari `web-desktop`.
+- 26 berkas sumber `web-desktop` dan komponen `mobile` — komentar teknis berfokus arsitektur, teks UI bahasa Indonesia baku, dan aksesibilitas ARIA sudah lengkap.
 
 ## Perlu tindakan
