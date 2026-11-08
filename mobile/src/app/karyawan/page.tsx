@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EmployeeBulkActions } from "@/components/karyawan/EmployeeBulkActions";
@@ -25,6 +26,10 @@ import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
+import {
+  KARYAWAN_SHORTCUT_AREAS,
+  navigationItemByArea,
+} from "@/lib/constants/navigation";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
   getDaftarKaryawan,
@@ -61,6 +66,9 @@ export default function KaryawanPage() {
 
   const canView = canAccessArea(user, "karyawan");
   const canManage = hasPermission(user, "employees.manage");
+  const shortcuts = KARYAWAN_SHORTCUT_AREAS.filter((area) =>
+    canAccessArea(user, area),
+  ).flatMap((area) => navigationItemByArea(area) ?? []);
 
   // ─── Data & Loading State ───────────────────────────────────────────────────
   const [employees, setEmployees] = useState<Record<string, unknown>[]>([]);
@@ -371,6 +379,26 @@ export default function KaryawanPage() {
           </button>
         ) : null}
       </div>
+
+      {shortcuts.length > 0 ? (
+        <nav
+          aria-label="Menu terkait karyawan"
+          className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1"
+        >
+          {shortcuts.map((item) => (
+            <Link
+              key={item.href}
+              id={`karyawan-pintasan-${item.area}`}
+              href={item.href}
+              onClick={() => triggerHaptic("light")}
+              className="flex min-h-11 shrink-0 items-center gap-2 rounded-2xl border border-white/10 bg-slate-900/70 px-3 text-xs font-semibold text-slate-200 transition active:scale-95"
+            >
+              <Icon name={item.icon} className="size-4 text-sky-300" />
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+      ) : null}
 
       {/* ── Aksi Massal: impor Excel & generate QR (employees.manage) ── */}
       {canManage ? (

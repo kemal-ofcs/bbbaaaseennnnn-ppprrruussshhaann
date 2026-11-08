@@ -13,11 +13,13 @@ export type IconName =
   | "database"
   | "document"
   | "download"
+  | "eye"
   | "history"
   | "home"
   | "id-card"
   | "logout"
   | "lock"
+  | "menu"
   | "moon"
   | "palette"
   | "phone"
@@ -114,6 +116,12 @@ const paths: Record<IconName, ReactNode> = {
       <line x1="12" x2="12" y1="15" y2="3" />
     </>
   ),
+  eye: (
+    <>
+      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
   "id-card": (
     <>
       <rect x="2" y="5" width="20" height="14" rx="2" />
@@ -139,6 +147,7 @@ const paths: Record<IconName, ReactNode> = {
       <path d="M8 10V7a4 4 0 0 1 8 0v3" />
     </>
   ),
+  menu: <path d="M4 6h16M4 12h16M4 18h16" />,
   moon: <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />,
   palette: (
     <>

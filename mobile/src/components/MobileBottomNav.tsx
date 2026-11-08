@@ -14,6 +14,12 @@ interface NavItem {
   isElevated?: boolean;
 }
 
+function tabMatches(pathname: string, href: string) {
+  return href === "/dashboard"
+    ? pathname === "/dashboard" || pathname === "/"
+    : pathname.startsWith(href);
+}
+
 export function MobileBottomNav() {
   const pathname = usePathname();
   const { user } = useAuth();
@@ -34,7 +40,7 @@ export function MobileBottomNav() {
   if (canHistory) {
     navItems.push({ href: "/history", icon: "clock", label: "Riwayat" });
   }
-  navItems.push({ href: "/settings", icon: "settings", label: "Pengaturan" });
+  navItems.push({ href: "/menu", icon: "menu", label: "Menu" });
   // Jumlah menu mengikuti izin role, jadi posisi Scanner dihitung, bukan ditulis tetap.
   if (canScanner) {
     navItems.splice(Math.floor(navItems.length / 2), 0, {
@@ -52,10 +58,14 @@ export function MobileBottomNav() {
     >
       <div className="mx-auto flex w-full max-w-lg items-end justify-around px-2">
         {navItems.map((item) => {
+          // Modul yang dibuka dari halaman Menu tidak punya tab sendiri, jadi Menu yang menyala.
           const isActive =
-            item.href === "/dashboard"
-              ? pathname === "/dashboard" || pathname === "/"
-              : pathname.startsWith(item.href);
+            item.href === "/menu"
+              ? !navItems.some(
+                  (other) =>
+                    other.href !== "/menu" && tabMatches(pathname, other.href),
+                )
+              : tabMatches(pathname, item.href);
 
           if (item.isElevated) {
             return (
