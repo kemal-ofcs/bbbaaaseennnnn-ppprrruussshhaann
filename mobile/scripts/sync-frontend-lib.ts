@@ -18,6 +18,8 @@ const filesToCopy = [
   // dan `components/inventory/gaya.ts` yang juga disalin.
   "components/ui/PilihCari.tsx",
   "components/ui/KonfirmasiData.tsx",
+  // Pengirim notifikasi Telegram: berjalan di setiap sesi login, identik di kedua build.
+  "components/AutoTelegramRunner.tsx",
   "lib/db.ts",
   "lib/db-schema.ts",
   "lib/db-migrations.ts",

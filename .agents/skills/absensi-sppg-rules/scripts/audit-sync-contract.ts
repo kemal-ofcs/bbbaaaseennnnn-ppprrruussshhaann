@@ -158,6 +158,9 @@ const expectedCloudOnlyTables = [
   "inventory_penerimaan_foto",
   "app_bootstrap_state",
   "app_mail_config",
+  // Notifikasi grup Telegram (v33): token bot dan antrean pesan, server saja.
+  "app_telegram_setting",
+  "notifikasi_telegram",
   "app_permission",
   "app_role",
   "app_session",

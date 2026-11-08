@@ -29,6 +29,8 @@ const filesToSync = [
   // Tutup buku: gerbang periode di `accounting::tulis_jurnal_tx` dan aturan
   // bentrokan wajib identik dengan Desktop dan TS.
   "tutup_buku.rs",
+  // Notifikasi grup Telegram: SQL sumber dan isi pesan wajib identik dengan TS.
+  "telegram.rs",
   "commands.rs",
   // Tarif default payroll: satu sumber untuk SQLite lokal dan Turso cloud, di
   // kedua workspace. Perbedaan sekecil apa pun di sini membuat baris seed lokal

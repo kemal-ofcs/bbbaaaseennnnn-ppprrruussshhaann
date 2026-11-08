@@ -829,6 +829,37 @@ kembar dengan vektor uji yang sama).
   `holiday/create` yang sudah ada per tanggal; tanggal yang sudah terdaftar
   dilewati. Data libur nasional bawaan versi sekolah sengaja TIDAK diport.
 
+## Notifikasi grup Telegram (schema versi 33)
+
+Bot SATU ARAH ke grup internal per bidang (`inventaris`, `keuangan`,
+`pimpinan`); tidak ada perintah dari Telegram yang bisa mengubah data. Dua tabel
+KHUSUS CLOUD (sentinel `-2029`): `app_telegram_setting` (key/value: `bot_token`,
+`aktif`, `aktif_sejak` UTC, `grup:<bidang>`, `kirim:<kejadian>`; token tidak
+pernah dikembalikan ke UI dan tidak pernah disimpan di SQLite perangkat) dan
+antrean `notifikasi_telegram` (`kejadian` sengaja tanpa CHECK). Keduanya ikut
+`PROMOTION_PLAN`, supaya pesan yang sudah terkirim tidak dikirim ulang dari
+database tujuan.
+
+Kejadian TIDAK dikaitkan ke jalur simpan. Pengirim (`desktop/telegram.rs` ↔
+`services/telegram.ts`, SQL dan isi pesan kembar di `validations/telegram.ts`)
+membaca datanya tiap siklus dan mencatatnya dengan id deterministik
+(`pgj-baru:`, `pgj-putus:`, `stok:<tanggal WIB>`, `kasbon:`, `tutup:`, `buka:`,
+`buka-pimpinan:`, `gaji:<id log>`), lalu mengirim dengan klaim atomik
+(`klaim_oleh`/`klaim_sampai`), coba ulang 3 kali (`statusSetelahGagal`). Tujuh
+kejadian: pengajuan baru → Keuangan; ACC/tolak dan ringkasan stok harian (mulai
+07.00 WIB) → Inventaris; kasbon (tanpa nama karyawan) dan tutup/buka buku →
+Keuangan; status gaji REVIEWED/APPROVED/PAID/REJECTED dan buku dibuka kembali →
+Pimpinan. Gaji hanya jumlah pegawai dan total bersih dari `payroll_runs`, dan
+totalnya disembunyikan bila pegawainya < 3 (`MIN_PEGAWAI_NOMINAL_GAJI`);
+`payroll_items` tidak pernah dibaca. Kejadian sebelum `aktif_sejak` atau lebih
+dari 7 hari tidak dikirim. Menambah kejadian = satu SQL sumber + fungsi pesan
+kembar + entri `BIDANG_KEJADIAN`/`bidang_kejadian`.
+
+`AutoTelegramRunner` berjalan untuk setiap sesi login (`desktop_drain_telegram`
+cukup sesi, hasilnya hanya hitungan). Konfigurasi hanya Superadmin
+(`settings.manage` + `is_superadmin`), kartunya di tab Pengaturan "Notifikasi",
+Web/Desktop saja.
+
 ## Domain contoh
 
 `master_item` dan `log_aktivitas` adalah tabel peraga yang memperagakan pola
