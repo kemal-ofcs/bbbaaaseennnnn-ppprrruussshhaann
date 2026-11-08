@@ -564,6 +564,25 @@ Diport dari versi sekolah (v53 di sana).
   `desimal` bila payload membawa kuncinya. Ekspor inventaris menulis sel Angka
   sungguhan lewat penanda opt-in `AngkaExcel` di `lib/client/excel-export.ts`;
   pemanggil lain tetap teks. Sentinel kini `-2023`.
+- **Hapus barang (schema versi 32)**: `inventory_barang.dihapus_pada`, pola
+  kolom tambahan: baris ditandai + `status_aktif = 0`, tidak dibuang, ikut
+  outbox `inventory-item/save` tanpa rute baru; cloud memakai
+  `dihapus_pada = COALESCE(lama, baru)` dan memaksa `status_aktif = 0`.
+  `BARANG_BISA_DIHAPUS_SQL` (dieja kembar `inventory.rs` ↔
+  `services/inventory.ts`) = salah input (`BARANG_SALAH_INPUT_SQL`: tanpa unit,
+  setiap mutasi bukan-`Pembatalan` punya `'batal-' || id_mutasi`) ATAU barang
+  nonaktif yang habis dipakai (setiap `inventory_saldo` = 0, tanpa Peminjaman
+  yang belum kembali penuh, tanpa `inventory_servis` terbuka). Riwayatnya tetap
+  terbaca di laporan karena kueri `JOIN inventory_barang` tanpa saring
+  `dihapus_pada`; pemilih kartu stok tidak memuatnya. Barang terhapus hilang
+  dari daftar kecuali masih bermutasi dari perangkat yang offline
+  (`WHERE dihapus_pada IS NULL OR NOT bisa_dihapus`); `save_item_tx` menolaknya.
+  Kode barang salah input bebas dipakai lagi, kode barang terhapus lainnya
+  dicadangkan (`kode_dipakai` ↔ `kodeDipakai`). Izin sensitif
+  `inventory.item.delete` (di `NOT IN` seed Admin Rust dan
+  `SENSITIVE_MUTATION_PERMISSIONS`); panel aksi di rincian barang
+  (Nonaktifkan/Aktifkan, Hapus dengan ketik `KONFIRMASI_HAPUS_PERMANEN`).
+  Sentinel kini `-2028`.
 
 ## Pembukuan (schema versi 21)
 

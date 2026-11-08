@@ -93,6 +93,7 @@ diberikan secara sadar lewat Role & Akses. Daftar resminya ada di
 | `face_template.manage` | Wajah orang lain yang didaftarkan di nama seorang karyawan meloloskan kartu yang dipinjamkan |
 | `database_backup.restore` | SELURUH data perangkat sekaligus — tidak ada operasi lain yang menghapus sebanyak ini dalam satu langkah |
 | `inventory.adjust` | Stok yang dihapus lewat opname, pembatalan, atau Rusak/Hilang/Kedaluwarsa tanpa ada penerimanya: jalan termudah menutupi barang yang diambil orang |
+| `inventory.item.delete` | Barang hilang dari daftar, label, dan impor di semua perangkat, dan tidak bisa dikembalikan dari aplikasi |
 | `accounting.reverse` | Efek sebuah transaksi hilang dari seluruh laporan lewat jurnal pembalik, tanpa uang yang benar-benar kembali |
 | `loan.approve` | Uang perusahaan dicairkan ke seorang karyawan dan kemudian dipotong dari gajinya |
 | `accounting.close` | Jurnal seluruh perangkat terkunci untuk periode itu, dan keputusan bentrokan menentukan potret saldo mana yang berlaku |
