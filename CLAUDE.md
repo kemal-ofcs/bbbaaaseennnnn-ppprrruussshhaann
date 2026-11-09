@@ -897,8 +897,51 @@ Rincian lengkap dan keputusan pemilik ada di `prd-driver.md`. Logika
   hanya dari kamera, berstempel; `foto_sha256` = SHA-256 isi JPEG. Dihapus
   setelah 90 hari jam database (`AutoFotoCleanupRunner`, lokal + cloud, tanpa
   outbox) dengan peringatan 7 hari di layar dispatcher; baris laporan tetap.
-- Upah surat jalan dibayar terpisah dari gaji (pembayaran dan `trip.pay`
-  menyusul di fase 2 / schema v35).
+- Upah surat jalan dibayar terpisah dari gaji, lihat bagian berikut.
+
+### Pembayaran upah dan lokasi palsu (schema versi 35)
+
+Fase 2 `prd-driver.md` (§14). Sentinel `-2031`. Pemeriksaan jam GPS (§6.1)
+SENGAJA ditunda sampai uji HP membuktikan `position.timestamp` bukan jam sistem.
+
+- Dua tabel tersinkron append-only: `drv_upah_bayar` (`Bayar` atau
+  `Pembatalan`) dan `drv_upah_bayar_baris` (`<id_bayar>:<id_perjalanan>`,
+  menyalin upah saat dibayar). Satu rute `trip-payment/create` (header + baris
+  satu event, pembatalan juga), `delete_missing: false`, ikut promosi dan
+  dibuang saat pindah database. Pembatalan = baris berid `batal-<id_bayar>`,
+  jadi dua perangkat yang membatalkan yang sama menghasilkan PK yang sama.
+- **Status bayar tidak disimpan**: `bayar_aktif` ↔ `bayarAktif` = pembayaran
+  `Bayar` yang memuat surat jalan itu dan belum dibatalkan. Total tidak dari
+  isian, selalu jumlah upah surat jalan saat dicatat.
+- **Satu surat jalan satu pembayaran hanya ditegakkan di perangkat**
+  (`periksa_bayar_upah` ↔ `periksaBayarUpah`: Selesai, penerima = driver
+  pembayaran, belum dibayar). Cloud tidak pernah menolak; bayar ganda dari
+  perangkat offline menjadi tanda `dibayar_ganda`, dan status/penerima/upah
+  yang berubah setelah dibayar menjadi `upah_berubah` (`tanda_upah` ↔
+  `tandaUpah`, ber-`id` surat jalan, ikut `tanda` di daftar surat jalan).
+- Surat jalan yang sudah dibayar terkunci dari pindah upah dan dari
+  `Disetujui` atas ganti driver (`tolak_bila_dibayar` ↔ `tolakBilaDibayar`,
+  `PESAN_SUDAH_DIBAYAR`). Laporan lain sudah ditolak karena surat jalannya
+  tertutup, dan tarif hanya bisa diubah selama Direncanakan.
+- `trip.pay` sensitif (di `SENSITIVE_MUTATION_PERMISSIONS` dan `NOT IN` seed
+  Admin Rust). Rekap (`desktop_trip_wage_recap`, batas `MAKS_REKAP_UPAH` 5.000)
+  dan riwayat (`desktop_trip_payments`) cukup `trip.view` atau `trip.pay`;
+  halaman `/perjalanan` tetap dijaga area `trip.view`.
+- Pembukuan tetap jurnal manual (Q-28): tidak ada sumber jurnal baru, CHECK
+  `keu_jurnal.sumber` tidak disentuh.
+- Tab **Upah** (`UpahPanel.tsx`, `rekapUpah.ts`, `cetakTandaTerimaUpah.ts`, di
+  `filesToCopy`): rekap per driver (penerima upah), per kendaraan AWAL, dan per
+  tanggal surat jalan (Q-32), Excel lima sheet, tanda terima A4 tanpa nomor
+  (disembunyikan di Mobile).
+- **Lokasi palsu**: `drv_laporan.lokasi_palsu` (0/1, kosong = tidak
+  diperiksa), tanda `lokasi_palsu`. Command khusus Mobile
+  `mobile_location_is_mock` di `mobile/src-tauri/src/mobile/device_location.rs`
+  (di luar daftar salin) memakai JNI lewat `with_webview` →
+  `jni_handle().exec`; dependensi `jni` WAJIB versi yang sama dengan wry
+  (0.21.1), karena `JNIEnv` dari `exec` bertipe crate itu. Tidak ada Kotlin:
+  `mobile/src-tauri/gen/` di-gitignore. Hanya laporan dari HP driver yang
+  membawa nilainya; cloud mengubah nilai selain 0/1 menjadi kosong, tidak
+  pernah menolak.
 
 ## Domain contoh
 

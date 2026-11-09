@@ -1,7 +1,9 @@
-# PRD — Perjalanan Driver (draf 1, belum dieksekusi)
+# PRD — Perjalanan Driver
 
-Status: **semua pertanyaan sudah dijawab (9 Nov 2026).** Jawabannya ada di
-§12 dan urutan pengerjaannya di §13. Belum ada kode yang ditulis.
+Status (9 Nov 2026): **fase 1 (skema v34, §13) dan fase 2 (skema v35, §14)
+sudah dibangun.** Jawaban pertanyaan ada di §12 dan §14.3. Sisa: uji di HP
+sungguhan (§9), `bun run check` penuh, pemeriksaan jam GPS (§6.1, menunggu uji
+HP poin 5), dan fase 3 (Telegram).
 
 ---
 
@@ -289,7 +291,7 @@ WebView tidak bisa membedakan lokasi palsu dari yang asli. Mitigasinya:
 - **Fase 1:** tandai perpindahan yang mustahil, yaitu kecepatan di antara dua
   laporan berurutan lebih dari 150 km/jam (Haversine ÷ selisih waktu), atau
   akurasi persis 0 m. Foto tetap menjadi bukti utama.
-- **Fase 2 (opsional):** command native `mobile_location_is_mock`, yang membaca
+- **Fase 2 (sudah dibangun, lihat §14):** command native `mobile_location_is_mock`, yang membaca
   `Location.isMock()` di Android 12+ (aturan 27: berawalan `mobile_`, dipanggil
   di dalam `if (isMobileRuntime())`).
 
@@ -340,8 +342,8 @@ ada yang ditolak otomatis, karena GPS di dalam gudang memang sering meleset.
 `trip.manage` (dispatcher) membuat dan mencetak surat jalan. Driver tidak
 memegangnya (Q-11).
 
-**Sudah dibangun di langkah 4.** `trip.pay` baru ditambahkan di fase 2
-bersama tabel pembayarannya. Admin bawaan mendapat semua izin perjalanan
+**Sudah dibangun di langkah 4.** `trip.pay` ditambahkan di fase 2
+(langkah 12) bersama tabel pembayarannya. Admin bawaan mendapat semua izin perjalanan
 kecuali `trip.cancel` dan `trip.tariff`. Jalur Web hanya melayani dispatcher;
 laporan driver (foto + GPS) hanya dari aplikasi. Login, sesi Web, dan muat
 ulang sesi Desktop menolak akun yang personilnya nonaktif.
@@ -485,8 +487,8 @@ bawah ikut sinkron kecuali yang ditandai.
   + 5 menit), `kecepatan_mustahil`, `akurasi_buruk`, `akurasi_nol`,
   `luar_radius`, `tanpa_gps`, `tanpa_foto`, `menunggu_persetujuan`,
   `muat_beda`, `sisa_muatan`.
-- `drv_upah_bayar` (pembayaran upah) **belum dibuat**: tabel itu fase 2 dan
-  akan ditambahkan bersama skema v35.
+- `drv_upah_bayar` dan `drv_upah_bayar_baris` (pembayaran upah) serta
+  `drv_laporan.lokasi_palsu` ditambahkan di skema v35 (fase 2, §14.1).
 - Koordinat disimpan `REAL` (bukan uang, jadi aturan 13 tidak berlaku).
 - Rute kanonik: `vehicle-type/save`, `trip-destination/save`, `vehicle/save`,
   `trip-place/save`, `trip/save` (header + seluruh muatan dalam satu event,
@@ -571,6 +573,9 @@ halaman `/driver` Mobile dan Desktop; di Web hanya pesan "dari aplikasi di HP"):
    WebView mengisinya dengan jam sistem dan pemeriksaan itu dibuang.
 6. Aplikasi ke latar belakang saat kamera menyala lalu kembali: kamera hidup
    lagi, tidak macet.
+7. Lokasi palsu (fase 2): dengan aplikasi Fake GPS aktif, dialog lapor
+   menampilkan "Lokasi palsu terdeteksi" dan laporannya bertanda
+   `lokasi_palsu` di Perlu ditinjau; tanpa Fake GPS tidak ada tanda.
 
 ## 10. Fase
 
@@ -651,3 +656,183 @@ lalu `bun run check` penuh oleh pemilik repositori.
 sesi (lokal + cloud, tanpa outbox), dan peringatan 7 hari di layar dispatcher
 yang membuka tab Unduh foto mulai tanggal laporan tertua. Sisa fase 1: uji di
 HP sungguhan (§9) dan `bun run check` penuh.
+
+## 14. Urutan pengerjaan fase 2
+
+Pemeriksaan jam GPS (§6.1 poin 2) **ditunda** sampai uji HP poin 5 di §9
+selesai. Fase ini tidak menyentuhnya.
+
+### 14.1 Usulan model data (skema v35, sentinel `-2031`)
+
+| Tabel / kolom | Isi | Snapshot |
+| :-- | :-- | :-- |
+| `drv_upah_bayar` | id_bayar, jenis (`Bayar`, `Pembatalan`), id_ref (id pembayaran yang dibatalkan), id_karyawan (driver), tanggal (tanggal bayar), total `INTEGER`, keterangan / alasan, dicatat_oleh (dari sesi), created_at. Append-only. | `trip-payment`, `false` |
+| `drv_upah_bayar_baris` | id_baris = `<id_bayar>:<id_perjalanan>`, id_bayar, id_perjalanan, upah `INTEGER` (salinan saat dibayar). Menumpang event pembayarannya, pola `drv_laporan_muatan`. | `trip-payment-line`, append-only, `false` |
+| `drv_laporan.lokasi_palsu` | `INTEGER` `0`/`1`, kosong = tidak diperiksa (Desktop, Android < 6, atau perangkat lama). `CREATE` + `ALTER` di kedua jalur. | ikut `trip-report` |
+
+- **Pembatalan = baris `Pembatalan` berid `batal-<id_bayar>`** di tabel yang
+  sama, jadi dua perangkat yang membatalkan pembayaran yang sama menghasilkan
+  PK yang sama. Status "Dibatalkan" pembayaran tidak disimpan, diturunkan dari
+  keberadaan baris itu.
+- **Satu surat jalan satu pembayaran** ditegakkan **di perangkat**: surat
+  jalan harus `Selesai`, penerima upahnya = driver pembayaran, dan belum ada
+  di pembayaran yang tidak dibatalkan. Cloud tidak pernah menolak (outbox
+  macet permanen); dua pembayaran offline atas surat jalan yang sama tampil di
+  Perlu ditinjau sebagai `dibayar_ganda`.
+- **Setelah dibayar**, perangkat menolak pindah upah, ubah tarif, Tidak Jalan,
+  dan Batalkan pada surat jalan itu. Perubahan yang tetap masuk dari perangkat
+  offline (status jadi `Dibatalkan`, penerima atau upah berbeda dari salinan
+  di baris pembayaran) ditandai `upah_berubah`.
+- Total = jumlah `upah` barisnya, diperiksa di perangkat dan di Rust sebelum
+  menulis. Rute satu saja: `trip-payment/create` (header + baris dalam satu
+  event, pembatalan juga lewat rute ini).
+- Pembukuan tetap manual (Q-28): tidak ada jurnal otomatis, CHECK
+  `keu_jurnal.sumber` tidak disentuh.
+
+**Sudah dibangun di langkah 9.** DDL di `storage.rs` (Desktop dan Mobile),
+`turso.rs`, dan `db-migrations.ts`; `lokasi_palsu` lewat `CREATE` +
+`ensure_column`/`hasColumn`. `CLIENT_SCHEMA_VERSION` dan
+`CURRENT_SCHEMA_VERSION` = 35, `REQUIRED_TABLE_COUNT` = 70, sentinel
+`-2031`, dan tes `sentinel_2030_memicu_skema_upah_driver`. Kedua tabel ikut
+`PROMOTION_PLAN` dan dibuang saat pindah database (`reset_cloud_linked_data`).
+`audit:contract` sengaja masih merah sampai langkah 11 mendaftarkan tabel dan
+kolomnya ke `SNAPSHOT_TABLES`.
+
+**Sudah dibangun di langkah 10** (`driver.rs` ↔ `validations/driver.ts`, tes
+`pembayaran_upah` ↔ "pembayaran upah" dengan vektor dan pesan galat yang
+sama):
+
+- `validate_bayar_upah` (driver, tanggal, 1–500 surat jalan tanpa kembar,
+  keterangan) dan `validate_batal_bayar` (alasan wajib). Isian tidak membawa
+  total: total = jumlah upah yang dikembalikan `periksa_bayar_upah`.
+- `periksa_bayar_upah` (Selesai, penerima = driver pembayaran, belum ada di
+  pembayaran aktif) dan `periksa_batal_bayar`, keduanya hanya di perangkat.
+- `bayar_aktif` (pembayaran `Bayar` yang memuat surat jalan dan belum
+  dibatalkan) menjadi dasar kunci "sudah dibayar" di langkah 12.
+- `tanda_upah`: `dibayar_ganda` dan `upah_berubah`, ber-`id` surat jalan.
+  `tanda_tinjau` menambah `lokasi_palsu`; kolomnya sudah dibaca dari
+  `drv_laporan` di kedua jalur. Label ketiganya ada di `tampilan.ts`.
+
+**Sudah dibangun di langkah 11** (Rust; kembaran TS di `services/driver.ts`
+dikerjakan di langkah 12 bersama rute API):
+
+- Rute `trip-payment/create` di `CANONICAL_SYNC_ROUTES` dan
+  `canonical_sync_route`. Payload `{ bayar, baris }` = baris lokal apa adanya.
+  `cloud_bayar_statements` hanya memeriksa bentuk dan CHECK (`Bayar` wajib
+  punya baris, `Pembatalan` wajib `id_ref` dan tanpa baris), lalu
+  `INSERT … ON CONFLICT DO NOTHING`.
+- Snapshot `trip-payment` dan `trip-payment-line` (`delete_missing: false`)
+  di `SNAPSHOT_TABLES` = `SNAPSHOT_SOURCES`, sehingga pulsa sinkronisasi ikut
+  terpasang. `drv_laporan.lokasi_palsu` ikut snapshot dan insert cloud; nilai
+  selain 0/1 menjadi kosong, tidak ditolak.
+- Penulisan lokal `catat_bayar_upah` dan `batal_bayar_upah`: SQLite + outbox
+  satu transaksi, `dicatat_oleh` dari sesi. Tanggal pembatalan = tanggal WIB
+  saat dibatalkan.
+- `kumpulkan` (daftar, rincian, perjalanan saya) kini membawa `bayar` (id
+  pembayaran aktif), `identitas_kendaraan_awal` (dasar rekap per kendaraan),
+  dan tanda `dibayar_ganda`/`upah_berubah`. `rekap_upah` memakai batas 5.000
+  surat jalan (`MAKS_REKAP_UPAH`, daftar biasa tetap 500), `daftar_bayar_upah`
+  memuat pembatalan dan surat jalannya untuk riwayat dan tanda terima.
+- Tes `bayar_upah_lokal_outbox_dan_cloud`. `audit-sync-contract.ts` mendapat
+  rute dan dua domain snapshot baru di daftar harapannya (pemeriksaan tidak
+  dilonggarkan).
+
+**Sudah dibangun di langkah 12:**
+
+- Izin `trip.pay` di `catalog.ts`, `SENSITIVE_MUTATION_PERMISSIONS`, seed
+  `app_permission` Rust (urutan 1506), dan `NOT IN` seed Admin Rust; Admin
+  bawaan Web tidak mendapatnya karena sensitif.
+- Command `desktop_trip_pay` dan `desktop_trip_pay_cancel` (`trip.pay`),
+  `desktop_trip_wage_recap` dan `desktop_trip_payments` (`trip.view` atau
+  `trip.pay`, supaya kasir tanpa akses perjalanan tetap bisa membayar).
+  Terdaftar di kedua `lib.rs`, `build.rs`, dan `capabilities/default.json`.
+- Jalur Web: `catatBayarUpah`, `batalBayarUpah`, `rekapUpah`,
+  `daftarBayarUpah` di `services/driver.ts` (kembar Rust), rute
+  `/api/trips/pay`, `/pay-cancel`, `/wage-recap/query`, `/payments/query`,
+  dan gateway bercabang `isDesktopRuntime()`. `kumpulkanPerjalanan` ikut
+  membawa `bayar`, `identitas_kendaraan_awal`, dan tanda upah.
+- Kunci "sudah dibayar" (`tolak_bila_dibayar` ↔ `tolakBilaDibayar`,
+  `PESAN_SUDAH_DIBAYAR`) di pindah upah dan di `Disetujui` (menyetujui ganti
+  driver pada surat jalan Selesai bisa menggeser penerima). Laporan lain
+  sudah ditolak `periksa_urutan` karena surat jalannya tertutup, dan tarif
+  hanya bisa diubah selama Direncanakan, jadi tidak perlu kunci tambahan.
+- Tes Web "pembayaran upah (cermin tes Rust)". `rbac-migration.test.ts`
+  ikut mencantumkan versi skema 35.
+
+**Sudah dibangun di langkah 13** (tab **Upah** di `/perjalanan`, Web/Desktop
+dan Mobile; `UpahPanel.tsx`, `rekapUpah.ts`, `cetakTandaTerimaUpah.ts`, ketiganya
+di `filesToCopy`):
+
+- Rentang tanggal surat jalan sendiri, bawaan awal bulan ini sampai hari ini
+  (WIB). Data dari `rekapUpah` + `daftarBayarUpah`, dimuat ulang setiap
+  sinkronisasi selesai.
+- **Belum dibayar** per penerima upah, dengan "Tandai dibayar" (`trip.pay`):
+  daftar surat jalan tercentang semua, tanggal bayar, keterangan, lalu
+  `konfirmasiData`. Total yang tampil hanya perkiraan; yang dicatat dihitung
+  backend.
+- **Rekap** per driver (penerima upah untuk Selesai, driver bertugas
+  selainnya), per kendaraan awal, atau per tanggal surat jalan: jumlah Selesai,
+  Belum selesai, Tidak Jalan, Dibatalkan, dan upah dibayar/belum.
+- **Riwayat pembayaran** (tanggal bayar dalam rentang): cetak tanda terima A4
+  tanpa nomor (Q-33, disembunyikan di Mobile; pembayaran batal tercetak
+  "DIBATALKAN"), dan Batalkan dengan alasan wajib (`trip.pay`).
+- **Ekspor Excel** satu berkas lima sheet: Per Driver, Per Kendaraan, Per
+  Tanggal, Rincian Surat Jalan, Pembayaran. Rupiah sebagai sel Angka
+  (`AngkaExcel`), disimpan lewat `saveFileWithPicker`.
+- Halaman `/perjalanan` tetap dijaga area `trip.view`, jadi kasir yang hanya
+  memegang `trip.pay` perlu `trip.view` juga untuk membuka tab ini.
+- Tes `rekapUpah.test.ts` (pengelompokan, belum dibayar, isi buku Excel).
+
+**Sudah dibangun di langkah 14** (lokasi palsu native, §6.2):
+
+- Modul khusus Mobile `mobile/src-tauri/src/mobile/device_location.rs` (di
+  luar daftar salin `sync-rust-modules.ts`), command `mobile_location_is_mock`
+  ber-`require_permission("trip.report")`. JNI dijalankan lewat
+  `WebviewWindow::with_webview` → `jni_handle().exec` milik Tauri, membaca
+  `LocationManager.getLastKnownLocation` untuk `gps`, `network`, dan `fused`,
+  lalu `Location.isMock()` (Android 12+) atau `isFromMockProvider()`.
+- **Koreksi Q-34:** `ndk-context` ternyata tidak ada di `Cargo.lock` dan tidak
+  diperlukan. Dependensi langsung yang ditambah hanya `jni = "0.21.1"`
+  (target Android), versi yang sama dengan wry 0.55.1 karena `JNIEnv` dari
+  `exec` bertipe crate itu.
+- Vonis murni `vonis_lokasi_palsu`: hanya fix berumur ≤ 120 detik menurut
+  `elapsedRealtimeNanos` (jam monotonik, tidak ikut jam HP) yang dinilai, dan
+  satu penyedia palsu sudah cukup. Tidak ada fix baru = tidak diperiksa.
+- Gateway `periksaLokasiPalsu` memanggilnya di dalam `if (isMobileRuntime())`
+  dan mengembalikan `null` untuk semua kegagalan. `DriverWorkspace` memanggilnya
+  tepat setelah GPS didapat, menampilkan "Lokasi palsu terdeteksi" (Q-35), dan
+  mengirim `lokasi_palsu` bersama laporan. Laporan tidak pernah ditahan.
+- `LaporanDraft`/`laporanDraftSchema` menerima `lokasi_palsu`; validator hanya
+  meneruskannya untuk laporan dari HP driver (dispatcher selalu kosong), dan
+  penulisan lokal menyimpannya ke `drv_laporan.lokasi_palsu`.
+- Belum diuji di HP: perlu dicoba dengan aplikasi Fake GPS (Android 12+ dan
+  di bawahnya), termasuk saat Fake GPS hanya memalsukan penyedia `gps`.
+
+### 14.2 Langkah
+
+| # | Langkah | Gerbang |
+| :-- | :-- | :-- |
+| 9 | **Skema v35**: `drv_upah_bayar`, `drv_upah_bayar_baris`, `drv_laporan.lokasi_palsu` di keempat lapis, sentinel `-2031`, `ensure_schema_current` naik. | `audit:schema` |
+| 10 | **Aturan domain kembar** `driver.rs` ↔ `validations/driver.ts`: validasi pembayaran dan pembatalan, status bayar turunan, tanda tinjau baru (`dibayar_ganda`, `upah_berubah`, `lokasi_palsu`). Vektor uji yang sama. | `bun test` + `cargo test` |
+| 11 | **Sinkronisasi**: rute `trip-payment/create`, handler cloud (tidak menolak karena bayar ganda), `SNAPSHOT_TABLES` = `SNAPSHOT_SOURCES`, penulisan lokal SQLite + outbox satu transaksi, kueri rekap. | `audit:contract` + tes Rust |
+| 12 | **RBAC dan jalur Web**: izin `trip.pay` (sensitif, tidak ikut paket Admin), command dan rute API, penguncian surat jalan yang sudah dibayar. | tes Rust + `web-rbac-boundary` |
+| 13 | **Layar Upah** (tab baru di `/perjalanan`): rekap belum dibayar, Tandai dibayar (`konfirmasiData`), riwayat + batal (alasan wajib), cetak tanda terima A4, ekspor Excel per driver, kendaraan, dan tanggal. | `bun test` + typecheck |
+| 14 | **Lokasi palsu native**: modul khusus Mobile `device_location.rs` (di luar daftar salin), command `mobile_location_is_mock` lewat JNI (`Location.isMock()` Android 12+, `isFromMockProvider()` di bawahnya), dipanggil gateway di dalam `if (isMobileRuntime())`, hasilnya dikirim bersama laporan. | `cargo test` Mobile + `audit:contract` (uji HP ditunda) |
+| 15 | Bagian `CLAUDE.md` dan catatan "Sudah dibangun" di PRD. | `audit:docs` |
+
+### 14.3 Jawaban fase 2 (9 Nov 2026)
+
+| # | Pertanyaan | Jawaban |
+| :-- | :-- | :-- |
+| Q-31 | Isi rekap per driver/kendaraan/tanggal | Upah surat jalan `Selesai` (dibayar/belum) **dan** jumlah surat jalan per status (Selesai, Tidak Jalan, Dibatalkan). |
+| Q-32 | Dasar "per kendaraan" dan "per tanggal" | Kendaraan **awal** (dasar tarif, `drv_perjalanan.id_kendaraan`) dan **tanggal surat jalan**. Keduanya tidak berubah oleh laporan offline yang telat. |
+| Q-33 | Nomor tanda terima | Tanpa nomor: tanggal bayar, driver, total, dan daftar nomor surat jalan. |
+| Q-34 | Dependensi lokasi palsu | Disetujui. Dibangun hanya dengan `jni = "0.21.1"` (target Android, sudah ada di `Cargo.lock` lewat wry); `ndk-context` ternyata tidak ada di lock dan tidak diperlukan karena Tauri menyediakan JNI lewat `jni_handle().exec`. Kotlin tidak dipakai karena `mobile/src-tauri/gen/` di-gitignore. |
+| Q-35 | Driver diberi tahu? | Ya. Layar lapor menampilkan "Lokasi palsu terdeteksi"; laporan tetap boleh dikirim dan ditandai `lokasi_palsu` di Perlu ditinjau (§6.2: tidak ada yang ditolak otomatis). |
+
+**Langkah 9–15 sudah dibangun (9 Nov 2026).** Bagian ringkas ada di
+`CLAUDE.md` ("Pembayaran upah dan lokasi palsu (schema versi 35)"), dan
+angka di dokumen skill (`SKILL.md`, `references/01` dan `02`) sudah
+disesuaikan sampai `audit:docs` lulus. Sisa fase 2: uji HP poin 5 dan 7 (§9),
+pemeriksaan jam GPS bila poin 5 lolos, dan `bun run check` penuh oleh pemilik
+repositori.

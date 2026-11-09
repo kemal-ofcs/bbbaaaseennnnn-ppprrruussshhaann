@@ -38,4 +38,6 @@ pub mod payroll;
 // Administrasi payroll: SALINAN modul Desktop oleh scripts/sync-rust-modules.ts.
 pub mod payroll_admin;
 pub mod share;
+// Khusus Mobile (di luar daftar salin): deteksi lokasi palsu lewat JNI.
+pub mod device_location;
 pub use config::MobileState;

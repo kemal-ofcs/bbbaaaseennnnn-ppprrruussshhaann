@@ -12,6 +12,7 @@ dependencies = [
  "dotenvy",
  "hex",
  "hmac",
+ "jni 0.21.1",
  "log",
  "pbkdf2",
  "rand_core 0.6.4",

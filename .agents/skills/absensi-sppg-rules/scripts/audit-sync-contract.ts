@@ -56,6 +56,8 @@ const expectedRoutes = [
   "trip/save",
   "trip-report/create",
   "trip-report-photo/save",
+  // Pembayaran upah surat jalan (v35).
+  "trip-payment/create",
   "installment/activate",
   "installment/reapprove",
   "installment/close",
@@ -137,6 +139,9 @@ const expectedSnapshotTriples = [
   "tripCargo|trip-cargo|drv_muatan",
   "tripReports|trip-report|drv_laporan",
   "tripReportCargo|trip-report-cargo|drv_laporan_muatan",
+  // Pembayaran upah surat jalan (v35).
+  "tripPayments|trip-payment|drv_upah_bayar",
+  "tripPaymentLines|trip-payment-line|drv_upah_bayar_baris",
 ].sort();
 
 // Tabel DDL lokal (storage.rs) yang memang TIDAK ikut snapshot sync.

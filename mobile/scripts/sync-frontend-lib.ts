@@ -89,6 +89,11 @@ const filesToCopy = [
   "components/perjalanan/UnduhFotoPanel.tsx",
   "components/perjalanan/cetakSuratJalan.ts",
   "components/perjalanan/tampilan.ts",
+  // Tab Upah (v35): rekap, pembayaran, tanda terima A4 (disembunyikan di
+  // Mobile), dan ekspor Excel.
+  "components/perjalanan/UpahPanel.tsx",
+  "components/perjalanan/rekapUpah.ts",
+  "components/perjalanan/cetakTandaTerimaUpah.ts",
   // Layar driver: kamera + GPS + stempel, laporan, dan ambil alih darurat.
   "components/perjalanan/DriverWorkspace.tsx",
 ];

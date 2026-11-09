@@ -1,16 +1,16 @@
 # ANTISLOP.md — hasil antislop
 
-- Waktu: 9 November 2026, 13:18 WIB
-- Commit: d628554 (+ 119 berkas berubah/baru, belum commit)
+- Waktu: 9 November 2026, 17:17 WIB
+- Commit: a77b67a (+ 67 berkas berubah/baru, belum commit)
 - Berkas disunting: 0
 
 ## Disunting
-- (tidak ada — seluruh komentar, teks antarmuka, dan aksesibilitas ARIA pada fitur perjalanan driver sudah bersih dan bebas slop)
+- (tidak ada — seluruh komentar teknis arsitektural, teks UI bahasa Indonesia, dan aksesibilitas ARIA pada fitur upah perjalanan driver sudah bersih dan bebas slop)
 
 ## Dilewati
-- `CLAUDE.md`, `prd-driver.md`, `.agents/**` — berkas panduan/spesifikasi (dikecualikan).
-- 10 berkas unit test (`*.test.ts`) di `web-desktop` dan `mobile` — berkas tes (dikecualikan).
-- 31 berkas salinan Mobile turunan di `mobile/src/lib/**` dan `mobile/src-tauri/src/mobile/**` — salinan dari `web-desktop`.
-- 78 berkas sumber `web-desktop` dan komponen `mobile` — komentar arsitektur terarah, teks UI bahasa Indonesia natural, tap target driver ramah sentuh (min-h-16), dan aksesibilitas ARIA lengkap.
+- `CLAUDE.md`, `prd-driver.md`, `.agents/**` — dokumentasi dan spesifikasi (dikecualikan).
+- 5 berkas tes (`*.test.ts`) di `web-desktop` dan `mobile` — berkas pengujian (dikecualikan).
+- 13 berkas salinan Mobile turunan di `mobile/src/lib/**` dan `mobile/src-tauri/src/mobile/**` — salinan dari `web-desktop`.
+- 49 berkas sumber `web-desktop` dan komponen `mobile` — komentar arsitektural terarah, teks UI baku, dan dialog konfirmasi data sudah rapi.
 
 ## Perlu tindakan

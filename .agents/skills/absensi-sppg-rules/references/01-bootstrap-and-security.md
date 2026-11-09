@@ -100,6 +100,7 @@ diberikan secara sadar lewat Role & Akses. Daftar resminya ada di
 | `installment.cancel` | Membatalkan pembayaran cicilan membalik jurnalnya, dan menutup kontrak membuat sisa utangnya hanya bisa dibereskan dengan jurnal manual |
 | `trip.cancel` | Perjalanan yang dibatalkan tidak dibayar: membatalkannya memutus upah driver yang mungkin sudah setengah jalan |
 | `trip.tariff` | Tarif jenis kendaraan, tarif kategori tujuan, dan penerima upah menentukan uang yang dibayarkan per surat jalan |
+| `trip.pay` | Menandai upah surat jalan dibayar mengunci surat jalannya dari pembayaran lain, dan membatalkannya membuka jalan membayar surat jalan yang sama dua kali |
 
 ### Penanganan Form Input Konfigurasi (Token Retention):
 - Token yang sudah tersimpan di vault TIDAK PERNAH diekspos kembali ke frontend dalam bentuk plaintext.
