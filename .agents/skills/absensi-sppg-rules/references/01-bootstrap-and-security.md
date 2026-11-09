@@ -98,6 +98,8 @@ diberikan secara sadar lewat Role & Akses. Daftar resminya ada di
 | `loan.approve` | Uang perusahaan dicairkan ke seorang karyawan dan kemudian dipotong dari gajinya |
 | `accounting.close` | Jurnal seluruh perangkat terkunci untuk periode itu, dan keputusan bentrokan menentukan potret saldo mana yang berlaku |
 | `installment.cancel` | Membatalkan pembayaran cicilan membalik jurnalnya, dan menutup kontrak membuat sisa utangnya hanya bisa dibereskan dengan jurnal manual |
+| `trip.cancel` | Perjalanan yang dibatalkan tidak dibayar: membatalkannya memutus upah driver yang mungkin sudah setengah jalan |
+| `trip.tariff` | Tarif jenis kendaraan, tarif kategori tujuan, dan penerima upah menentukan uang yang dibayarkan per surat jalan |
 
 ### Penanganan Form Input Konfigurasi (Token Retention):
 - Token yang sudah tersimpan di vault TIDAK PERNAH diekspos kembali ke frontend dalam bentuk plaintext.

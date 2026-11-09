@@ -89,17 +89,18 @@ dibawa driver untuk ditunjukkan di tempat muat dan bongkar. Driver tidak bisa
 membuat surat jalan.
 
 **Penomoran.** Aplikasi membuat nomornya sendiri dengan awalan yang diatur di
-Pengaturan, misalnya `KRS-` atau `KOS-`, diikuti tahun-bulan dan nomor urut:
-`KRS-2611-001`. Nomor urut kembali ke 001 setiap bulan (Q-18).
+Pengaturan, misalnya `KRS-` atau `KOS-`, diikuti tahun-bulan, kode perangkat,
+dan nomor urut: `KRS-2611-WAB12-001` (diputuskan di langkah 2). Nomor urut
+kembali ke 001 setiap bulan (Q-18).
 
-- Nomor urut dihitung dari data di perangkat. Dua komputer dispatcher yang
-  sama-sama offline bisa memberi nomor yang sama. Tidak ada UNIQUE di database
-  (aturan 32): nomor kembar ditandai "nomor ganda" di daftar, dan dispatcher
-  diminta memberi nomor baru **sebelum dicetak**. Ini memang akan terjadi,
-  karena ada lebih dari satu perangkat dispatcher (Q-19).
-- Surat jalan yang sudah dicetak tetap boleh diberi nomor baru, tetapi
-  aplikasi memperingatkan "sudah dicetak, cetak ulang".
-- Mengganti awalan tidak mengubah nomor surat jalan yang sudah ada.
+- Nomor urut dihitung per kode perangkat (`seri_perangkat`, 5 karakter
+  pertama kode perangkat lisensi; Web memakai `WEB`), sama seperti nomor
+  jurnal dan pengajuan. Dua komputer dispatcher yang offline (Q-19) karena itu
+  **tidak pernah** menghasilkan nomor yang sama, jadi tanda "nomor ganda" dan
+  penggantian nomor tidak diperlukan.
+- Awalan: huruf dan angka, maksimal 8 karakter; tanda hubung di ujung dibuang.
+  Bawaannya `SJ`. Mengganti awalan tidak mengubah nomor surat jalan yang sudah
+  ada.
 
 **Cetak.** Surat jalan dicetak dari aplikasi. Isinya: nama dan logo
 perusahaan, nomor, tanggal, driver, kendaraan (jenis + plat), kategori tujuan,
@@ -206,9 +207,13 @@ bisa lagi melapor di perjalanan itu, tetapi laporan yang sudah dikirimnya
 
 ### 4.4 Batal (poin 6)
 
-- Sebelum berangkat: laporan `Tidak Jalan` dengan alasan wajib. Foto opsional,
-  karena driver mungkin tidak pernah ke lokasi.
-- Di tengah jalan: laporan `Dibatalkan` dengan alasan dan foto wajib.
+- Sebelum berangkat: laporan `Tidak Jalan` dengan alasan wajib.
+- Di tengah jalan: laporan `Dibatalkan` dengan alasan wajib.
+- Keduanya dicatat **dispatcher** (`trip.manage` / `trip.cancel`, sesuai
+  §6.4), tanpa foto dan GPS. Driver di lapangan melapor `Kendala` dengan foto,
+  lalu dispatcher yang menutup perjalanannya (diputuskan di langkah 2).
+- Dispatcher juga boleh menutup `Selesai` dengan alasan wajib, untuk
+  perjalanan yang HP driver-nya mati. Upahnya tetap ke driver yang bertugas.
 
 ### 4.5 Status
 
@@ -335,6 +340,12 @@ ada yang ditolak otomatis, karena GPS di dalam gudang memang sering meleset.
 `trip.manage` (dispatcher) membuat dan mencetak surat jalan. Driver tidak
 memegangnya (Q-11).
 
+**Sudah dibangun di langkah 4.** `trip.pay` baru ditambahkan di fase 2
+bersama tabel pembayarannya. Admin bawaan mendapat semua izin perjalanan
+kecuali `trip.cancel` dan `trip.tariff`. Jalur Web hanya melayani dispatcher;
+laporan driver (foto + GPS) hanya dari aplikasi. Login, sesi Web, dan muat
+ulang sesi Desktop menolak akun yang personilnya nonaktif.
+
 - `trip.report` saja **tidak cukup**: command juga wajib memeriksa bahwa
   driver yang sedang bertugas di perjalanan itu (menurut laporan ganti
   terakhir di database perangkat) adalah `id_karyawan` milik sesi. Ini
@@ -428,33 +439,64 @@ Aturan Alfa dan hari hadir ini **masuk fase 1**. Tanpanya, begitu driver
 mulai memakai fitur ini, mereka akan jadi Alfa setiap hari dan bergaji pokok
 nol.
 
+**Sudah dibangun di langkah 5.** Dua SQL kembar `PELAPOR_PERJALANAN_SQL` dan
+`HARI_HADIR_SQL` (`desktop/driver.rs` ↔ `validations/driver.ts`). Tanggal
+laporan = tanggal WIB dari `waktu_perangkat` (UTC + 7 jam), dan hanya laporan
+ber-`id_karyawan` (dari HP driver) yang dihitung. Generate Alfa melaporkannya
+sebagai "Lapor Perjalanan" di ringkasan. Audit absensi melewati pelapor
+sepenuhnya, termasuk scan masuk/pulangnya pada tanggal itu.
+
 ## 8. Model data (usulan)
 
-Semua tabel bawah ikut sinkron kecuali yang ditandai. Nama dan kolom final
-menunggu jawaban §12.
+**Sudah dibangun di langkah 1 (skema v34).** DDL-nya ada di `storage.rs`
+(Desktop dan Mobile), `turso.rs`, dan `db-migrations.ts`. Semua tabel di
+bawah ikut sinkron kecuali yang ditandai.
 
 | Tabel | Isi | Snapshot |
 | :-- | :-- | :-- |
-| `drv_jenis_kendaraan` | id, nama (bawaan: Truk, CDD, CDE, Pickup, Box, Motor, Bajaj, Lainnya), tarif `INTEGER`, `status_aktif`. Berupa daftar yang bisa diubah, bukan CHECK enum, karena tarifnya melekat di sini. | ya, `delete_missing: false` |
-| `drv_kategori_tujuan` | id, nama (bawaan: Antar Kota, Luar Kota, Beda Pulau), tarif `INTEGER`, `status_aktif` | ya, `delete_missing: false` |
-| `drv_kendaraan` | id, id_jenis, identitas (plat/nomor), nama, `status_aktif` | ya, `delete_missing: false` |
-| `drv_bongkar` | id, id_laporan (`Selesai Bongkar`), id_muatan, qty `INTEGER`, berat_kg_x100 `INTEGER`. Dikirim dalam event `trip-report/create` yang sama. | ya, append-only, `delete_missing: false` |
-| `drv_upah_bayar` | id, id_karyawan, tanggal, total `INTEGER`, daftar id surat jalan, dicatat_oleh, dibatalkan (pola `batal-<id>`) | ya, `delete_missing: false` |
-| `drv_muatan` | id, id_perjalanan, tempat_muat, tempat_bongkar (rencana, opsional), nama_barang, jenis_barang, qty `INTEGER`, satuan, berat_kg_x100 `INTEGER`, qty_dimuat / berat_dimuat_x100 (konfirmasi driver, kosong = belum) | ya, `delete_missing: true` + `PendingGuard::induk_tertunda` (pola baris pengajuan) |
-| `drv_lokasi` | id, nama, jenis (`Pool`, `Muat`, `Bongkar`, `Lainnya`), lat, lng, radius_m, `status_aktif` | ya, `delete_missing: false` |
-| `drv_perjalanan` | id, tanggal, id_karyawan awal, id_kendaraan awal, **nomor surat jalan (dibuat aplikasi, unik di aplikasi, bukan constraint DB)**, id_kategori_tujuan, tarif_kendaraan + tarif_tujuan (dikunci saat dibuat), id_karyawan_upah (kosong = penutup `Selesai`), catatan, dibuat_oleh, dibuat_pada | ya, `delete_missing: false` |
-| `drv_laporan` | id, id_perjalanan, jenis, jenis_kendala, terlambat_menit, id_lokasi, nama_lokasi, lat, lng, akurasi_m, waktu_perangkat, waktu_gps, diterima_cloud, id_karyawan (pelapor), id_karyawan_baru / id_kendaraan_baru (untuk ganti), keterangan, foto_sha256, kode_operator | ya, append-only, `delete_missing: false` |
-| `drv_laporan_foto` | id_laporan, foto_mime, foto_base64 | **tidak** (pola `absensi_foto`) |
+| `drv_jenis_kendaraan` | id_jenis, nama, tarif `INTEGER`, `status_aktif`. Berupa daftar yang bisa diubah, bukan CHECK enum, karena tarifnya melekat di sini. Tanpa seed bawaan: dispatcher mengisi jenis dan tarifnya sendiri. | `vehicle-type`, `delete_missing: false` |
+| `drv_kategori_tujuan` | id_kategori, nama, tarif `INTEGER`, `status_aktif` | `trip-destination`, `false` |
+| `drv_kendaraan` | id_kendaraan, id_jenis, identitas (plat/nomor), nama, catatan, `status_aktif` | `vehicle`, `false` |
+| `drv_lokasi` | id_lokasi, nama, jenis (`Pool`, `Muat`, `Bongkar`, `Lainnya`), lat, lng, radius_m (10–10.000, bawaan 200), `status_aktif` | `trip-place`, `false` |
+| `drv_perjalanan` | id_perjalanan, tanggal, **seri + nomor_urut + nomor** (pola `inventory_pengajuan`), id_karyawan dan id_kendaraan awal, id_jenis dan id_kategori, tarif_kendaraan + tarif_tujuan (dikunci saat dibuat), id_karyawan_upah (kosong = penutup `Selesai`), catatan, dicetak_pada, dibuat_oleh | `trip`, `false` |
+| `drv_muatan` | id_muatan, id_perjalanan, urutan, tempat_muat, tempat_bongkar (rencana), nama_barang, jenis_barang, qty `INTEGER`, satuan, berat_kg_x100 | `trip-cargo`, **`true`**. `PendingGuard::induk_tertunda` dipasang di langkah 3, sebelum ada rute push. |
+| `drv_laporan` | id_laporan, id_perjalanan, jenis, mode_ganti, id_ref, jenis_kendala, terlambat_menit, id_lokasi, nama_lokasi, lat, lng, akurasi_m, waktu_perangkat, waktu_gps, diterima_cloud, id_karyawan (driver pelapor; kosong bila dispatcher), id_karyawan_baru / id_kendaraan_baru, keterangan, foto_sha256, dilaporkan_oleh | `trip-report`, append-only, `false` |
+| `drv_laporan_muatan` | id_baris, id_laporan, id_muatan, qty, berat_kg_x100. Satu tabel untuk konfirmasi muat **dan** catatan bongkar, menumpang event laporannya. | `trip-report-cargo`, append-only, `false` |
+| `drv_laporan_foto` | id_laporan (PK, satu foto per laporan), mime_type (`image/jpeg` saja), data_base64 | **tidak** (pola `inventory_penerimaan_foto`) |
 
 - `jenis` laporan: `Berangkat`, `Tiba Muat`, `Selesai Muat`, `Tiba Bongkar`,
   `Selesai Bongkar`, `Kendala`, `Ganti Kendaraan`, `Ganti Driver`,
-  `Tidak Jalan`, `Dibatalkan`, `Selesai`. Dieja identik di CHECK keempat
-  lapis, validator Rust, dan TS.
+  `Disetujui`, `Ditolak`, `Tidak Jalan`, `Dibatalkan`, `Selesai`. Dieja
+  identik di CHECK keempat lapis, validator Rust, dan TS.
+- **Ganti dan persetujuannya** (§4.3): baris `Ganti …` membawa `mode_ganti`
+  (`Langsung` dari dispatcher, `Darurat` dari driver, `Minta Izin`).
+  Keputusan dispatcher adalah baris baru `Disetujui`/`Ditolak` dengan
+  `id_ref` = id baris ganti. Yang berlaku: `Langsung` dan `Darurat` selalu,
+  sedangkan `Minta Izin` hanya bila ada `Disetujui` yang merujuknya.
+- **Nomor surat jalan memakai seri per perangkat** (`seri_perangkat`, pola
+  jurnal dan pengajuan), sehingga dua perangkat offline tidak pernah
+  menghasilkan nomor yang sama. Bentuknya `KRS-2611-WAB12-001` (§4.1a).
+- **Waktu laporan** (`waktu_perangkat`, `waktu_gps`) disimpan UTC berbentuk
+  `YYYY-MM-DD HH:MM:SS`, sama dengan `datetime('now')`, supaya bisa
+  dibandingkan langsung dengan `diterima_cloud`. Stempel di foto tetap WIB.
+- **Aturan murni sudah dibangun di langkah 2**: `desktop/driver.rs` ↔
+  `validations/driver.ts`, 7 tes kembar dengan vektor yang sama. Kode tanda
+  tinjau: `urutan_janggal` (jam mundur), `jam_maju` (jam perangkat > jam cloud
+  + 5 menit), `kecepatan_mustahil`, `akurasi_buruk`, `akurasi_nol`,
+  `luar_radius`, `tanpa_gps`, `tanpa_foto`, `menunggu_persetujuan`,
+  `muat_beda`, `sisa_muatan`.
+- `drv_upah_bayar` (pembayaran upah) **belum dibuat**: tabel itu fase 2 dan
+  akan ditambahkan bersama skema v35.
 - Koordinat disimpan `REAL` (bukan uang, jadi aturan 13 tidak berlaku).
 - Rute kanonik: `vehicle-type/save`, `trip-destination/save`, `vehicle/save`,
   `trip-place/save`, `trip/save` (header + seluruh muatan dalam satu event,
   pola `accounting-journal/post`), `trip-report/create` (konfirmasi muatan
   menumpang di event `Selesai Muat`), `trip-report-photo/save`.
+  **Sudah dibangun di langkah 3**, beserta penulisan lokal (SQLite + outbox
+  satu transaksi) dan pemeriksaan "driver yang bertugas". Cetak dan pindah
+  upah memakai `trip/save` yang sama. Jalur Web (`services/driver.ts` + rute
+  API) dikerjakan di langkah 4 bersama izinnya, dan pengambilan foto dari
+  cloud per id di langkah 6 bersama layar yang membukanya.
 - Awalan nomor surat jalan disimpan di `setting_gex_system`
   (`sj_prefix`).
 - `master_operator.id_karyawan` (cloud-only) ditambah lewat `CREATE` +
@@ -481,11 +523,60 @@ menunggu jawaban §12.
   dan itu menjadi konfirmasinya.
 - Tanpa canvas 3D di layar kamera.
 
+**Sudah dibangun di langkah 6** (`components/perjalanan/`, halaman
+`/perjalanan` Web/Desktop dan Mobile, menu grup "Perjalanan"):
+
+- Tab **Surat jalan** (rentang tanggal, filter status, cari nomor/driver/plat),
+  **Perlu ditinjau**, **Armada & lokasi** (awalan nomor, jenis kendaraan,
+  kategori tujuan, kendaraan, lokasi dengan "Ambil koordinat dari perangkat
+  ini"), dan **Unduh foto**.
+- Rincian surat jalan: muatan rencana/dimuat/dibongkar, linimasa laporan
+  dengan foto (dimuat saat diketuk) dan "Buka di Maps", serta aksi cetak, ubah,
+  ganti kendaraan/driver Langsung, setujui/tolak ganti darurat, Tidak Jalan,
+  Tutup Selesai, Batalkan (`trip.cancel`), dan pindah upah (`trip.tariff`).
+- Kop surat jalan memakai nama dan logo perusahaan (data branding yang terbuka
+  untuk semua sesi), karena profil lengkap butuh izin `settings.manage`.
+  Tombol cetak disembunyikan di Mobile (WebView Android tidak punya dialog
+  cetak).
+- Unduh foto massal dipilih per surat jalan (filter driver + "pilih semua"),
+  bukan per laporan, sehingga tidak perlu kueri backend baru.
+- Playwright belum terpasang di repo ini (tidak ada konfigurasi maupun skrip
+  `test:e2e`), jadi gerbang Playwright langkah 6 belum bisa dijalankan.
+
+**Sudah dibangun di langkah 7** (`DriverWorkspace.tsx`, `lib/client/foto-laporan.ts`,
+halaman `/driver` Mobile dan Desktop; di Web hanya pesan "dari aplikasi di HP"):
+
+- Daftar perjalanan saya (dua hari ke belakang sampai dua hari ke depan),
+  disaring backend (`desktop_trip_mine`, `desktop_trip_my_detail`).
+- Satu tombol besar untuk langkah berikutnya; Kendala, Ganti kendaraan, dan
+  Serahkan ke driver lain selalu tersedia selama perjalanan terbuka. Ambil
+  alih perjalanan driver lain lewat daftar ringkas yang tidak memuat tarif.
+- Dialog lapor: GPS saat dialog dibuka (lokasi terdaftar terdekat dalam radius
+  mengisi nama tempat), isian per jenis, foto kamera belakang dengan stempel
+  (perusahaan, jenis + tempat, driver + kendaraan, koordinat, waktu WIB),
+  960 px JPEG 0,6 yang diturunkan bertahap sampai muat 200.000 karakter.
+- Konfirmasi muat/bongkar terisi dari rencana: baris yang tempatnya cocok
+  dengan nama tempat `Tiba` dicentang, jumlahnya = sisa.
+- Akun Driver tanpa izin dasbor/beranda langsung diarahkan ke `/driver`.
+
+**Wajib diuji di HP sungguhan sebelum dipakai:**
+
+1. Izin kamera dan lokasi diminta, dan kamera belakang yang terbuka.
+2. Foto terbaca: plat, wajah, dan teks stempel; ukuran sekitar 100 KB.
+3. Akurasi GPS di dalam gudang dan di jalan; nama lokasi terdaftar terisi
+   otomatis saat berada dalam radius.
+4. Mode pesawat: laporan tetap tersimpan, "N data belum terkirim" muncul, lalu
+   terkirim sendiri saat sinyal kembali dan muncul di layar dispatcher.
+5. Jam GPS (§6.1): bandingkan `waktu_gps` dengan jam HP; bila sama persis,
+   WebView mengisinya dengan jam sistem dan pemeriksaan itu dibuang.
+6. Aplikasi ke latar belakang saat kamera menyala lalu kembali: kamera hidup
+   lagi, tidak macet.
+
 ## 10. Fase
 
 | Fase | Isi |
 | :-- | :-- |
-| **1** | Master kendaraan, jenis + tarif, kategori tujuan + tarif, lokasi, akun Driver, surat jalan + nomor otomatis + muatan + cetak, semua jenis laporan + foto + stempel + GPS, konfirmasi muatan, status turunan, linimasa dispatcher, tanda tinjau (jam mundur, kecepatan mustahil, akurasi buruk, lapor dari luar radius, nomor ganda, muatan beda), unduh foto massal (ZIP), penghapusan foto 90 hari, aturan tidak-Alfa + hari hadir gaji harian dari laporan perjalanan. |
+| **1** | Master kendaraan, jenis + tarif, kategori tujuan + tarif, lokasi, akun Driver, surat jalan + nomor otomatis + muatan + cetak, semua jenis laporan + foto + stempel + GPS, konfirmasi muatan, status turunan, linimasa dispatcher, tanda tinjau (jam mundur, kecepatan mustahil, akurasi buruk, lapor dari luar radius, muatan beda), unduh foto massal (ZIP), penghapusan foto 90 hari, aturan tidak-Alfa + hari hadir gaji harian dari laporan perjalanan. |
 | **2** | Rekap dan pembayaran upah surat jalan (terpisah dari gaji, jurnal manual), rekap/ekspor Excel per driver, kendaraan, dan tanggal, deteksi lokasi palsu native, serta pemeriksaan jam GPS bila lolos uji §6.1. |
 | **3** | Notifikasi Telegram (kendala, perjalanan selesai, tidak jalan) ke bidang baru `armada`. |
 
@@ -543,7 +634,7 @@ Langkah 1–4 tanpa UI, supaya kontraknya teruji lebih dulu.
 | # | Langkah | Gerbang |
 | :-- | :-- | :-- |
 | 1 | **Skema v34**: semua tabel `drv_*` di keempat lapis, `master_operator.id_karyawan`, kunci `sj_prefix`, sentinel `-2030`, dan `ensure_schema_current` naik. | `audit:schema` |
-| 2 | **Aturan domain kembar** `desktop/driver.rs` ↔ `validations/driver.ts` + `services/driver.ts`: validasi, status turunan, nomor surat jalan, upah, tanda tinjau (jam mundur, kecepatan, akurasi, radius, nomor ganda, selisih muat/bongkar), dan batas foto. Diuji dengan vektor yang sama di kedua bahasa. | `bun test` + `cargo test` |
+| 2 | **Aturan domain kembar** `desktop/driver.rs` ↔ `validations/driver.ts` + `services/driver.ts`: validasi, status turunan, nomor surat jalan, upah, tanda tinjau (jam mundur, kecepatan, akurasi, radius, selisih muat/bongkar), dan batas foto. Diuji dengan vektor yang sama di kedua bahasa. | `bun test` + `cargo test` |
 | 3 | **Sinkronisasi**: rute kanonik, handler cloud (tidak pernah menolak karena urutan), `SNAPSHOT_TABLES` = `SNAPSHOT_SOURCES`, dan foto di luar snapshot. | `audit:contract` |
 | 4 | **RBAC dan akun**: izin baru, role bawaan Driver, pemeriksaan cakupan "driver yang sedang bertugas", dan hubungan akun ↔ personil. | tes Rust + `web-rbac-boundary` |
 | 5 | **Absensi dan gaji**: aturan tidak-Alfa dan hari hadir `FLAT_DAILY` dari laporan perjalanan (Rust ↔ TS). | tes Alfa + payroll yang sudah ada tetap lulus |
@@ -553,3 +644,10 @@ Langkah 1–4 tanpa UI, supaya kontraknya teruji lebih dulu.
 
 Setelah langkah 8: bagian ringkas di `CLAUDE.md` (pola bagian modul lain),
 lalu `bun run check` penuh oleh pemilik repositori.
+
+**Langkah 1–8 sudah dibangun (9 Nov 2026).** Langkah 8: SQL kembar
+`HAPUS_FOTO_LAMA_SQL` dan `FOTO_SEGERA_DIHAPUS_SQL` (jam database, umur dari
+`drv_laporan_foto.created_at`), `AutoFotoCleanupRunner` tiap 6 jam di setiap
+sesi (lokal + cloud, tanpa outbox), dan peringatan 7 hari di layar dispatcher
+yang membuka tab Unduh foto mulai tanggal laporan tertua. Sisa fase 1: uji di
+HP sungguhan (§9) dan `bun run check` penuh.

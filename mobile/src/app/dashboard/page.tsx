@@ -38,11 +38,16 @@ export default function DashboardPage() {
   const [eksporTerbuka, setEksporTerbuka] = useState(false);
   const [pesanEkspor, setPesanEkspor] = useState<string | null>(null);
 
+  // Akun Driver (hanya lapor perjalanan) langsung ke layarnya, bukan dasbor kosong.
+  const keLayarDriver = !canViewMetrics && canAccessArea(user, "driver");
+
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.replace("/login");
+    } else if (!authLoading && keLayarDriver) {
+      router.replace("/driver");
     }
-  }, [authLoading, isAuthenticated, router]);
+  }, [authLoading, isAuthenticated, keLayarDriver, router]);
 
   useEffect(() => {
     let cancelled = false;

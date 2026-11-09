@@ -860,6 +860,46 @@ cukup sesi, hasilnya hanya hitungan). Konfigurasi hanya Superadmin
 (`settings.manage` + `is_superadmin`), kartunya di tab Pengaturan "Notifikasi",
 Web/Desktop saja.
 
+## Perjalanan driver / surat jalan (schema versi 34)
+
+Rincian lengkap dan keputusan pemilik ada di `prd-driver.md`. Logika
+`desktop/driver.rs` (disalin ke Mobile) dan kembarannya `validations/driver.ts`
++ `services/driver.ts`, diuji dengan vektor yang sama. UI di
+`components/perjalanan/` (di `filesToCopy`): `/perjalanan` untuk dispatcher,
+`/driver` untuk driver (Mobile/Desktop; Web hanya pesan). Sentinel `-2030`.
+
+- Delapan tabel tersinkron `drv_*` (`delete_missing: false`, kecuali
+  `drv_muatan` yang dilindungi `PendingGuard::induk_tertunda` lewat event
+  `trip/save`). Foto `drv_laporan_foto` di luar snapshot, didorong per foto dan
+  ditarik per id. Rute: `vehicle-type`, `trip-destination`, `vehicle`,
+  `trip-place`, `trip` (`save`), `trip-report/create`, `trip-report-photo/save`.
+- **Status, driver, dan kendaraan yang bertugas TIDAK disimpan**: diturunkan
+  dari `drv_laporan` yang append-only (`status_perjalanan`, `penugasan`).
+  Ganti `Langsung`/`Darurat` berlaku seketika, `Minta Izin` hanya setelah
+  `Disetujui`; keputusan adalah laporan baru ber-`id_ref`.
+- **Cloud tidak pernah menolak laporan karena urutan atau penugasan**; urutan
+  diperiksa di perangkat (`periksa_urutan`) dan kejanggalan menjadi tanda tinjau
+  (`tanda_tinjau`), tidak ada yang ditolak otomatis.
+- Waktu laporan UTC `YYYY-MM-DD HH:MM:SS` (bentuk `datetime('now')`),
+  `diterima_cloud` selalu jam database cloud. Tanggal laporan = tanggal WIB.
+- Nomor `<awalan>-<YYMM>-<seri perangkat>-<urut>` (`seri_perangkat`, Web `WEB`),
+  jadi dua perangkat offline tidak pernah berebut nomor. Awalan di
+  `setting_gex_system.sj_prefix`. Tarif dikunci saat surat jalan dibuat.
+- Driver: akun `master_operator` ber-`id_karyawan` (role bawaan `driver`, hanya
+  `trip.report`). Laporan driver memakai personil SESI, tidak pernah payload,
+  dan hanya di surat jalan yang sedang ditugaskan kepadanya (kecuali ambil
+  alih lewat `Ganti Driver` atas namanya). Personil nonaktif = login, sesi Web,
+  dan laporannya ditolak. `trip.cancel` dan `trip.tariff` sensitif.
+- **Absensi dan gaji**: laporan perjalanan ber-`id_karyawan` pada tanggal WIB D
+  = bekerja pada D: tidak di-Alfa-kan, tidak dinilai audit absensi, dan dihitung
+  hari hadir FLAT_DAILY (`PELAPOR_PERJALANAN_SQL`, `HARI_HADIR_SQL`, kembar).
+- Foto 960 px JPEG ±100 KB (maks 200.000 karakter base64, `image/jpeg` saja),
+  hanya dari kamera, berstempel; `foto_sha256` = SHA-256 isi JPEG. Dihapus
+  setelah 90 hari jam database (`AutoFotoCleanupRunner`, lokal + cloud, tanpa
+  outbox) dengan peringatan 7 hari di layar dispatcher; baris laporan tetap.
+- Upah surat jalan dibayar terpisah dari gaji (pembayaran dan `trip.pay`
+  menyusul di fase 2 / schema v35).
+
 ## Domain contoh
 
 `master_item` dan `log_aktivitas` adalah tabel peraga yang memperagakan pola

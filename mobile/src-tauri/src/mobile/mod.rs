@@ -16,6 +16,8 @@ mod accounting;
 mod loan;
 // Tutup buku: SALINAN `desktop/tutup_buku.rs` oleh sync-rust-modules.ts.
 mod tutup_buku;
+// Perjalanan driver: SALINAN `desktop/driver.rs` oleh sync-rust-modules.ts.
+mod driver;
 // Notifikasi grup Telegram: SALINAN `desktop/telegram.rs` oleh sync-rust-modules.ts.
 pub mod telegram;
 // Lisensi offline Ed25519: SALINAN `desktop/license.rs` oleh sync-rust-modules.ts.

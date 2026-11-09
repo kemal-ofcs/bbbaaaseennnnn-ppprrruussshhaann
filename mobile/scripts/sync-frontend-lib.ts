@@ -20,6 +20,8 @@ const filesToCopy = [
   "components/ui/KonfirmasiData.tsx",
   // Pengirim notifikasi Telegram: berjalan di setiap sesi login, identik di kedua build.
   "components/AutoTelegramRunner.tsx",
+  // Masa simpan foto laporan perjalanan 90 hari, berjalan di setiap sesi login.
+  "components/AutoFotoCleanupRunner.tsx",
   "lib/db.ts",
   "lib/db-schema.ts",
   "lib/db-migrations.ts",
@@ -78,6 +80,17 @@ const filesToCopy = [
   "components/operational/aturanPilihPersonil.ts",
   "components/personnel/UbahMassal.tsx",
   "components/personnel/aturanUbahMassal.ts",
+  // Perjalanan driver (v34): layar dispatcher. Cetak surat jalan disembunyikan
+  // di Mobile karena WebView Android tidak punya dialog cetak.
+  "components/perjalanan/PerjalananWorkspace.tsx",
+  "components/perjalanan/FormSuratJalan.tsx",
+  "components/perjalanan/RincianSuratJalan.tsx",
+  "components/perjalanan/ArmadaPanel.tsx",
+  "components/perjalanan/UnduhFotoPanel.tsx",
+  "components/perjalanan/cetakSuratJalan.ts",
+  "components/perjalanan/tampilan.ts",
+  // Layar driver: kamera + GPS + stempel, laporan, dan ambil alih darurat.
+  "components/perjalanan/DriverWorkspace.tsx",
 ];
 
 for (const file of filesToCopy) {

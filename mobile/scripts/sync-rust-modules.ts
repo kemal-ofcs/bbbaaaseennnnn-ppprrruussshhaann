@@ -31,6 +31,10 @@ const filesToSync = [
   "tutup_buku.rs",
   // Notifikasi grup Telegram: SQL sumber dan isi pesan wajib identik dengan TS.
   "telegram.rs",
+  // Perjalanan driver: status turunan, urutan laporan, dan tanda tinjau wajib
+  // identik dengan Desktop dan TS, karena HP driver dan dispatcher membaca
+  // laporan yang sama.
+  "driver.rs",
   "commands.rs",
   // Tarif default payroll: satu sumber untuk SQLite lokal dan Turso cloud, di
   // kedua workspace. Perbedaan sekecil apa pun di sini membuat baris seed lokal

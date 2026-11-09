@@ -48,6 +48,14 @@ const expectedRoutes = [
   "inventory-request/close",
   "inventory-receipt/create",
   "inventory-receipt-photo/save",
+  // Perjalanan driver / surat jalan (v34).
+  "vehicle-type/save",
+  "trip-destination/save",
+  "vehicle/save",
+  "trip-place/save",
+  "trip/save",
+  "trip-report/create",
+  "trip-report-photo/save",
   "installment/activate",
   "installment/reapprove",
   "installment/close",
@@ -120,6 +128,15 @@ const expectedSnapshotTriples = [
   "employeeLoanMutations|loan-mutation|keu_pinjaman_mutasi",
   "employeeLoanDeferrals|loan-deferral|keu_pinjaman_tunda",
   "bookClosings|accounting-close|keu_tutup_buku",
+  // Perjalanan driver / surat jalan (v34).
+  "vehicleTypes|vehicle-type|drv_jenis_kendaraan",
+  "tripDestinations|trip-destination|drv_kategori_tujuan",
+  "vehicles|vehicle|drv_kendaraan",
+  "tripPlaces|trip-place|drv_lokasi",
+  "trips|trip|drv_perjalanan",
+  "tripCargo|trip-cargo|drv_muatan",
+  "tripReports|trip-report|drv_laporan",
+  "tripReportCargo|trip-report-cargo|drv_laporan_muatan",
 ].sort();
 
 // Tabel DDL lokal (storage.rs) yang memang TIDAK ikut snapshot sync.
@@ -133,6 +150,9 @@ const expectedLocalOnlyTables = [
   // Foto penerimaan barang (v30), pola yang sama: didorong satu per satu lewat
   // 'inventory-receipt-photo/save', ditarik per id saat diketuk.
   "inventory_penerimaan_foto",
+  // Foto laporan perjalanan driver (v34), pola yang sama: didorong per foto,
+  // ditarik per id saat dibuka.
+  "drv_laporan_foto",
   "audit_absensi",
   "desktop_client_identity",
   "desktop_credential_alias",
@@ -156,6 +176,8 @@ const expectedCloudOnlyTables = [
   "absensi_foto",
   // Foto penerimaan barang (v30): ditarik per id, tidak ikut snapshot.
   "inventory_penerimaan_foto",
+  // Foto laporan perjalanan driver (v34): ditarik per id, tidak ikut snapshot.
+  "drv_laporan_foto",
   "app_bootstrap_state",
   "app_mail_config",
   // Notifikasi grup Telegram (v33): token bot dan antrean pesan, server saja.
