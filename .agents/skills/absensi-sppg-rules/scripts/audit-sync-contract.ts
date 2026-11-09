@@ -58,6 +58,11 @@ const expectedRoutes = [
   "trip-report-photo/save",
   // Pembayaran upah surat jalan (v35).
   "trip-payment/create",
+  // HRIS fase 1 (v36): organisasi dan kontrak.
+  "hr-branch/save",
+  "hr-division/save",
+  "hr-position/save",
+  "hr-contract/create",
   "installment/activate",
   "installment/reapprove",
   "installment/close",
@@ -142,6 +147,12 @@ const expectedSnapshotTriples = [
   // Pembayaran upah surat jalan (v35).
   "tripPayments|trip-payment|drv_upah_bayar",
   "tripPaymentLines|trip-payment-line|drv_upah_bayar_baris",
+  // HRIS fase 1 (v36): organisasi dan kontrak.
+  "hrBranches|hr-branch|hr_cabang",
+  "hrDivisions|hr-division|hr_divisi",
+  "hrDivisionNames|hr-division-name|hr_divisi_nama",
+  "hrPositions|hr-position|hr_jabatan",
+  "hrContracts|hr-contract|hr_kontrak",
 ].sort();
 
 // Tabel DDL lokal (storage.rs) yang memang TIDAK ikut snapshot sync.
@@ -188,6 +199,12 @@ const expectedCloudOnlyTables = [
   // Notifikasi grup Telegram (v33): token bot dan antrean pesan, server saja.
   "app_telegram_setting",
   "notifikasi_telegram",
+  // HRIS fase 1 (v36, Q-30, Q-45): data pribadi, keuangan, dan dokumen
+  // karyawan tidak pernah ada di SQLite perangkat.
+  "hr_profil",
+  "hr_dokumen_jenis",
+  "hr_dokumen",
+  "hr_dokumen_berkas",
   "app_permission",
   "app_role",
   "app_session",

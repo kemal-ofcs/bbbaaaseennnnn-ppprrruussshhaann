@@ -974,6 +974,45 @@ jadi versi skema tetap 35 dan sentinel tetap `-2031`.
 - Tes kembar `catat_armada_dari_data_cloud` (Rust, `TursoClient::local_file`)
   ↔ "kejadian armada" (`services/telegram.test.ts`), data dan pesan sama.
 
+## HRIS fase 1: organisasi, kontrak, profil, dokumen (schema versi 36)
+
+Rincian dan keputusan pemilik di `prd-hris.md` §16. Logika `desktop/hris.rs`
+(disalin ke Mobile) ↔ `validations/hris.ts` + `services/hris.ts`, diuji dengan
+vektor yang sama; SQL kembar diperiksa harfiah oleh `hris.test.ts`. Sentinel
+`-2032`, `REQUIRED_TABLE_COUNT` 79.
+
+- **Tersinkron** (`delete_missing: false`, tidak ada baris yang dihapus):
+  `hr_cabang`, `hr_divisi`, `hr_divisi_nama` (setiap nama yang pernah dipakai,
+  menumpang `hr-division/save`), `hr_jabatan`, `hr_kontrak` (append-only,
+  pembatalan `batal-<id>`). Rute `hr-branch|hr-division|hr-position/save`,
+  `hr-contract/create`. `master_data` + `id_cabang/id_divisi/id_jabatan/id_atasan`.
+- **Khusus cloud** (Q-30, Q-45): `hr_profil`, `hr_dokumen_jenis`, `hr_dokumen`,
+  `hr_dokumen_berkas`. Tidak pernah di SQLite perangkat, tanpa outbox; command
+  `desktop_hr_profile*`/`desktop_hr_document*` lewat `TursoClient`, Web lewat
+  `/api/hris`. Berkas maks 1 MB, MIME harus cocok dengan tanda tangan bita.
+- **`master_data.divisi`/`jabatan_status` tetap teks nama SEKARANG**: scanner,
+  kartu ID, dan kueri lama tidak berubah. Simpan divisi/jabatan memperbarui teks
+  data kini karyawannya dan menautkan teks yang belum punya master
+  (`SELARASKAN_*_SQL`); riwayat tidak ditulis ulang dan tampil lewat
+  `DIVISI_KINI_SQL` (laporan bulanan, riwayat, log scan, koreksi, backup).
+  Nama divisi lama dicadangkan. Migrasi teks → master hanya di cloud, id dari
+  hex nama (`MIGRASI_ORGANISASI_SQL`).
+- **Payload `employee/*`**: kunci organisasi absen atau `null` = tidak dibawa
+  (perangkat lama, atau yang belum menarik migrasi), `""` = dikosongkan.
+  Tanpa `id_divisi`, cloud memetakan teks divisi lewat `hr_divisi_nama` dan
+  menormalkannya, jadi event lama tidak mengembalikan nama lama. Impor dan
+  form menolak teks divisi/jabatan yang tidak dikenal (Q-44).
+- `tanggal_daftar` = Tanggal Masuk (Q-41); handler cloud `employee/update`
+  kini menulisnya. `jenis_personil` mengikuti kontrak tidak dibatalkan
+  terakhir (`JENIS_DARI_KONTRAK_SQL`, Q-40), isiannya terkunci bila berkontrak.
+  Status kerja dan tanda kontrak (`percobaan_lewat`, `pkwt_lewat`,
+  `harian_perlu_pkwtt`) diturunkan, angkanya dari `setting_gex_system hr_*`.
+- RBAC: `hr.*` (fase 1), `hr.finance.manage` sensitif, `CONFIDENTIAL_PERMISSIONS`
+  (pribadi, keuangan, dokumen) tidak ikut paket Admin. Role bawaan `hrd` dan
+  `atasan`. Halaman `/hris` (Web/Desktop, `desktopSaja` di menu) memuat
+  Karyawan, Struktur, dan Organisasi; Mobile hanya form karyawan
+  (`IsianOrganisasi.tsx`, di `filesToCopy`).
+
 ## Domain contoh
 
 `master_item` dan `log_aktivitas` adalah tabel peraga yang memperagakan pola

@@ -9,6 +9,7 @@ import {
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { konfirmasiData } from "@/components/ui/KonfirmasiData";
 import { Modal } from "@/components/ui/Modal";
+import { IsianOrganisasi } from "@/components/personnel/IsianOrganisasi";
 import { PilihCari } from "@/components/ui/PilihCari";
 import { triggerHaptic } from "@/lib/client/haptics";
 import {
@@ -34,8 +35,8 @@ const DEFAULT_FORM: KaryawanInput = {
   id_unik: "",
   kode_karyawan: "",
   nama: "",
-  divisi: "Operasional",
-  jabatan_status: "Staff",
+  divisi: "",
+  jabatan_status: "",
   no_hp: "",
   lp: "L",
   id_shift: 1,
@@ -56,6 +57,10 @@ interface EmployeeFormModalProps {
   initialData: KaryawanInput | null;
   /** Daftar shift yang tersedia untuk dipilih. */
   shifts: Record<string, unknown>[];
+  /** Karyawan aktif yang boleh dipilih sebagai atasan langsung. */
+  calonAtasan: ReadonlyArray<{ id_unik: string; nama: string }>;
+  /** Karyawan berkontrak: jenis personil mengikuti kontrak (Q-40). */
+  punyaKontrak?: boolean;
   /** Callback menutup modal tanpa menyimpan. */
   onClose: () => void;
   /** Callback sukses menyimpan — menerima pesan konfirmasi. */
@@ -71,6 +76,8 @@ export function EmployeeFormModal({
   mode,
   initialData,
   shifts,
+  calonAtasan,
+  punyaKontrak = false,
   onClose,
   onSuccess,
 }: EmployeeFormModalProps) {
@@ -294,47 +301,19 @@ export function EmployeeFormModal({
           />
         </div>
 
-        {/* 4 & 5. Divisi & Jabatan */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div>
-            <label
-              htmlFor="employee-division"
-              className="text-slate-400 block mb-1 font-semibold"
-            >
-              Divisi:
-            </label>
-            <input
-              id="employee-division"
-              type="text"
-              value={formData.divisi}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, divisi: e.target.value }))
-              }
-              aria-invalid={!!formErrors.divisi}
-              className={inputClass(!!formErrors.divisi)}
-            />
-          </div>
-          <div>
-            <label
-              htmlFor="employee-position"
-              className="text-slate-400 block mb-1 font-semibold"
-            >
-              Jabatan:
-            </label>
-            <input
-              id="employee-position"
-              type="text"
-              value={formData.jabatan_status ?? ""}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  jabatan_status: e.target.value,
-                }))
-              }
-              className={inputClass()}
-            />
-          </div>
-        </div>
+        {/* 4 & 5. Organisasi: divisi, jabatan, cabang, atasan (HRIS v36) */}
+        <IsianOrganisasi
+          nilai={formData}
+          onUbah={(perubahan) =>
+            setFormData((prev) => ({ ...prev, ...perubahan }))
+          }
+          calonAtasan={calonAtasan}
+          idDiri={mode === "edit" ? formData.id_unik : undefined}
+          galatDivisi={formErrors.divisi}
+        />
+        {formErrors.divisi ? (
+          <p className="-mt-2 text-xs text-rose-200">{formErrors.divisi}</p>
+        ) : null}
 
         {/* 6, 7, 8. Gender, Shift & Personil */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -397,6 +376,10 @@ export function EmployeeFormModal({
             </label>
             <select
               id="employee-personnel"
+              disabled={punyaKontrak}
+              title={
+                punyaKontrak ? "Mengikuti kontrak terakhir di HRIS." : undefined
+              }
               value={formData.jenis_personil || "Pegawai"}
               onChange={(e) =>
                 setFormData((prev) => ({
@@ -465,7 +448,7 @@ export function EmployeeFormModal({
             htmlFor="employee-join-date"
             className="mb-1 block text-slate-400 font-semibold"
           >
-            Tanggal Mulai Masuk:
+            Tanggal Masuk:
           </label>
           <input
             id="employee-join-date"

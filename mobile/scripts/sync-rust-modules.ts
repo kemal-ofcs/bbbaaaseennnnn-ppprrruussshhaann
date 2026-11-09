@@ -35,6 +35,9 @@ const filesToSync = [
   // identik dengan Desktop dan TS, karena HP driver dan dispatcher membaca
   // laporan yang sama.
   "driver.rs",
+  // HRIS: aturan organisasi, kontrak, dan validasi profil/dokumen wajib
+  // identik dengan Desktop dan TS.
+  "hris.rs",
   "commands.rs",
   // Tarif default payroll: satu sumber untuk SQLite lokal dan Turso cloud, di
   // kedua workspace. Perbedaan sekecil apa pun di sini membuat baris seed lokal

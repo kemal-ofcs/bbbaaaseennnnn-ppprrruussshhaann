@@ -37,6 +37,7 @@ import {
   toggleStatusKaryawan,
   updateKaryawan,
 } from "@/lib/gateways/employee";
+import { ambilOrganisasi, type Organisasi } from "@/lib/gateways/hris";
 import { getDaftarShift } from "@/lib/gateways/shift";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import { useHydrated } from "@/lib/hooks/useHydrated";
@@ -72,6 +73,13 @@ export default function KaryawanPage() {
 
   // ─── Data & Loading State ───────────────────────────────────────────────────
   const [employees, setEmployees] = useState<Record<string, unknown>[]>([]);
+  // Master organisasi HRIS untuk Ubah massal divisi/jabatan/cabang.
+  const [org, setOrg] = useState<Organisasi | null>(null);
+  useEffect(() => {
+    ambilOrganisasi()
+      .then(setOrg)
+      .catch(() => setOrg(null));
+  }, []);
   const [shifts, setShifts] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -176,8 +184,27 @@ export default function KaryawanPage() {
 
   const kolomMassal = useMemo<KolomMassal[]>(
     () => [
-      { key: "divisi", label: "Divisi", jenis: "teks" },
-      { key: "jabatan_status", label: "Jabatan", jenis: "teks" },
+      {
+        key: "id_divisi",
+        label: "Divisi",
+        opsi: (org?.divisi ?? [])
+          .filter((d) => d.is_aktif === 1)
+          .map((d) => ({ value: d.id_divisi, label: d.nama })),
+      },
+      {
+        key: "id_jabatan",
+        label: "Jabatan",
+        opsi: (org?.jabatan ?? [])
+          .filter((j) => j.is_aktif === 1)
+          .map((j) => ({ value: j.id_jabatan, label: j.nama })),
+      },
+      {
+        key: "id_cabang",
+        label: "Cabang",
+        opsi: (org?.cabang ?? [])
+          .filter((c) => c.is_aktif === 1)
+          .map((c) => ({ value: c.id_cabang, label: c.nama })),
+      },
       {
         key: "id_shift",
         label: "Shift",
@@ -202,7 +229,7 @@ export default function KaryawanPage() {
         jenis: "tanggal",
       },
     ],
-    [shifts],
+    [shifts, org],
   );
 
   // ─── Handler: Toggle Status ─────────────────────────────────────────────────
@@ -629,6 +656,17 @@ export default function KaryawanPage() {
           mode={formMode}
           initialData={formInitialData}
           shifts={shifts}
+          calonAtasan={employees
+            .filter((emp) => emp.status_aktif !== "Nonaktif")
+            .map((emp) => ({
+              id_unik: String(emp.id_unik),
+              nama: String(emp.nama),
+            }))}
+          punyaKontrak={Boolean(
+            formMode === "edit" &&
+              employees.find((emp) => emp.id_unik === formInitialData?.id_unik)
+                ?.punya_kontrak,
+          )}
           onClose={() => setFormOpen(false)}
           onSuccess={handleFormSuccess}
         />

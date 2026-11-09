@@ -17,6 +17,8 @@ const filesToCopy = [
   // Dropdown dengan kotak cari dan dialog konfirmasi: bergantung pada `Modal`
   // dan `components/inventory/gaya.ts` yang juga disalin.
   "components/ui/PilihCari.tsx",
+  // Isian organisasi HRIS (v36) di form karyawan: cabang, divisi, jabatan, atasan.
+  "components/personnel/IsianOrganisasi.tsx",
   "components/ui/KonfirmasiData.tsx",
   // Pengirim notifikasi Telegram: berjalan di setiap sesi login, identik di kedua build.
   "components/AutoTelegramRunner.tsx",
