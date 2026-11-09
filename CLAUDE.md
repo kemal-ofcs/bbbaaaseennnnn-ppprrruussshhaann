@@ -832,7 +832,7 @@ kembar dengan vektor uji yang sama).
 ## Notifikasi grup Telegram (schema versi 33)
 
 Bot SATU ARAH ke grup internal per bidang (`inventaris`, `keuangan`,
-`pimpinan`); tidak ada perintah dari Telegram yang bisa mengubah data. Dua tabel
+`pimpinan`, `armada`); tidak ada perintah dari Telegram yang bisa mengubah data. Dua tabel
 KHUSUS CLOUD (sentinel `-2029`): `app_telegram_setting` (key/value: `bot_token`,
 `aktif`, `aktif_sejak` UTC, `grup:<bidang>`, `kirim:<kejadian>`; token tidak
 pernah dikembalikan ke UI dan tidak pernah disimpan di SQLite perangkat) dan
@@ -853,7 +853,14 @@ Pimpinan. Gaji hanya jumlah pegawai dan total bersih dari `payroll_runs`, dan
 totalnya disembunyikan bila pegawainya < 3 (`MIN_PEGAWAI_NOMINAL_GAJI`);
 `payroll_items` tidak pernah dibaca. Kejadian sebelum `aktif_sejak` atau lebih
 dari 7 hari tidak dikirim. Menambah kejadian = satu SQL sumber + fungsi pesan
-kembar + entri `BIDANG_KEJADIAN`/`bidang_kejadian`.
+kembar + entri `BIDANG_KEJADIAN`/`bidang_kejadian`. Enam kejadian perjalanan
+ke grup Armada ada di subbagian "Notifikasi armada" di bawah.
+
+**Perangkat lama membatalkan kejadian yang tidak dikenalnya.** Semua build
+menguras antrean yang sama, dan `bidang_kejadian` = `None` membuat baris itu
+`Dibatalkan`. Sentinel tidak bisa mencegahnya karena sentinel lama tetap ada
+di cloud, jadi kejadian baru baru boleh dinyalakan setelah semua perangkat
+diperbarui.
 
 `AutoTelegramRunner` berjalan untuk setiap sesi login (`desktop_drain_telegram`
 cukup sesi, hasilnya hanya hitungan). Konfigurasi hanya Superadmin
@@ -942,6 +949,30 @@ SENGAJA ditunda sampai uji HP membuktikan `position.timestamp` bukan jam sistem.
   `mobile/src-tauri/gen/` di-gitignore. Hanya laporan dari HP driver yang
   membawa nilainya; cloud mengubah nilai selain 0/1 menjadi kosong, tidak
   pernah menolak.
+
+### Notifikasi armada (fase 3, tanpa perubahan skema)
+
+Fase 3 `prd-driver.md` (§15). Memakai modul Telegram v33 apa adanya: bidang
+`armada` dan sakelar `kirim:trip_*` hanya baris baru di `app_telegram_setting`,
+jadi versi skema tetap 35 dan sentinel tetap `-2031`.
+
+- Enam kejadian, semuanya ke Armada: `trip_kendala`, `trip_ganti_izin`
+  (Darurat/Minta Izin yang belum diputuskan), `trip_lokasi_palsu` (id per
+  laporan: `drv-kendala:`, `drv-ganti:`, `drv-palsu:`), serta `trip_selesai`,
+  `trip_tidak_jalan`, `trip_dibatalkan` (id per surat jalan lewat `TRIP_TUTUP`,
+  jadi laporan penutup kembar dari dua perangkat menjadi satu pesan).
+- SQL sumber menyaring `diterima_cloud` (jam cloud), bukan jam perangkat:
+  laporan offline yang telat tetap dikirim selama sampai dalam 7 hari, dengan
+  baris "Dikirim terlambat (offline)." bila selisihnya > `MENIT_TERLAMBAT` (30).
+  Laporan yang surat jalannya belum ada di cloud menunggu siklus berikutnya.
+  Teks SQL diperiksa identik Rust ↔ TS oleh `validations/telegram.test.ts`.
+- Driver dan kendaraan di pesan = `penugasan` atas laporan SEBELUM kejadian
+  (`tugas_sebelum` ↔ `tugasSebelum`); driver = pelapor bila dari HP driver.
+  Isinya nama driver dan `<jenis> <plat>` saja: koordinat, foto, upah, dan
+  muatan tidak pernah ikut (Q-37). Lokasi palsu ditulis "Perlu ditinjau",
+  bukan vonis.
+- Tes kembar `catat_armada_dari_data_cloud` (Rust, `TursoClient::local_file`)
+  ↔ "kejadian armada" (`services/telegram.test.ts`), data dan pesan sama.
 
 ## Domain contoh
 

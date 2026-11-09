@@ -8,8 +8,8 @@ import {
   syncNow,
 } from "@/lib/gateways/sync-status";
 import { AutoAlfaRunner } from "./AutoAlfaRunner";
-import { AutoSyncRunner } from "./AutoSyncRunner";
 import { AutoFotoCleanupRunner } from "./AutoFotoCleanupRunner";
+import { AutoSyncRunner } from "./AutoSyncRunner";
 import { AutoTelegramRunner } from "./AutoTelegramRunner";
 import { LicenseNotice } from "./license/LicenseNotice";
 import { MobileBottomNav } from "./MobileBottomNav";

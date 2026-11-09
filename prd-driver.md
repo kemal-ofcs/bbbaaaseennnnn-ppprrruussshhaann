@@ -1,9 +1,9 @@
 # PRD — Perjalanan Driver
 
-Status (9 Nov 2026): **fase 1 (skema v34, §13) dan fase 2 (skema v35, §14)
-sudah dibangun.** Jawaban pertanyaan ada di §12 dan §14.3. Sisa: uji di HP
-sungguhan (§9), `bun run check` penuh, pemeriksaan jam GPS (§6.1, menunggu uji
-HP poin 5), dan fase 3 (Telegram).
+Status (10 Nov 2026): **fase 1 (skema v34, §13), fase 2 (skema v35, §14), dan
+fase 3 (Telegram armada, tanpa perubahan skema, §15) sudah dibangun.** Jawaban
+pertanyaan ada di §12, §14.3, dan §15.3. Sisa: uji di HP sungguhan (§9),
+`bun run check` penuh, dan pemeriksaan jam GPS (§6.1, menunggu uji HP poin 5).
 
 ---
 
@@ -172,7 +172,8 @@ dan berat (kg, dua desimal, disimpan ×100 sebagai `INTEGER` seperti pola
 Laporan `Kendala` dengan jenis tetap: `Macet`, `Kendaraan Rusak`, `Ban`,
 `Kecelakaan`, `Cuaca`, `Antre Muat/Bongkar`, `Lainnya` (wajib diisi
 keterangan), ditambah perkiraan keterlambatan dalam menit (opsional).
-Perjalanan tetap berjalan. Kendala bisa dikirim ke grup Telegram (fase 3).
+Perjalanan tetap berjalan. Kendala dikirim ke grup Telegram Armada (fase 3,
+§15).
 
 ### 4.3 Ganti kendaraan dan driver (poin 4 dan 5)
 
@@ -583,7 +584,7 @@ halaman `/driver` Mobile dan Desktop; di Web hanya pesan "dari aplikasi di HP"):
 | :-- | :-- |
 | **1** | Master kendaraan, jenis + tarif, kategori tujuan + tarif, lokasi, akun Driver, surat jalan + nomor otomatis + muatan + cetak, semua jenis laporan + foto + stempel + GPS, konfirmasi muatan, status turunan, linimasa dispatcher, tanda tinjau (jam mundur, kecepatan mustahil, akurasi buruk, lapor dari luar radius, muatan beda), unduh foto massal (ZIP), penghapusan foto 90 hari, aturan tidak-Alfa + hari hadir gaji harian dari laporan perjalanan. |
 | **2** | Rekap dan pembayaran upah surat jalan (terpisah dari gaji, jurnal manual), rekap/ekspor Excel per driver, kendaraan, dan tanggal, deteksi lokasi palsu native, serta pemeriksaan jam GPS bila lolos uji §6.1. |
-| **3** | Notifikasi Telegram (kendala, perjalanan selesai, tidak jalan) ke bidang baru `armada`. |
+| **3** | Notifikasi Telegram ke bidang baru `armada`: kendala, selesai, tidak jalan, dibatalkan, ganti yang menunggu keputusan, dan lokasi palsu (Q-36). |
 
 ## 11. Di luar cakupan
 
@@ -836,3 +837,114 @@ angka di dokumen skill (`SKILL.md`, `references/01` dan `02`) sudah
 disesuaikan sampai `audit:docs` lulus. Sisa fase 2: uji HP poin 5 dan 7 (§9),
 pemeriksaan jam GPS bila poin 5 lolos, dan `bun run check` penuh oleh pemilik
 repositori.
+
+## 15. Urutan pengerjaan fase 3 (Telegram armada)
+
+Pola modul Telegram v33 dipakai apa adanya: pengirim membaca kejadian dari
+data cloud tiap siklus (`catat_kejadian` ↔ `catatKejadian`), mencatatnya ke
+`notifikasi_telegram` dengan id deterministik, lalu mengirimnya lewat klaim
+atomik yang sudah ada. Jalur simpan laporan tidak disentuh.
+
+### 15.1 Usulan
+
+**Tanpa migrasi skema.** Pengaturan Telegram berbentuk key/value
+(`grup:armada`, `kirim:<kejadian>` cukup baris baru di
+`app_telegram_setting`), dan `notifikasi_telegram.kejadian` sengaja tanpa
+CHECK. Sentinel tetap `-2031`, versi skema tetap 35.
+
+Bidang baru `armada` (label "Armada"). Kejadian usulan:
+
+| Kejadian | Sumber | Id | Isi pesan (usulan) |
+| :-- | :-- | :-- | :-- |
+| `trip_kendala` | `drv_laporan.jenis = 'Kendala'` | `drv-kendala:<id_laporan>` | nomor SJ, jenis kendala, perkiraan terlambat, keterangan, nama tempat, driver, kendaraan, jam kejadian WIB |
+| `trip_selesai` | laporan `Selesai` pertama per surat jalan | `drv-selesai:<id_perjalanan>` | nomor SJ, driver, kendaraan, jam selesai WIB; bila ditutup dispatcher: "ditutup oleh <operator>" + alasan |
+| `trip_tidak_jalan` | laporan `Tidak Jalan` pertama per surat jalan | `drv-tidak-jalan:<id_perjalanan>` | nomor SJ, driver dan kendaraan rencana, alasan, oleh |
+| `trip_dibatalkan` | laporan `Dibatalkan` pertama per surat jalan | `drv-batal:<id_perjalanan>` | nomor SJ, driver, kendaraan, alasan, oleh |
+| `trip_ganti_izin` | `Ganti Kendaraan`/`Ganti Driver` ber-`mode_ganti` `Darurat` atau `Minta Izin` yang belum punya `Disetujui`/`Ditolak` saat dibaca | `drv-ganti:<id_laporan>` | nomor SJ, jenis ganti, "sudah berlaku" (Darurat) atau "menunggu izin" (Minta Izin), dari → ke (driver/kendaraan), alasan, pelapor; "Putuskan di aplikasi." |
+| `trip_lokasi_palsu` | laporan ber-`lokasi_palsu = 1` | `drv-palsu:<id_laporan>` | ditulis sebagai tanda tinjau, bukan vonis: "Perlu ditinjau: lokasi palsu terdeteksi", nomor SJ, jenis laporan, driver, jam |
+
+- **Waktu yang menyaring** adalah `diterima_cloud` (jam database cloud, UTC):
+  kejadian dikirim bila `diterima_cloud >= aktif_sejak` dan
+  `>= datetime('now','-7 days')`, seperti kejadian v33. Laporan offline yang
+  telat sampai tetap dikirim, dengan baris tambahan **"Dikirim terlambat
+  (offline), kejadian <jam WIB>"** bila selisih `diterima_cloud` −
+  `waktu_perangkat` lebih dari 30 menit (§6.1 poin 4: telat bukan curang).
+- **Driver dan kendaraan** diambil dari fungsi `penugasan` yang sudah kembar
+  (laporan ganti terakhir yang berlaku), bukan dari `drv_perjalanan` awal,
+  supaya pesan tidak salah setelah ganti kendaraan/driver. Nama driver dari
+  `master_data`, kendaraan = jenis + identitas (plat).
+- **Tidak ikut pesan:** koordinat, foto, tarif/upah, muatan, dan tanda tinjau.
+- **Batas yang diketahui:** perangkat yang belum diperbarui ikut menguras
+  antrean yang sama dan menandai kejadian yang tidak dikenalnya `Dibatalkan`
+  (`bidang_kejadian` = `None`). Sentinel tidak bisa mencegahnya, karena
+  sentinel lama tetap ada di cloud. Jadi **semua perangkat wajib diperbarui
+  sebelum grup Armada diatur**, sama seperti catatan CHECK jurnal v28.
+
+- Semua kejadian di atas ke bidang `armada` dan masing-masing punya sakelar
+  sendiri. Satu laporan bisa menghasilkan dua pesan berbeda kejadian
+  (misalnya Kendala yang bertanda lokasi palsu).
+
+**Sudah dibangun di langkah 16** (`telegram.rs` ↔ `validations/telegram.ts`,
+tes `isi_pesan_perjalanan` ↔ "isi pesan perjalanan" dengan vektor yang sama):
+
+- Bidang `armada`, enam kejadian `trip_*` di `KEJADIAN`/`TELEGRAM_KEJADIAN`,
+  `bidang_kejadian`/`BIDANG_KEJADIAN`, dan labelnya. Draft konfigurasi
+  (`baca_draft` ↔ `telegramDraftSchema`) kini mewajibkan `grup.armada` dan
+  keenam sakelar.
+- SQL sumber `SQL_TRIP_KENDALA`, `SQL_TRIP_TUTUP` (berparameter jenis +
+  awalan, lewat tabel `TRIP_TUTUP`), `SQL_TRIP_GANTI_IZIN`,
+  `SQL_TRIP_LOKASI_PALSU`. Semuanya menyaring `diterima_cloud`, menghitung
+  `waktu_wib` dan `telat_menit` di database, dan memerlukan surat jalannya
+  sudah ada di cloud. Tes TS "SQL perjalanan disalin harfiah ke telegram.rs"
+  memeriksa keempat teksnya identik di Rust (Desktop atau salinan Mobile).
+- Id `drv-kendala:`, `drv-ganti:`, `drv-palsu:` (per laporan) dan
+  `drv-selesai:`, `drv-tidak-jalan:`, `drv-batal:` (per surat jalan).
+- Pesan `pesan_trip_kendala`, `pesan_trip_tutup`, `pesan_trip_ganti_izin`,
+  `pesan_trip_lokasi_palsu`, dengan baris "Dikirim terlambat (offline)." bila
+  `telat_menit` > `MENIT_TERLAMBAT` (30).
+
+**Sudah dibangun di langkah 17** (`catat_armada` ↔ `catatArmada`, dipanggil
+`catat_kejadian` sebelum ringkasan harian):
+
+- Driver dan kendaraan di pesan diambil dari `penugasan` atas laporan yang
+  urut SEBELUM kejadian (`tugas_sebelum` ↔ `tugasSebelum`), jadi Selesai
+  setelah ganti darurat menyebut kendaraan pengganti, dan "Dari" pada pesan
+  ganti adalah yang bertugas sebelumnya. Keputusan yang datang belakangan
+  tidak mengubah pesan yang sudah tercatat.
+- Driver = pelapor bila laporan dari HP driver, selain itu driver yang
+  bertugas. Nama dari `master_data` (`SQL_NAMA_PERSONIL`), cadangan nama
+  operator lalu id; kendaraan `<jenis> <identitas>` (`SQL_LABEL_KENDARAAN`).
+  Laporan penutup dari dispatcher menulis "Oleh" + "Alasan".
+- Kartu Notifikasi: grup Armada (grid 2 × 2) dengan petunjuk "perbarui semua
+  perangkat lebih dulu", dan enam sakelar baru dari `TELEGRAM_KEJADIAN`.
+- Tes kembar `catat_armada_dari_data_cloud` (Rust, `TursoClient::local_file`)
+  ↔ "kejadian armada" (Web, libsql memori) dengan data dan isi pesan yang
+  sama: lima pesan, Selesai kembar satu pesan, Minta Izin yang sudah disetujui
+  dan laporan sebelum `aktif_sejak` tidak dikirim, siklus kedua tidak
+  menambah apa pun. `audit:contract` dan `audit:schema` lulus tanpa perubahan
+  skrip.
+
+### 15.2 Langkah
+
+| # | Langkah | Gerbang |
+| :-- | :-- | :-- |
+| 16 | **Aturan murni kembar** `telegram.rs` ↔ `validations/telegram.ts`: bidang `armada`, kejadian baru + `BIDANG_KEJADIAN`/`bidang_kejadian` + label, SQL sumber (di cloud, saring `diterima_cloud`), fungsi id, fungsi pesan (termasuk baris "dikirim terlambat"). Vektor uji yang sama. | `bun test` per berkas + `cargo test telegram` |
+| 17 | **Pengirim dan pengaturan**: `catat_kejadian` ↔ `catatKejadian` (driver/kendaraan lewat `penugasan`), draft `grup.armada` + `kirim.*` di `baca_draft` ↔ `telegramDraftSchema`, kartu Notifikasi (grup Armada + sakelar), tes pengirim yang sudah ada diperluas. | `bun test` per berkas + `cargo test` + typecheck |
+| 18 | Bagian `CLAUDE.md` (subbagian v33/v34), catatan "Sudah dibangun" di §15, status di kepala PRD, dan dokumen skill. | `audit:docs` |
+
+**Langkah 16–18 sudah dibangun (10 Nov 2026).** `CLAUDE.md` mendapat bidang
+`armada` di bagian Telegram v33, catatan "perangkat lama membatalkan kejadian
+yang tidak dikenalnya", dan subbagian "Notifikasi armada" di bagian perjalanan
+driver. Dokumen skill tidak berubah: tidak ada angka rute, tabel, izin, atau
+versi skema yang bergeser, dan `audit:docs` lulus. Sisa fase 3: uji kirim
+sungguhan ke grup Armada setelah semua perangkat diperbarui, dan `bun run
+check` penuh oleh pemilik repositori.
+
+### 15.3 Jawaban fase 3 (9 Nov 2026)
+
+| # | Pertanyaan | Jawaban |
+| :-- | :-- | :-- |
+| Q-36 | Kejadian selain Kendala, Selesai, Tidak Jalan | Ditambah `Dibatalkan`, ganti darurat/minta izin yang menunggu keputusan, dan lokasi palsu. |
+| Q-37 | Data pribadi di pesan | Nama driver + jenis dan plat kendaraan. Tanpa koordinat, foto, upah, dan muatan. |
+| Q-38 | Laporan offline yang telat sampai | Tetap dikirim selama sampai di cloud dalam 7 hari, dengan baris "Dikirim terlambat (offline)" bila selisihnya > 30 menit. |
+| Q-39 | Pesan Selesai | Satu pesan per surat jalan, tanpa ringkasan harian. |
