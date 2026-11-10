@@ -1054,6 +1054,48 @@ diperiksa harfiah oleh `hr-pengajuan.test.ts`. Sentinel `-2033`,
   Halaman `/pengajuan` (area `pengajuan`) di Web, Desktop, dan Mobile; tab Cuti
   di rincian karyawan dan jenis + aturan cuti di tab Organisasi `/hris`.
 
+## HRIS fase 3: lembur (SPL), tukar shift, dinas luar (schema versi 38)
+
+Rincian dan keputusan pemilik di `prd-hris.md` §18 (Q-55 sampai Q-58). Tanpa
+tabel, rute, command, atau izin baru: lima kolom di `hr_pengajuan`
+(`jam_mulai`, `jam_selesai`, `id_karyawan_tukar`, `id_shift_asal`,
+`id_shift_tukar`, tanpa CHECK, `ensure_column`/`hasColumn`, indeks
+`idx_hr_pengajuan_tukar` sesudahnya) dan tiga jenis bawaan. Sentinel `-2034`,
+`REQUIRED_TABLE_COUNT` tetap 84. Kolomnya terdaftar di `SNAPSHOT_TABLES`
+`hr_pengajuan`; tanpa itu perangkat tidak pernah menarik isiannya.
+
+- **Saringan kelompok.** `PENGAJUAN_RENTANG_SQL` dan `LAPORAN_PENGAJUAN_SQL`
+  hanya membaca `KELOMPOK_TIDAK_HADIR` (Cuti, Izin, Sakit, Dinas Luar): Lembur
+  dan Tukar Shift tidak pernah menutup Alfa, audit, atau `cuti_dibayar`.
+  Keduanya dipaksa `Tidak Berpengaruh` di `validasi_jenis`, supaya perangkat v37
+  yang belum diperbarui tidak membayarnya sebagai cuti.
+- **Sidik** sembilan bagian fase 2 tetap; Lembur menambah jam, Tukar Shift
+  menambah pasangan dan kedua shift. Keputusan lama tidak gugur.
+- **Bertumpuk** lewat matriks `bentrok_pengajuan` ↔ `bentrokPengajuan`, kedua
+  karyawan tukar ikut dicocokkan (`baca_pengajuan` membaca `id_karyawan_tukar`).
+  Tukar ditolak bila salah satu punya `backup_karyawan` Aktif di tanggal itu.
+  "Tidak untuk diri sendiri" berlaku untuk kedua karyawan tukar.
+- **Tukar shift dibaca dari pengajuan, bukan `backup_karyawan`** (Q-55):
+  `TUKAR_RENTANG_SQL` / `muat_tukar` ↔ `muatTukar`. Scanner mengganti shift
+  dasar di SATU titik (`shift_tukar_scan` ↔ `shiftTukarScan`, sebelum
+  `base_shift`/`baseShiftRow`), Generate Alfa menilai tanggal tukar kemarin dan
+  hari ini terpisah dengan shift tukarnya, audit mengganti shift tanggal itu,
+  laporan kehadiran membaca `LAPORAN_TUKAR_SQL`. Rekap gaji tanpa kait.
+- **Lembur `hr_lembur_mode`** (`otomatis` bawaan / `spl`):
+  `lembur_spl` ↔ `lemburSpl` di baris agregat rekap gaji, SEBELUM
+  `apply_holiday_fallback`. Per tanggal kerja dibayar `min(SPL, jam)`; di hari
+  libur atau libur mingguan seluruh jam hari itu butuh SPL, dipotong dari bagian
+  lembur dulu (Q-56). Mode dibaca saat rekap dihitung, termasuk pembekuan (Q-57).
+  `LEMBUR_HARIAN_SQL` memakai definisi libur rekap yang sama. FLAT_DAILY tidak
+  pernah membayar lembur. Batas `hr_lembur_maks_harian`/`_mingguan` (jam) hanya
+  tanda `lembur_lewat_batas`.
+- **Dinas luar** lewat jalur fase 2 apa adanya (Q-58): `cuti_dibayar` menurut
+  `dampak_gaji`, tanpa setengah hari; `HARI_HADIR_SQL` tidak diubah. Laporan
+  kode **DL**, total `dinas` ikut persen hadir; rekap bulanan `totalDinas`.
+- **Semua perangkat wajib diperbarui** sebelum Lembur atau Tukar Shift dipakai:
+  perangkat v37 memakai `PENGAJUAN_RENTANG_SQL` lama dan melewatkan Alfa
+  karyawannya.
+
 ## Domain contoh
 
 `master_item` dan `log_aktivitas` adalah tabel peraga yang memperagakan pola

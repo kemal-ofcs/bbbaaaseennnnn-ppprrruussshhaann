@@ -6,7 +6,9 @@ A-4, A-5 disetujui; A-2 ditolak (Q-38). "Urutan pengerjaan fase 1" ada di §16
 (jawaban Q-39 sampai Q-46 mengubah sebagian §5). **Fase 1 selesai** (§16.9),
 `bun run check` penuh lulus (10 Nov 2026). **Fase 2 dibangun** (§17, jawaban
 Q-47 sampai Q-54; catatan dan penyimpangan di §17.12), `bun run check` penuh
-belum dijalankan (pemilik).
+belum dijalankan (pemilik). **Fase 3 dibangun** (§18, jawaban Q-55 sampai
+Q-58; catatan dan penyimpangan di §18.11), `bun run check` penuh lulus
+(10 Nov 2026).
 
 ---
 
@@ -1306,3 +1308,285 @@ Penyimpangan dari §17.1–§17.9, untuk ditinjau:
   menampilkannya. Ekspor laporan kehadiran menambah kolom Cuti.
 - Catatan di form Koreksi Admin (Web/Desktop dan Mobile) untuk Sakit/Izin.
 
+## 18. Urutan pengerjaan fase 3
+
+Ditulis setelah menelusuri kode (10 Nov 2026), disetujui pemilik. Q-55 sampai
+Q-58 dijawab (§18.9) dan isi bagian ini mengikuti jawabannya. Bila §7 dan
+bagian ini berbeda, **bagian ini yang berlaku**.
+
+### 18.1 Temuan dari kode
+
+- **`PENGAJUAN_RENTANG_SQL` dan `LAPORAN_PENGAJUAN_SQL` tidak menyaring
+  kelompok.** Begitu Lembur atau Tukar Shift berlaku, `pengaju_tanggal`
+  menutup tanggal itu dari Generate Alfa dan audit, padahal karyawannya tetap
+  wajib masuk. Keduanya harus disaring ke kelompok ketidakhadiran.
+- `cuti_dibayar` ↔ `cutiDibayar` hanya membaca `dampak_gaji = 'Dibayar'`.
+  Lembur dan Tukar Shift harus `Tidak Berpengaruh`; itu juga melindungi
+  perangkat v37 yang belum diperbarui (mereka tetap memakai SQL lama dan akan
+  memperlakukan pengajuan Lembur sebagai cuti dibayar bila jenisnya `Dibayar`).
+- CHECK `hr_pengajuan.kelompok` sudah memuat nilai fase 3. CHECK
+  `setengah_hari` hanya untuk Izin, jadi Dinas Luar setengah hari butuh
+  membangun ulang tabel di keempat lapis (tidak diusulkan).
+- **Lembur absensi** = `max(0, jam_kerja − jam_kerja_normal_menit)` per baris
+  sesi (`time_policy`), tanpa melihat jam pulang shift. Rekap gaji menjumlahkan
+  per periode; tanggal libur (`tbl_hari_libur` aktif, atau di luar hari kerja
+  shift BARIS itu) memindahkan seluruh jam hari itu ke jam hari libur.
+  **Jenjang `overtime_tier_rules` diterapkan pada total jam satu periode,
+  bukan per hari** (`calculateOvertimeIndex`); perilaku lama, tidak diubah fase
+  ini. FLAT_DAILY tidak membayar lembur sama sekali, jadi SPL untuk gaji harian
+  hanya administrasi.
+- **`backup_karyawan` satu arah.** Karyawan asal ditolak scanner ("sedang
+  digantikan"); pengganti scan dengan `id_shift_backup` sebagai sesi
+  `PENGGANTI`. Generate Alfa dan audit tidak membaca `backup_karyawan` sama
+  sekali, jadi asal yang digantikan tetap di-Alfa kecuali ada koreksi.
+  Tukar dua arah lewat dua baris backup **gagal**: tiap orang menjadi asal di
+  satu baris dan pengganti di baris lain, `find_effective_backup` ↔
+  `findEffectiveBackup` mengambil baris pertama yang cocok (urut `id_backup`),
+  sehingga salah satu ditolak scan, dan keduanya di-Alfa karena tidak punya
+  sesi `NORMAL`. Baris backup juga ditulis langsung (bukan status turunan) dan
+  jalur Web-nya memakai jam JS.
+- Scanner memakai `master_data.id_shift` sebagai shift dasar di satu titik
+  (`baseShiftRow` di `attendance-processor.ts`, `base_shift` di `scanner.rs`);
+  id sesi `NORMAL-<tanggal>-<id>-<shift>`, kode shift whitelist libur, dan
+  multi-sesi turun dari sana. Generate Alfa, audit, dan laporan kehadiran juga
+  membaca shift dari `master_data`.
+- **Dinas luar sudah hampir lengkap lewat fase 2**: Alfa dan audit menutup
+  tanggal pengajuan berlaku apa pun, dan `cuti_dibayar` memberi FLAT_DAILY +1
+  hari dan HOURLY + jam normal kecuali hari hadir. Memperluas `HARI_HADIR_SQL`
+  (usul §7.3) hanya menolong FLAT_DAILY; HOURLY tetap tanpa jam.
+- `kodeKelompok` mengembalikan `null` untuk kelompok lain, jadi Lembur dan
+  Tukar Shift sudah tidak tampil di laporan; DL tinggal ditambahkan.
+- Aturan cuti disimpan lewat `desktop_hr_leave_settings_save`
+  (`hr.org.manage`, Web aksi `aturan`).
+- Tidak ada tabel baru: `REQUIRED_TABLE_COUNT` tetap 84.
+
+### 18.2 Model data (skema v38, sentinel `-2034` `hris-pengajuan-v2`)
+
+**Isian sebagai kolom di `hr_pengajuan`, bukan tabel anak** (keputusan §12).
+Satu baris = satu sidik = satu event `hr-request/save`; tabel anak butuh
+`PendingGuard` dan event gabungan, sedangkan isiannya hanya satu tanggal dan
+paling banyak tiga nilai.
+
+| Kolom baru | Kelompok | Arti |
+| :-- | :-- | :-- |
+| `jam_mulai`, `jam_selesai` TEXT | Lembur | `HH:MM`; `jam_selesai <= jam_mulai` = lewat tengah malam |
+| `id_karyawan_tukar` TEXT | Tukar Shift | karyawan kedua |
+| `id_shift_asal`, `id_shift_tukar` INTEGER | Tukar Shift | salinan shift `id_karyawan` dan `id_karyawan_tukar` saat diajukan; mengganti shift karyawan sesudahnya tidak mengubah tukar yang sudah ada |
+
+- `CREATE` di keempat lapis + `ensure_column`/`hasColumn`, **tanpa CHECK**:
+  `ALTER TABLE ADD COLUMN` tidak bisa memuat CHECK lintas kolom, dan database
+  baru dan lama harus sama. Ditegakkan Rust, TS, dan handler cloud (bentuk salah
+  = tanpa statement = konflik, pola fase 2).
+- Indeks `idx_hr_pengajuan_tukar (id_karyawan_tukar, tanggal_mulai)` setelah
+  loop `ensure_column` dan di `INDEX_MIGRATIONS` (aturan 20).
+- `UPSERT_PENGAJUAN_SQL` (Rust = TS) + lima kolom; handler `hr-request/save`
+  menulisnya. Perangkat v37 tidak pernah mengirim kelompok baru
+  (`periksa_jenis` lama menolaknya) dan mengirim Cuti/Izin/Sakit tanpa kunci
+  baru = kosong, jadi tidak perlu pola "hanya bila kunci dibawa".
+
+**Isian per kelompok** (`validasi_pengajuan` ↔ `validasiPengajuan`, kembar):
+
+| Kelompok | Tanggal | Isian lain | `alasan` di form |
+| :-- | :-- | :-- | :-- |
+| Cuti, Izin, Sakit | rentang (fase 2) | kolom baru kosong | Alasan |
+| Dinas Luar | rentang, tanpa setengah hari | kolom baru kosong | Tujuan dan keperluan |
+| Lembur | satu tanggal kerja (= `absensi_harian.tanggal`, shift malam ikut tanggal masuk) | jam mulai/selesai, durasi 1–1.439 menit | Pekerjaan |
+| Tukar Shift | satu tanggal | karyawan kedua aktif, bukan dirinya; shift keduanya ada dan berbeda | Alasan |
+
+**Jenis**: `KELOMPOK_AKTIF` + `Lembur`, `Tukar Shift`, `Dinas Luar`. Untuk
+Lembur dan Tukar Shift `validasi_jenis` memaksa `dampak_gaji = 'Tidak
+Berpengaruh'`, `potong_jatah = 0`, `maks_hari` kosong. Bawaan baru di
+`hr-jenis-bawaan.json` (`INSERT OR IGNORE`, id tetap): `jns-lembur` (urgent
+ya), `jns-tukar-shift` (urgent tidak), `jns-dinas-luar` (`Dibayar`, urgent ya,
+wajib dokumen tidak).
+
+**Pengaturan** (`setting_gex_system`, lewat `desktop_hr_leave_settings_save` /
+aksi `aturan` yang diperluas; kosong = bawaan): `hr_lembur_mode` `otomatis` |
+`spl` (bawaan `otomatis`), `hr_lembur_maks_harian` jam 1–12 (4),
+`hr_lembur_maks_mingguan` jam 1–72 (18).
+
+Kedua jalur: `CURRENT_SCHEMA_VERSION`/`CLIENT_SCHEMA_VERSION` 38, sentinel
+`-2034` + angka `ensure_schema_current`. Tanpa tabel baru, jadi
+`REQUIRED_TABLE_COUNT`, `PROMOTION_PLAN`, purge, dan `CLOUD_MIRRORED_TABLES`
+tidak berubah.
+
+### 18.3 Status, sidik, dan kueri
+
+- Status, keputusan, urgent, Diketahui, Batal: fase 2 apa adanya.
+- **Sidik**: sembilan bagian fase 2 tetap untuk Cuti/Izin/Sakit/Dinas Luar,
+  jadi sidik dan keputusan lama tidak gugur. Lembur menambah `jam_mulai`,
+  `jam_selesai`; Tukar Shift menambah `id_karyawan_tukar`, `id_shift_asal`,
+  `id_shift_tukar`.
+- `PENGAJUAN_RENTANG_SQL` dan `LAPORAN_PENGAJUAN_SQL` + `AND p.kelompok IN
+  ('Cuti', 'Izin', 'Sakit', 'Dinas Luar')`; semua pembaca fase 2 berhenti
+  melihat Lembur dan Tukar Shift.
+- `SPL_RENTANG_SQL`: Lembur berlaku `?1`..`?2` → karyawan, tanggal, jam.
+- `TUKAR_RENTANG_SQL`: Tukar Shift berlaku → `(id_karyawan, tanggal,
+  id_shift_tukar)` UNION `(id_karyawan_tukar, tanggal, id_shift_asal)`.
+  Ketiganya memakai `berlaku_sql!` / `PENGAJUAN_BERLAKU_SQL`, teks kembar.
+- **Bertumpuk** (perangkat dan Web, `bentrok_pengajuan` ↔ `bentrokPengajuan`;
+  pengajuan Menunggu atau berlaku, karyawan dicocokkan di `id_karyawan` DAN
+  `id_karyawan_tukar`):
+
+  | | Ketidakhadiran | Lembur | Tukar Shift |
+  | :-- | :-- | :-- | :-- |
+  | **Ketidakhadiran** (Cuti, Izin, Sakit, DL) | tolak (fase 2) | tolak, kecuali Izin setengah hari | tolak |
+  | **Lembur** | | tolak bila jamnya beririsan | boleh |
+  | **Tukar Shift** | | | tolak |
+
+  Tukar Shift juga ditolak bila salah satu karyawan punya `backup_karyawan`
+  Aktif di tanggal itu.
+- "Tidak untuk diri sendiri" untuk Tukar Shift berlaku bila karyawan sesi salah
+  satu dari keduanya.
+- **Tanda baru** `lembur_lewat_batas`: SPL Menunggu/berlaku karyawan itu
+  berjumlah > `hr_lembur_maks_harian` di tanggal itu, atau > 
+  `hr_lembur_maks_mingguan` di minggu Senin–Minggu-nya. Tidak menolak.
+
+### 18.4 Lembur dan gaji (perubahan A-4)
+
+- **`otomatis`**: rekap tidak berubah; SPL hanya administrasi.
+- **`spl`**: `lembur_spl(conn, mulai, akhir)` ↔ `lemburSpl` per karyawan per
+  tanggal kerja. Aturan murni `potong_lembur_spl` ↔ `potongLemburSpl` diuji
+  vektor yang sama:
+  - menit SPL = jumlah durasi SPL berlaku tanggal itu;
+  - hari biasa: lembur absensi L, dibayar `min(SPL, L)`;
+  - hari libur dan libur mingguan (definisi rekap yang ada): menurut Q-56
+    (usul: seluruh jam hari itu juga butuh SPL, dibayar `min(SPL, jam kerja +
+    lembur)`; potongan diambil dari bagian lembur dulu, baru jam kerja, supaya
+    `apply_holiday_fallback` tetap benar);
+  - hasilnya mengurangi `total_lembur_menit`/`total_libur_menit`/
+    `total_libur_jam_kerja_menit` di baris agregat rekap (Rust
+    `desktop_get_payroll_recap`, TS `computePayrollRecap`), sebelum
+    `apply_holiday_fallback`.
+- Baris rekap + `lembur_tanpa_spl_menit` (jam lembur di tanggal tanpa SPL) dan
+  `lembur_dipotong_menit` (seluruh yang tidak dibayar); `breakdown_snapshot`
+  mencatat `lembur_spl: { mode, dipotong_menit, tanpa_spl_menit }`. Layar rekap
+  gaji menampilkan kolom "Lembur tanpa SPL" di mode `spl`.
+- Mode dibaca saat rekap dihitung, termasuk saat run dibekukan (Q-57).
+- FLAT_DAILY tidak terpengaruh; tarif tetap `overtime_tier_rules`.
+
+### 18.5 Tukar shift (scanner, Alfa, audit, laporan)
+
+Usul Q-55: **dibaca langsung dari pengajuan berlaku, bukan lewat
+`backup_karyawan`** (§18.1). Satu pengajuan = satu tanggal, dua karyawan:
+`id_karyawan` memakai `id_shift_tukar`, `id_karyawan_tukar` memakai
+`id_shift_asal`. Bila salah satu shift tidak menjadwalkan tanggal itu, orang
+itu libur dan yang lain masuk (tukar libur).
+
+- **Scanner** (`scanner.rs` ↔ `attendance-processor.ts`): `shift_tukar_scan` ↔
+  `shiftTukarScan` mencari tukar berlaku karyawan itu di tanggal kalender scan
+  dan sehari sebelumnya; kandidat terbaru yang tanggal kerjanya menurut shift
+  tukar = tanggal tukar dipakai (pola asal di `find_effective_backup`). Shift
+  dasar diganti di SATU titik sebelum `baseShiftRow`/`base_shift`; id sesi,
+  whitelist libur, multi-sesi, jam kerja, dan lembur mengikutinya. Backup tetap
+  diperiksa lebih dulu, dan sesi terbuka shift lama tetap ditutup dengan
+  shiftnya sendiri.
+- **Generate Alfa** (`operational.rs` ↔ `alfa-audit.ts`) dan **audit**: untuk
+  tanggal bertukar, hari kerja, jam pulang, dan batas Alfa memakai shift tukar.
+  Tanggal tukar hari ini dan kemarin dinilai terpisah dengan shift tukarnya,
+  supaya tukar ke shift malam tetap dinilai; penilaian shift dasar melewati
+  tanggal itu.
+- **Laporan kehadiran**: data baru `tukar` (karyawan, tanggal, hari kerja dan
+  kode shift tukar) untuk "dijadwalkan" di tanggal itu. Rekap gaji tidak perlu
+  kait: libur mingguan sudah dibaca dari `absensi_harian.id_shift`.
+- Terminal yang belum menarik persetujuan memakai shift lama (keterbatasan
+  offline yang sama dengan backup).
+
+### 18.6 Dinas luar
+
+Usul Q-58: **jalur fase 2 apa adanya.** Alfa dan audit tertutup; gaji lewat
+`cuti_dibayar` menurut `dampak_gaji` jenisnya (bawaan `Dibayar`: FLAT_DAILY +1
+hari, HOURLY + jam normal shift kini, kecuali hari hadir). `HARI_HADIR_SQL`
+tidak diubah (beda dari §7.3), tanpa setengah hari, wajib dokumen per jenis.
+
+- Laporan kehadiran: kode **DL** (`kodeKelompok`), total baru `dinas`,
+  dihitung hari wajib dan ikut persen hadir (bekerja di luar kantor). Rekap
+  bulanan + `totalDinas`, ekspor + kolom Dinas.
+- Uang dinas tetap reimbursement fase 4.
+
+### 18.7 Hak akses
+
+Tanpa izin baru. Mengajukan, urgent, dan memutus memakai izin fase 2
+(`izin_pemutus` jenisnya); pengaturan lembur `hr.org.manage`.
+
+### 18.8 Command, rute, dan layar
+
+Tanpa command dan rute outbox baru (`audit:contract` tidak berubah):
+`desktop_hr_request_save` dan Web `simpanPengajuan` menerima isian baru,
+`desktop_hr_requests` membawa kolom dan tanda baru,
+`desktop_hr_leave_settings_save` + tiga kunci lembur, baris rekap gaji + dua
+angka lembur.
+
+**Layar**:
+
+1. `PengajuanWorkspace` (Web, Desktop, Mobile): isian menurut kelompok jenis
+   (Lembur: tanggal, jam mulai/selesai, pekerjaan, ringkasan jam hari itu dan
+   minggu itu; Tukar Shift: tanggal + `PilihCari` karyawan kedua, dengan shift
+   keduanya sebelum dan sesudah; Dinas Luar: rentang + tujuan). Daftar dan
+   rincian menampilkan jam atau pasangan tukar.
+2. Organisasi `/hris`: "Aturan cuti" menjadi "Aturan cuti dan lembur" (mode,
+   batas harian dan mingguan); mengganti mode memperingatkan bahwa rekap gaji
+   yang belum dibekukan ikut berubah.
+3. Rekap gaji: kolom "Lembur tanpa SPL" di mode `spl`.
+4. Laporan kehadiran: kode DL dan kolom Dinas.
+
+### 18.9 Jawaban fase 3 (10 Nov 2026)
+
+| No | Pertanyaan | Jawaban |
+| :-- | :-- | :-- |
+| Q-55 | Tukar shift lewat `backup_karyawan` atau dibaca dari pengajuan? | Dari pengajuan (§18.5); `backup_karyawan` tidak bisa dua arah tanpa merombak scanner dan tidak dibaca Alfa |
+| Q-56 | Mode `spl` di hari libur / libur mingguan | Seluruh jam hari itu butuh SPL, dibayar `min(SPL, jam kerja + lembur)` |
+| Q-57 | Ganti `hr_lembur_mode` di tengah periode | Berlaku untuk seluruh periode yang belum dibekukan, dengan peringatan; run yang sudah dibekukan mencatat modenya |
+| Q-58 | Dampak dinas luar ke gaji | Lewat `cuti_dibayar` per jenis (FLAT +1 hari, HOURLY + jam normal), tanpa setengah hari, wajib dokumen per jenis |
+
+### 18.10 Langkah
+
+| # | Langkah | Gerbang |
+| :-- | :-- | :-- |
+| 1 | **Skema v38**: lima kolom + indeks di keempat lapis, jenis bawaan baru, sentinel `-2034`. | `audit:schema` + tes sentinel/provisioning Rust |
+| 2 | **Aturan kembar** `hr_pengajuan.rs` ↔ `validations/hr-pengajuan.ts`: isian per kelompok, sidik diperluas, saringan kelompok, `SPL_RENTANG_SQL`, `TUKAR_RENTANG_SQL`, bentrok, `lembur_lewat_batas`, `potong_lembur_spl`, `shift_tukar_scan`. | `bun test` + `cargo test hr_pengajuan` |
+| 3 | **Sinkronisasi**: `UPSERT_PENGAJUAN_SQL` dan handler cloud `hr-request/save`. | `audit:contract` + `tests_alur` |
+| 4 | **Tukar shift**: scanner, Generate Alfa, audit, laporan. | tes `attendance-processor`, `alfa-audit`, `attendance-audit`, `laporan-kehadiran` (terpisah) + padanan Rust scanner |
+| 5 | **Lembur SPL**: kait rekap gaji kedua jalur, pengaturan. | tes `payroll-recap*` + Rust payroll, vektor baru |
+| 6 | **Dinas luar**: DL di laporan dan rekap bulanan. | tes laporan + rekap bulanan |
+| 7 | **Layar** Web/Desktop dan Mobile. | typecheck + Biome |
+| 8 | `bun run sync:mobile`, bagian `CLAUDE.md`, catatan "Sudah dibangun". | `audit:docs`; `bun run check` penuh oleh pemilik |
+
+### 18.11 Sudah dibangun (10 Nov 2026)
+
+Langkah 1–8 dibangun. Gerbang yang dijalankan: `audit:schema`,
+`audit:contract` (60 tabel snapshot, command Desktop 267 / Mobile 273), dan
+`audit:docs` lulus; `cargo test --lib` Desktop 390 lulus (termasuk
+`sentinel_2033_memicu_kolom_pengajuan_fase_3`, `tests_alur::alur_fase3_tukar_dan_lembur`,
+`tukar_shift_berlaku_mengganti_shift_dasar_scan`,
+`tukar_shift_dan_lembur_saat_generate_alfa`); tes TS terkait lulus
+(`hr-pengajuan.test.ts` dengan vektor kembar fase 3 dan teks SQL kembar,
+`hr-pengajuan-fase3.test.ts` untuk Alfa, audit, simpan Web, dan rekap gaji
+SPL, `attendance-processor`, `laporan-kehadiran`, `report`, `alfa-audit`,
+`attendance-audit`, `operational-workflow`, `hr-pengajuan-absensi`,
+`payroll-recap-hari-kerja`, `loan`); typecheck kedua workspace dan Biome
+berkas yang diubah bersih. `bun run check` penuh lulus (pemilik, 10 Nov 2026).
+
+Penyimpangan dan catatan, untuk ditinjau:
+
+- **Kolom baru terdaftar di `SNAPSHOT_TABLES`** `hr_pengajuan` (Desktop dan
+  Mobile `sync.rs`). Tidak tertulis di §18.2; tanpa itu isian lembur dan tukar
+  tidak pernah tertarik ke perangkat lain (`audit:contract` menangkapnya).
+- **Rekap gaji tanpa kolom baru.** "Lembur tanpa SPL" tampil sebagai baris kecil
+  di sel Jam Lembur (`X j tidak dibayar (SPL)`, rinciannya di tooltip), karena
+  tabel rekap memakai kolom tetap. Angkanya ada di baris rekap
+  (`lembur_dipotong_menit`, `lembur_tanpa_spl_menit`, `lembur_mode`) dan di
+  `breakdown_snapshot.lembur_spl`.
+- **Aturan lembur disimpan lewat command aturan cuti** yang sama
+  (`desktop_hr_leave_settings_save` / aksi `aturan`): satu tombol "Simpan aturan
+  cuti dan lembur"; drafnya wajib membawa ketiga kunci lembur.
+- **Tes `attendance-processor.test.ts` kini memuat modul lewat `await import`**
+  dengan `server-only` di-mock, karena scanner Web membaca tukar shift dari
+  `services/hr-pengajuan` (yang `server-only`).
+- Tukar shift dua offline untuk orang dan tanggal yang sama: yang ber-id
+  pengajuan terkecil dipakai di semua perangkat (`ORDER BY 1, 2, 4`); keduanya
+  ditandai `bertumpuk` di daftar.
+- Lembur lewat tengah malam dicatat di tanggal kerjanya (tanggal masuk shift);
+  irisan jam dinilai di garis waktu tanggal itu.
+- Tidak ada tes Rust khusus untuk audit dengan tukar shift; penggantian shiftnya
+  satu baris dan diuji di TS (`hr-pengajuan-fase3.test.ts`).
