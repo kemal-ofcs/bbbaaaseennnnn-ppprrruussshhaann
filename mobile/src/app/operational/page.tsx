@@ -776,6 +776,12 @@ export default function OperationalPage() {
                     </option>
                   ))}
                 </PilihCari>
+                {korJenis === "Sakit" || korJenis === "Izin" ? (
+                  <p className="mt-1 text-[11px] text-amber-200">
+                    Untuk catatan baru, pakai Pengajuan di menu Cuti &amp; Izin
+                    supaya ada persetujuan HRD dan jejak jatah cuti.
+                  </p>
+                ) : null}
               </div>
 
               {/* Jam Koreksi (Kondisional) */}

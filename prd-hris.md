@@ -3,8 +3,10 @@
 Status (10 Nov 2026): **PRD final, belum ada kode.** Semua keputusan (Q-1
 sampai Q-38) sudah dijawab pemilik (§13, §14). Perubahan arsitektur A-1, A-3,
 A-4, A-5 disetujui; A-2 ditolak (Q-38). "Urutan pengerjaan fase 1" ada di §16
-(jawaban Q-39 sampai Q-46 mengubah sebagian §5). **Fase 1 sudah dibangun**
-(§16.9), menunggu `bun run check` penuh oleh pemilik.
+(jawaban Q-39 sampai Q-46 mengubah sebagian §5). **Fase 1 selesai** (§16.9),
+`bun run check` penuh lulus (10 Nov 2026). **Fase 2 dibangun** (§17, jawaban
+Q-47 sampai Q-54; catatan dan penyimpangan di §17.12), `bun run check` penuh
+belum dijalankan (pemilik).
 
 ---
 
@@ -922,3 +924,385 @@ Penyimpangan dari §16.1–§16.6, untuk ditinjau:
 - Tes `services/alfa-audit.test.ts` + `operational-workflow.test.ts` gagal bila
   dijalankan dalam satu proses (`CLIENT_CLOSED`: klien bersama ditutup tes
   lain); masing-masing lulus sendiri, dan keduanya tidak diubah fase ini.
+
+## 17. Urutan pengerjaan fase 2
+
+Ditulis setelah menelusuri kode (10 Nov 2026). Pertanyaan yang muncul dijawab
+pemilik sebagai Q-47 sampai Q-54 (§17.10). Bila §6 dan bagian ini berbeda,
+**bagian ini yang berlaku**.
+
+### 17.1 Temuan dari kode
+
+- **Payroll hanya punya dua tipe gaji**: `HOURLY` dan `FLAT_DAILY`
+  (`payroll/models.rs`, `calculateEmployeePay`). Tidak ada gaji bulanan, jadi
+  tidak ada rumus potongan per hari. Di kedua tipe, hari tanpa jam kerja atau
+  tanpa hadir sudah otomatis tidak dibayar (Q-48).
+- Rekap gaji punya satu titik hitung per karyawan: baris agregat di
+  `desktop_get_payroll_recap` (dipakai pratinjau DAN pembekuan run) dan
+  `computePayrollRecap` (Web). Kasbon dikaitkan di sana lewat
+  `loan::pinjaman_aktif` ↔ `pinjamanAktif` + `potong_kasbon`; pengajuan
+  memakai pola yang sama.
+- `HARI_HADIR_SQL` (driver) = tanggal unik berstatus `Hadir`/`PRESENT` UNION
+  tanggal WIB berlaporan perjalanan. `PELAPOR_PERJALANAN_SQL` dikaitkan di tiga
+  tempat: Generate Alfa (`operational.rs` ↔ `alfa-audit.ts`), audit absensi
+  (`get_attendance_audit` ↔ `attendance-audit.ts`), dan hari hadir FLAT_DAILY.
+  Laporan kehadiran bulanan (`laporan-kehadiran.ts`) **tidak** membacanya.
+- `wajib_masuk` ↔ `wajibMasuk` hanya fungsi murni; datanya (hari kerja shift,
+  `tbl_hari_libur`, whitelist lewat `evaluate_holiday_scan` ↔
+  `evaluateHolidayScan`) dikumpulkan pemanggil masing-masing.
+- Pengajuan pembelian (v30) menyimpan keputusan sebagai **kolom** di baris
+  pengajuan, bukan tabel append-only. Fase ini menggabungkan: `sidik` dan
+  `validate_pemutus` dari pengajuan pembelian, keputusan append-only +
+  `diterima_cloud` dari `drv_laporan`/`keu_tutup_buku`.
+- Generate Alfa membuat baris `Alfa` di `absensi_harian`. Sakit yang diajukan
+  kemudian (tanggal lewat) menemukan baris Alfa yang sudah ada; A-3 melarang
+  menulis `absensi_harian`, jadi **pembaca** yang memenangkan pengajuan atas
+  Alfa (§17.5).
+- Sesi Web (`readSessionRecord`) tidak memuat `master_operator.id_karyawan`;
+  Rust punya `karyawan_sesi`. Aturan "tidak untuk diri sendiri" di Web membaca
+  kolom itu sekali per permintaan.
+- `hris.rs` sudah 2.100 baris; fase 2 menjadi modul baru `hr_pengajuan.rs`.
+- Penerima `Divisi` inventaris (sisa fase 1) dibaca untuk tampilan di tiga
+  kueri kembar: `stock_card` ↔ `stockCard`, `list_loans` ↔ `listLoans`,
+  `document` ↔ `documentInventaris`. `mutasi_json` (payload outbox) dan
+  pembacaan pinjaman untuk pengembalian (yang menyalin teks asli ke mutasi
+  kembali) tidak disentuh. Tidak ada agregasi per penerima.
+- `REQUIRED_TABLE_COUNT` = 79; fase ini menambah 5 → 84.
+
+### 17.2 Model data (skema v37, sentinel `-2033` `hris-pengajuan-v1`)
+
+**Tersinkron** (keempat lapis + `SNAPSHOT_TABLES` = `SNAPSHOT_SOURCES`). Semua
+`delete_missing: false` (tidak ada baris yang dihapus), tanpa `UNIQUE` selain
+PK, tanpa `PendingGuard` (tidak ada tabel anak yang ikut event induk).
+
+| Tabel | Kolom | Snapshot / rute |
+| :-- | :-- | :-- |
+| `hr_jenis_pengajuan` | `id_jenis` PK; `nama` NOT NULL; `kelompok` NOT NULL CHECK IN (`Cuti`, `Izin`, `Sakit`, `Lembur`, `Tukar Shift`, `Dinas Luar`, `Reimburse`); `izin_pemutus` NOT NULL DEFAULT `hr.request.decide` CHECK IN (`hr.request.decide`, `reimburse.decide`); `boleh_urgent`, `potong_jatah`, `wajib_dokumen`, `is_aktif` INTEGER 0/1; CHECK (`potong_jatah = 0 OR kelompok = 'Cuti'`); `dampak_gaji` NOT NULL CHECK IN (`Dibayar`, `Potong Gaji`, `Tidak Berpengaruh`); `maks_hari` INTEGER CHECK NULL atau > 0; `satuan_maks` NOT NULL DEFAULT `Hari Kerja` CHECK IN (`Hari Kerja`, `Hari Kalender`) (Q-53); `created_at`, `updated_at` | `hr-request-type` / `hr-request-type/save` |
+| `hr_pengajuan` | `id_pengajuan` PK (`pgn-<acak>`); `id_karyawan`, `id_jenis` NOT NULL; **salinan jenis saat diajukan**: `kelompok`, `potong_jatah`, `dampak_gaji` (menyunting jenis tidak mengubah cuti dan gaji yang lalu); `tanggal_mulai`, `tanggal_selesai` NOT NULL, CHECK `tanggal_selesai >= tanggal_mulai`; `setengah_hari` 0/1, CHECK (`setengah_hari = 0 OR (kelompok = 'Izin' AND tanggal_mulai = tanggal_selesai)`); `alasan` NOT NULL; `sidik` NOT NULL; `diajukan_oleh` NOT NULL (username sesi); `waktu_perangkat` NOT NULL (UTC); `created_at`, `updated_at`. Indeks `(id_karyawan, tanggal_mulai)`, `(tanggal_mulai, tanggal_selesai)` | `hr-request` / `hr-request/save` (buat dan sunting, upsert) |
+| `hr_pengajuan_keputusan` | `id_keputusan` PK; `id_pengajuan` NOT NULL; `jenis` CHECK IN (`Setujui`, `Tolak`, `Setujui Urgent`, `Diketahui`, `Batal`); `sidik` NOT NULL (isi yang dilihat); `alasan` (wajib untuk `Tolak` dan `Batal`); `oleh` NOT NULL; `waktu_perangkat` NOT NULL; `diterima_cloud` (jam database cloud, kosong di perangkat sampai tertarik); `created_at`. Indeks `id_pengajuan`. Append-only. Id tetap untuk keputusan yang hanya boleh ada satu: `urgent-<id>`, `tahu-<id>`, `batal-<id>` (dua perangkat menghasilkan PK yang sama); `Setujui`/`Tolak` acak, supaya keputusan ganda terlihat | `hr-request-decision` / `hr-request-decision/create` |
+| `hr_cuti_penyesuaian` | `id_penyesuaian` PK; `id_karyawan` NOT NULL; `periode` NOT NULL (tanggal mulai periode `YYYY-MM-DD`); `jenis` CHECK IN (`Saldo Awal`, `Koreksi`, `Diuangkan`, `Pembatalan`); `id_ref` (Pembatalan); `hari` INTEGER NOT NULL (boleh negatif; Diuangkan negatif); `nominal` INTEGER (rupiah, hanya Diuangkan, aturan 13); `alasan` NOT NULL; `dicatat_oleh` NOT NULL; `created_at`. Indeks `(id_karyawan, periode)`. Append-only; pembatalan `batal-<id>`; diuangkan `uang:<id_karyawan>:<periode>` | `hr-leave-adjustment` / `hr-leave-adjustment/create` |
+
+Cloud memakai `ON CONFLICT DO NOTHING` untuk keputusan dan penyesuaian, dan
+`diterima_cloud = datetime('now')` (aturan 19). Handler `hr-request/save`
+selalu upsert (tidak pernah menolak; suntingan yang telat menggugurkan
+keputusan lewat sidik, §17.3).
+
+**Jenis bawaan** (§6.3) di `src/lib/validations/hr-jenis-bawaan.json`, dibaca
+Rust lewat `include_str!` dan TS lewat import (pola `akun-bawaan.json`),
+`INSERT OR IGNORE` berid tetap (`jns-cuti-tahunan`, `jns-cuti-menikah`, …) di
+ketiga lapis. Seed lokal tidak lewat outbox, jadi tidak mendorong apa pun ke
+cloud (aturan 29 tidak terlanggar). Bawaan tambahan: Sakit `wajib_dokumen` 1;
+Cuti Melahirkan dan Keguguran `satuan_maks` kalender. CHECK `kelompok` dan
+`izin_pemutus` sudah memuat nilai fase 3–4 supaya tidak perlu membangun ulang
+CHECK nanti; validasi aplikasi fase 2 hanya menerima `Cuti`/`Izin`/`Sakit` dan
+`hr.request.decide`.
+
+**Khusus cloud** (Q-51, pola `hr_dokumen_berkas`; hanya `turso.rs` + Web):
+
+| Tabel | Kolom |
+| :-- | :-- |
+| `hr_pengajuan_berkas` | `id_berkas` PK, `id_pengajuan` NOT NULL, `urutan` CHECK 1–5, `nama_berkas`, `mime_type` CHECK IN (`image/jpeg`, `image/png`, `image/webp`, `application/pdf`), `data_base64` NOT NULL, `diunggah_oleh`, `created_at`. Indeks `id_pengajuan` |
+
+Validasi berkas memakai ulang `validasi_berkas` ↔ `validasiBerkas` fase 1
+(1 MB, tanda tangan bita). Lampiran ditambahkan setelah pengajuan tersimpan,
+hanya saat terhubung. Daftar pengajuan hanya membawa jumlah berkas.
+
+**Pengaturan cuti** (`setting_gex_system`, rute `setting/update` yang ada,
+lewat `desktop_hr_settings_save` yang diperluas dengan nilai teks; kosong =
+bawaan §6.5): `hr_cuti_periode`, `hr_cuti_hak` (0–60), `hr_cuti_syarat_bulan`
+(0–24), `hr_cuti_prorata` (0/1), `hr_cuti_sisa`, `hr_cuti_bawa_maks` (0–60),
+`hr_cuti_bawa_bulan` (1–12).
+
+Kedua jalur: `CURRENT_SCHEMA_VERSION`/`CLIENT_SCHEMA_VERSION` 37,
+`REQUIRED_TABLE_COUNT` 84, sentinel `-2033` + angka `ensure_schema_current`,
+`PROMOTION_PLAN` (kelima tabel), purge pindah database dan
+`CLOUD_MIRRORED_TABLES` (empat tabel tersinkron).
+
+### 17.3 Status, sidik, dan tanda
+
+**Sidik** (`sidik_pengajuan` ↔ `sidikPengajuan`): SHA-256 dari `id_karyawan`,
+`id_jenis`, `kelompok`, `potong_jatah`, `dampak_gaji`, `tanggal_mulai`,
+`tanggal_selesai`, `setengah_hari`, `alasan`, dipisah `\u001f`.
+
+**Urutan keputusan** (satu potongan SQL dan satu pembanding, kembar):
+`diterima_cloud IS NULL, diterima_cloud, waktu_perangkat, id_keputusan`.
+Keputusan yang sudah sampai di cloud diurutkan menurut jam cloud; yang masih
+tertunda di perangkat menyusul menurut jam perangkat.
+
+**Status** (`status_pengajuan` ↔ `statusPengajuan`, berurutan):
+
+1. ada `Batal` → **Dibatalkan**;
+2. keputusan final pertama (`Setujui`, `Tolak`, `Setujui Urgent`) yang
+   `sidik`-nya sama dengan sidik pengajuan sekarang: `Tolak` → **Ditolak**,
+   `Setujui` → **Disetujui**, `Setujui Urgent` → **Disetujui (urgent)**;
+3. selain itu → **Menunggu**.
+
+**Pengajuan berlaku** = Disetujui atau Disetujui (urgent). Bentuk SQL-nya,
+predikat atas alias `p` dan kembar teks Rust ↔ TS (`PENGAJUAN_BERLAKU_SQL`):
+
+```sql
+NOT EXISTS (SELECT 1 FROM hr_pengajuan_keputusan b
+            WHERE b.id_pengajuan = p.id_pengajuan AND b.jenis = 'Batal')
+AND (SELECT k.jenis FROM hr_pengajuan_keputusan k
+     WHERE k.id_pengajuan = p.id_pengajuan AND k.sidik = p.sidik
+       AND k.jenis IN ('Setujui', 'Tolak', 'Setujui Urgent')
+     ORDER BY k.diterima_cloud IS NULL, k.diterima_cloud, k.waktu_perangkat, k.id_keputusan
+     LIMIT 1) IN ('Setujui', 'Setujui Urgent')
+```
+
+`PENGAJUAN_RENTANG_SQL` (`?1`..`?2`) memilih pengajuan berlaku yang bertumpuk
+dengan rentang itu, beserta `id_karyawan`, tanggal, `kelompok`,
+`dampak_gaji`, `potong_jatah`, `setengah_hari`. Semua pembaca (§17.5–§17.7)
+memakai dua potongan ini; tidak ada kueri status ketiga.
+
+**Tanda** (`tanda_pengajuan` ↔ `tandaPengajuan`, tidak pernah menolak):
+`perlu_diketahui` (urgent berlaku tanpa `Diketahui`), `keputusan_ganda` (dua
+keputusan final bersidik sah dengan hasil berbeda), `keputusan_gugur` (ada
+keputusan final tetapi semuanya bersidik lama), `diputus_sendiri` (Q-28:
+`oleh` keputusan yang berlaku = `diajukan_oleh`, masuk daftar tinjau
+Superadmin), `bertumpuk` (berlaku/menunggu lain untuk karyawan yang sama di
+tanggal yang sama), `tanpa_dokumen` (jenis `wajib_dokumen`, hari terpakai > 1,
+tanpa lampiran; hanya terlihat saat online), `hadir_saat_cuti` (Q-34),
+`jatah_minus`.
+
+### 17.4 Aturan pengajuan (diperiksa di perangkat dan Web, kembar)
+
+- **Ajukan / sunting** (`hr.request.submit`): jenis aktif berkelompok
+  Cuti/Izin/Sakit; rentang sah dan ≤ 366 hari; `setengah_hari` hanya Izin satu
+  tanggal; alasan 1–500 karakter; `maks_hari` dibanding hari kerja atau hari
+  kalender menurut `satuan_maks`; ditolak bila bertumpuk dengan pengajuan
+  Menunggu/berlaku lain karyawan itu, atau bila ada proses gaji `PAID` yang
+  periodenya menyentuh rentang (`PERIODE_DIBAYAR_SQL`). Sunting hanya oleh
+  pengaju (atau Superadmin), hanya selama Menunggu.
+- **Urgent** (`hr.request.urgent`): jenis `boleh_urgent`; ditulis sebagai
+  pengajuan + keputusan `urgent-<id>` dalam satu transaksi (dua event outbox
+  berurutan).
+- **Tidak untuk diri sendiri** (§6.1): akun yang `id_karyawan`-nya sama
+  dengan karyawan pengajuan tidak boleh `Setujui Urgent`, `Setujui`, `Tolak`,
+  `Diketahui`, atau membatalkan pengajuan yang sudah berlaku. Berlaku juga
+  untuk Superadmin. Pengajuan biasa untuk diri sendiri boleh.
+- **Memutus** (izin `izin_pemutus` jenisnya): hanya selama Menunggu; Tolak
+  wajib alasan. Pengaju boleh memutus pengajuannya sendiri (Q-28), ditandai
+  `diputus_sendiri`. Setujui ditolak bila periode gaji `PAID` (sama seperti
+  ajukan).
+- **Diketahui** (`hr.request.decide`): hanya untuk urgent berlaku tanpa
+  `Diketahui`.
+- **Batal**: Menunggu → pengaju (atau Superadmin); berlaku → pemegang izin
+  pemutus jenisnya. Alasan wajib. Ditolak bila periode gaji `PAID`.
+
+### 17.5 Hari, Alfa, audit, dan laporan (perubahan A-3)
+
+**Hari wajib** (`tanggal_wajib` ↔ `tanggalWajib`): tanggal dalam rentang yang
+`wajib_masuk` untuk karyawan itu, memakai shift `master_data.id_shift` SAAT
+INI, `tbl_hari_libur`, dan whitelist (`evaluate_holiday_scan`), sama dengan
+Generate Alfa. Riwayat shift tidak ada, jadi pengajuan lama mengikuti shift
+sekarang (keterbatasan yang diterima).
+
+**Tanggal hadir** = definisi `HARI_HADIR_SQL` (scan `Hadir`/`PRESENT` atau
+laporan perjalanan), sebagai daftar tanggal (`TANGGAL_HADIR_SQL`, kembar).
+
+- **Generate Alfa** (`operational.rs` ↔ `alfa-audit.ts`): setelah cek pelapor
+  perjalanan, karyawan dengan pengajuan berlaku di tanggal itu dilewati
+  (termasuk setengah hari), hitungan baru `jumlahPengajuan`.
+- **Audit absensi**: tanggal yang ditutup pengajuan berlaku tidak dinilai,
+  pola pelapor.
+- **Laporan kehadiran** (`laporan_kehadiran` ↔ `getLaporanKehadiran`): data
+  baru `pengajuan` (`PENGAJUAN_RENTANG_SQL`). Urutan kode
+  `susunLaporanKehadiran`: H/T > pengajuan > S/I/D dari koreksi > A > L/M/-.
+  Kode pengajuan hanya di tanggal yang dijadwalkan atau yang punya catatan
+  (Alfa): **C** (Cuti, kode baru), **I** (Izin, termasuk setengah hari),
+  **S** (Sakit). Kolom total baru `cuti`; I dan S ikut menghitung pengajuan.
+  **DL** menunggu fase 3.
+- **Rekap bulanan** (`REKAP_BULANAN_SQL`, kembar): per hari ditambah
+  `kelompok` pengajuan berlaku (subkueri berpredikat `PENGAJUAN_BERLAKU_SQL`).
+  Hari tanpa hadir yang ditutup pengajuan dihitung Sakit/Izin/Cuti
+  (`totalCuti` baru), bukan Alfa. Seperti hari ini, rekap ini hanya melihat
+  tanggal yang punya baris absensi.
+- Baris Alfa lama tetap di `absensi_harian` (tidak ditulis, A-3); payroll
+  tidak membaca Alfa, jadi gaji tidak terpengaruh.
+- **Koreksi Admin** Sakit/Izin/Dispen tetap berfungsi dan tidak dimigrasi.
+  Form koreksi memberi catatan: "Untuk catatan baru, pakai Pengajuan di HRIS."
+
+### 17.6 Dampak ke gaji (perubahan A-4)
+
+`cuti_dibayar(conn, mulai, akhir)` ↔ `cutiDibayar` mengembalikan per karyawan
+`{ hari, menit }` dari pengajuan berlaku ber-`dampak_gaji = 'Dibayar'`, atas
+tanggal wajib dalam periode (satu tanggal dihitung sekali walau bertumpuk):
+
+| | Hari penuh | Setengah hari (Q-49) |
+| :-- | :-- | :-- |
+| FLAT_DAILY | +1 hari, kecuali tanggal hadir | +1 hari, kecuali tanggal hadir (sudah terhitung) |
+| HOURLY | + `jam_kerja_normal_menit` shift kini, kecuali tanggal hadir (Q-47) | + ½ `jam_kerja_normal_menit` (dibulatkan ke bawah), selalu |
+
+- Dikaitkan di baris agregat rekap (Rust `desktop_get_payroll_recap`, TS
+  `computePayrollRecap`): `days_present += hari`, menit reguler `+= menit`
+  (sebelum `apply_holiday_fallback`, sebagai jam hari biasa). Pembekuan run
+  memakai baris rekap yang sama. `breakdown_snapshot` mencatat
+  `cuti_dibayar: { hari, menit }` untuk slip.
+- Shift ber-jam normal 0 menghasilkan 0 menit dan tanda `jam_normal_nol` di
+  rekap.
+- **`Potong Gaji` dan `Tidak Berpengaruh` tanpa kait payroll** (Q-48): hari
+  itu tidak dibayar secara alami. Rumus potongan ditulis bila kelak ada tipe
+  gaji bulanan.
+
+### 17.7 Jatah cuti (§6.5)
+
+Tidak disimpan. `jatah_cuti(...)` ↔ `jatahCuti` murni, diuji vektor yang sama;
+datanya dikumpulkan satu fungsi baca per jalur.
+
+- **Tanggal masuk** = `master_data.tanggal_daftar` (Q-41). Kosong = tanpa hak,
+  tanda `tanpa_tanggal_masuk`. **Tanggal berhak** E = tanggal masuk +
+  `hr_cuti_syarat_bulan` (akhir bulan dijepit, mis. 31 Jan + 1 bulan = 28/29
+  Feb, memakai `tambah_bulan` fase 1).
+- **Periode** `ulang_tahun_kerja`: [E + 12k bulan, E + 12(k+1) bulan), hak
+  penuh. `kalender`: tahun kalender; tahun berjalannya E mendapat hak penuh
+  mulai E bila `hr_cuti_prorata` = 0, atau ⌊hak × bulan tersisa ÷ 12⌋
+  (bulan tersisa = bulan penuh dari E sampai 31 Desember) bila 1; tahun
+  sebelumnya tanpa hak. Tanggal sebelum E tidak bisa memakai jatah.
+- **Pemakaian** = tanggal wajib dari pengajuan berlaku `potong_jatah = 1`
+  dalam periode, dikurangi tanggal hadir (Q-34). Pengajuan yang melintasi
+  batas periode dibagi per tanggal.
+- **Penyesuaian** periode itu (yang tidak dibatalkan) ditambahkan.
+- **Dibawa** (Q-50, diturunkan tanpa baris): bila `hr_cuti_sisa = dibawa`,
+  bawaan = min(maks(sisa periode sebelumnya, 0), `hr_cuti_bawa_maks`). Bawaan
+  dipakai lebih dulu oleh pemakaian dalam `hr_cuti_bawa_bulan` bulan pertama
+  periode; sisanya hangus setelah itu. Dihitung berantai dari periode pertama,
+  jadi pengajuan offline yang telat ikut mengubahnya (belum ada uang yang
+  keluar).
+- **Diuangkan** (Q-50): bila `hr_cuti_sisa = diuangkan`, HRD menekan "Proses
+  akhir periode" untuk periode yang sudah berakhir; dicatat baris
+  `uang:<id_karyawan>:<periode>` jenis `Diuangkan`, `hari` = −sisa (sisa ≥ 0),
+  `nominal` = sisa × upah harian dari `salary_configs` yang berlaku di akhir
+  periode (FLAT_DAILY `daily_rate`; HOURLY `rate_per_hour` ×
+  `jam_kerja_normal_menit` ÷ 60, dibulatkan ke rupiah terdekat, aritmetika
+  bilangan bulat). Nilai dibekukan; dua perangkat menghasilkan PK yang sama
+  dan yang pertama sampai di cloud yang berlaku. **Pembayarannya** ikut kait
+  gaji reimbursement fase 4; sampai itu tampil "Perlu dibayar" dan dibayar
+  manual.
+- **Ganti `hr_cuti_periode`** (Q-54) berlaku langsung untuk semua periode;
+  dialog konfirmasi memperingatkan bahwa sisa cuti dihitung ulang.
+- Sisa minus boleh (HRD menyetujui melebihi jatah) dan tampil peringatan
+  `jatah_minus`, pola "Stok minus". Form pengajuan memperlihatkan hari terpakai
+  dan sisa jatah sebelum disimpan.
+
+### 17.8 Hak akses
+
+| Izin | Sensitif | HRD | Atasan | Admin bawaan |
+| :-- | :-- | :-- | :-- | :-- |
+| `hr.request.view` | | ya | ya | ya |
+| `hr.request.submit` | | ya | ya | ya |
+| `hr.request.urgent` | **ya (usul)** | | ya | tidak |
+| `hr.request.decide` | ya | ya | | tidak |
+| `hr.leave.adjust` | ya | | | tidak |
+
+- `hr.request.urgent` diusulkan sensitif (beda dari §10.1): urgent sama dengan
+  menyetujui, dan tanpa itu Admin bawaan mendapatkannya otomatis.
+- Sensitif = `SENSITIVE_MUTATION_PERMISSIONS` + `NOT IN` seed Admin Rust.
+  Role HRD dan Atasan diperbarui di Rust dan `DEFAULT_ROLE_PERMISSIONS`
+  (paket bawaan saja; role yang sudah disunting Superadmin tidak ditimpa,
+  sama seperti fase 1).
+- Membaca lampiran cukup `hr.request.view`; menambah/menghapus lampiran oleh
+  pengaju atau pemegang `hr.request.decide`.
+- Halaman: tab Pengajuan di `/hris` dijaga `hr.request.view`; Mobile halaman
+  `/pengajuan` dengan area baru `pengajuan` (`hr.request.view`).
+
+### 17.9 Command, rute, dan layar
+
+**Rust** (`desktop/hr_pengajuan.rs`, disalin ke Mobile; kedua `lib.rs`,
+`build.rs`, `capabilities/default.json`): `desktop_hr_requests` (daftar +
+status + tanda, saringan status/karyawan/rentang; `hr.request.view`),
+`desktop_hr_request_save` (`hr.request.submit`, urgent juga
+`hr.request.urgent`), `desktop_hr_request_decide` (`Setujui`/`Tolak`/
+`Diketahui`/`Batal`, izin per §17.4), `desktop_hr_request_types_save`
+(`hr.org.manage`), `desktop_hr_leave_balance` (jatah per periode + rincian
+satu karyawan; `hr.request.view`), `desktop_hr_leave_adjust` dan
+`desktop_hr_leave_period_close` (`hr.leave.adjust`); khusus cloud
+`desktop_hr_request_files`, `desktop_hr_request_file`,
+`desktop_hr_request_file_add`, `desktop_hr_request_file_delete`.
+Pengaturan cuti lewat `desktop_hr_settings_save` yang diperluas.
+
+**Web**: `validations/hr-pengajuan.ts` + `services/hr-pengajuan.ts`, rute
+`POST /api/hris/requests/<…>` (Zod `.strict()`, tanpa `GET`), gateway
+`gateways/hr-pengajuan.ts`.
+
+**Layar** (Q-52: pengajuan juga di Mobile):
+
+1. **Pengajuan** (`components/hris/PengajuanWorkspace.tsx`, di `filesToCopy`;
+   tab di `/hris` dan halaman Mobile `/pengajuan`): daftar dengan saringan
+   (Menunggu, Perlu diketahui, Perlu ditinjau = bertanda, Semua) + rentang;
+   form Ajukan (`PilihCari` karyawan, jenis, tanggal, setengah hari bila Izin,
+   alasan, Urgent bila boleh; ringkasan hari terpakai + sisa jatah;
+   `konfirmasiData`); rincian (isi, riwayat keputusan, tanda, lampiran saat
+   online, tombol sesuai izin).
+2. **Tab Cuti di rincian karyawan `/hris`**: jatah per periode (hak, bawaan,
+   penyesuaian, pemakaian, sisa), riwayat pengajuan, Penyesuaian
+   (`hr.leave.adjust`). Mobile: ringkasan jatah satu karyawan di form ajukan.
+3. **Organisasi `/hris`**: bagian Jenis pengajuan dan Aturan cuti
+   (Web/Desktop).
+4. **Proses akhir periode** (hanya mode `diuangkan`): daftar karyawan yang
+   periodenya berakhir dan belum diproses, plus daftar "Perlu dibayar".
+5. Catatan di form Koreksi Admin untuk Sakit/Izin.
+
+### 17.10 Jawaban fase 2 (10 Nov 2026)
+
+| No | Pertanyaan | Jawaban |
+| :-- | :-- | :-- |
+| Q-47 | HOURLY + `Dibayar` | `jam_kerja_normal_menit` shift kini per hari wajib, kecuali hari itu ada scan Hadir |
+| Q-48 | `Potong Gaji` untuk gaji bulanan | Tipe gaji bulanan tidak ada; tanpa kait payroll |
+| Q-49 | Setengah hari (Izin) | Tidak di-Alfa-kan; Dibayar: FLAT_DAILY 1 hari, HOURLY + ½ jam normal |
+| Q-50 | Dibawa dan diuangkan | Dibawa diturunkan tanpa baris; diuangkan dicatat HRD (`uang:`), dibayar lewat kait fase 4 |
+| Q-51 | Lampiran | Khusus cloud, pola `hr_dokumen_berkas`; wajib dokumen = tanda |
+| Q-52 | Mobile | Pengajuan juga di Mobile; pengaturan Web/Desktop |
+| Q-53 | Satuan `maks_hari` | Kolom `satuan_maks` per jenis |
+| Q-54 | Ganti `hr_cuti_periode` | Berlaku langsung dengan peringatan |
+
+### 17.11 Langkah
+
+| # | Langkah | Gerbang |
+| :-- | :-- | :-- |
+| 1 | **Sisa fase 1**: penerima `Divisi` tampil nama kini (`CASE WHEN m.penerima_tipe = 'Divisi' THEN <divisi_kini(m.penerima_nama)> ELSE m.penerima_nama END`) di `stock_card` ↔ `stockCard`, `list_loans` ↔ `listLoans`, `document` ↔ `documentInventaris`. | tes kembar: ganti nama divisi, kartu stok menampilkan nama baru |
+| 2 | **Skema v37**: 4 tabel tersinkron + 1 khusus cloud, jenis bawaan JSON, sentinel `-2033`, `REQUIRED_TABLE_COUNT` 84, promosi, purge, klasifikasi. | `audit:schema` + tes sentinel/provisioning Rust |
+| 3 | **Aturan domain kembar** `hr_pengajuan.rs` ↔ `validations/hr-pengajuan.ts`: sidik, status, tanda, validasi §17.4, `tanggal_wajib`, `PENGAJUAN_BERLAKU_SQL`/`PENGAJUAN_RENTANG_SQL`/`TANGGAL_HADIR_SQL`/`PERIODE_DIBAYAR_SQL` (teks identik), `jatah_cuti`, `cuti_dibayar`. | `bun test` + `cargo test hr_pengajuan` |
+| 4 | **Sinkronisasi**: rute §17.2, handler cloud (tidak menolak), penulisan lokal + outbox satu transaksi, snapshot. | `audit:contract` + tes cloud `TursoClient::local_file` |
+| 5 | **A-3**: Generate Alfa, audit, laporan kehadiran, rekap bulanan. | tes `alfa-audit`, `attendance-audit`, `laporan-kehadiran`, `report` (dijalankan terpisah) + padanan Rust |
+| 6 | **A-4**: kait rekap gaji. | tes `payroll-recap` + `loan` + Rust payroll tetap lulus, vektor baru |
+| 7 | **RBAC + command + rute + gateway**. | tes Rust + `web-rbac-boundary` |
+| 8 | **Layar** Web/Desktop dan Mobile. | typecheck + Biome |
+| 9 | `bun run sync:mobile`, bagian `CLAUDE.md`, catatan "Sudah dibangun". | `audit:docs`; `bun run check` penuh oleh pemilik |
+
+### 17.12 Sudah dibangun (10 Nov 2026)
+
+Langkah 1–9 dibangun. Gerbang yang dijalankan: `audit:schema`,
+`audit:contract` (86 rute, 60 tabel snapshot), dan `audit:docs` lulus;
+`cargo test --lib` Desktop 381 dan Mobile 385 lulus (termasuk
+`tests_alur`: penulisan lokal + outbox lalu payload outbox diterapkan ke
+database cloud `TursoClient::local_file`); tes TS terkait lulus
+(`hr-pengajuan.test.ts` dengan vektor kembar, `hr-pengajuan-absensi.test.ts`
+untuk Alfa, audit, dan rekap gaji, laporan, rekap bulanan, inventaris, RBAC);
+typecheck kedua workspace dan Biome berkas yang diubah bersih. `bun run check`
+penuh belum dijalankan (pemilik).
+
+Penyimpangan dari §17.1–§17.9, untuk ditinjau:
+
+- **Halaman `/pengajuan` (menu "Cuti & Izin"), bukan tab di `/hris`.** Satu
+  halaman yang sama di Web, Desktop, dan Mobile; Atasan tidak butuh area
+  `hris`. Tab Cuti di rincian karyawan dan jenis + aturan cuti di tab
+  Organisasi `/hris` tetap seperti rancangan.
+- **Aturan cuti lewat command sendiri** `desktop_hr_leave_settings_save`
+  (Web: aksi `aturan`), bukan memperluas `desktop_hr_settings_save`, karena
+  nilainya campuran teks dan angka.
+- **`diputus_sendiri` tidak berlaku untuk urgent.** Urgent memang diputus
+  pengajunya; tanda Q-28 hanya untuk Setujui/Tolak oleh pengaju yang sama.
+- **`tanpa_dokumen` dan `jatah_minus` bukan tanda daftar.** Lampiran khusus
+  cloud dan jatah butuh hitungan per karyawan, jadi keduanya tampil di
+  rincian pengajuan (saat online) dan di form ajukan / tab Cuti.
+- **Kode C/I/S hanya di TS** (`kodeKelompok`): matriks laporan disusun di
+  `laporan-kehadiran.ts` untuk ketiga build; Rust hanya mengirim data
+  `pengajuan` (`LAPORAN_PENGAJUAN_SQL`).
+- **Tes integrasi Alfa/audit/gaji hanya di TS.** Padanan Rust menguji fungsi
+  yang dipanggil kaitnya (`pengaju_tanggal`, `cuti_dibayar`) dengan data yang
+  setara; Generate Alfa dan rekap gaji Rust memanggil fungsi yang sama.
+- Rekap bulanan menambah kolom `totalCuti` di data; belum ada layar yang
+  menampilkannya. Ekspor laporan kehadiran menambah kolom Cuti.
+- Catatan di form Koreksi Admin (Web/Desktop dan Mobile) untuk Sakit/Izin.
+

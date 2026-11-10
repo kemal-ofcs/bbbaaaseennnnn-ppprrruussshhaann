@@ -63,6 +63,11 @@ const expectedRoutes = [
   "hr-division/save",
   "hr-position/save",
   "hr-contract/create",
+  // HRIS fase 2 (v37): pengajuan, keputusan, dan penyesuaian jatah.
+  "hr-request-type/save",
+  "hr-request/save",
+  "hr-request-decision/create",
+  "hr-leave-adjustment/create",
   "installment/activate",
   "installment/reapprove",
   "installment/close",
@@ -153,6 +158,11 @@ const expectedSnapshotTriples = [
   "hrDivisionNames|hr-division-name|hr_divisi_nama",
   "hrPositions|hr-position|hr_jabatan",
   "hrContracts|hr-contract|hr_kontrak",
+  // HRIS fase 2 (v37): pengajuan dan jatah cuti.
+  "hrRequestTypes|hr-request-type|hr_jenis_pengajuan",
+  "hrRequests|hr-request|hr_pengajuan",
+  "hrRequestDecisions|hr-request-decision|hr_pengajuan_keputusan",
+  "hrLeaveAdjustments|hr-leave-adjustment|hr_cuti_penyesuaian",
 ].sort();
 
 // Tabel DDL lokal (storage.rs) yang memang TIDAK ikut snapshot sync.
@@ -205,6 +215,8 @@ const expectedCloudOnlyTables = [
   "hr_dokumen_jenis",
   "hr_dokumen",
   "hr_dokumen_berkas",
+  // HRIS fase 2 (v37, Q-51): lampiran pengajuan (surat dokter).
+  "hr_pengajuan_berkas",
   "app_permission",
   "app_role",
   "app_session",

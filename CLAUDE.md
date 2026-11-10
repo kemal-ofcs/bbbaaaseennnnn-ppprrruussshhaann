@@ -1013,6 +1013,47 @@ vektor yang sama; SQL kembar diperiksa harfiah oleh `hris.test.ts`. Sentinel
   Karyawan, Struktur, dan Organisasi; Mobile hanya form karyawan
   (`IsianOrganisasi.tsx`, di `filesToCopy`).
 
+## HRIS fase 2: pengajuan cuti, izin, sakit (schema versi 37)
+
+Rincian dan keputusan pemilik di `prd-hris.md` §17. Logika
+`desktop/hr_pengajuan.rs` (disalin ke Mobile) ↔ `validations/hr-pengajuan.ts`
++ `services/hr-pengajuan.ts`, diuji dengan vektor yang sama; SQL kembar
+diperiksa harfiah oleh `hr-pengajuan.test.ts`. Sentinel `-2033`,
+`REQUIRED_TABLE_COUNT` 84.
+
+- **Tersinkron** (`delete_missing: false`): `hr_jenis_pengajuan` (bawaan dari
+  `validations/hr-jenis-bawaan.json`, `INSERT OR IGNORE` di ketiga lapis tanpa
+  outbox), `hr_pengajuan` (salinan `kelompok`/`potong_jatah`/`dampak_gaji`
+  saat diajukan + `sidik`), `hr_pengajuan_keputusan` dan `hr_cuti_penyesuaian`
+  (append-only). Rute `hr-request-type/save`, `hr-request/save`,
+  `hr-request-decision/create`, `hr-leave-adjustment/create`. Lampiran
+  `hr_pengajuan_berkas` KHUSUS CLOUD (Q-51).
+- **Status dan jatah tidak disimpan.** Status = keputusan final pertama
+  (`diterima_cloud`, lalu jam perangkat) yang sidiknya cocok dengan isi
+  sekarang; `Batal` menang. Satu predikat SQL `PENGAJUAN_BERLAKU_SQL`
+  (Rust: makro `berlaku_sql!`) dipakai Generate Alfa, audit, laporan
+  kehadiran (kode C/I/S), rekap bulanan, gaji, dan jatah. Cloud tidak pernah
+  menolak keputusan; keputusan ganda, isi yang berubah, dan diputus sendiri
+  (Q-28) menjadi tanda.
+- **A-3**: pengajuan berlaku menutup tanggal itu dari Alfa dan audit, tanpa
+  menulis `absensi_harian`; Alfa yang sudah ada kalah di laporan. **A-4**:
+  `cuti_dibayar` ↔ `cutiDibayar` di baris agregat rekap gaji: FLAT_DAILY
+  +1 hari, HOURLY + `jam_kerja_normal_menit` shift kini (½ untuk setengah
+  hari), kecuali tanggal hadir. `Potong Gaji` tanpa kait (tidak ada tipe gaji
+  bulanan, Q-48).
+- Ditolak di perangkat, tidak di cloud: bertumpuk, melebihi `maks_hari`
+  (`satuan_maks`), rentang tanpa hari kerja, dan tanggal di proses gaji
+  `PAID`. "Tidak untuk diri sendiri" (urgent, memutus, membatalkan yang
+  berlaku) memakai `master_operator.id_karyawan`, juga untuk Superadmin.
+- Jatah: periode `ulang_tahun_kerja` berpangkal di tanggal berhak, atau
+  `kalender`; dibawa diturunkan tanpa baris; diuangkan dicatat HRD sebagai
+  `uang:<karyawan>:<periode>` dan dibayar manual sampai kait fase 4.
+- RBAC: `hr.request.view`/`submit` biasa; `hr.request.urgent`,
+  `hr.request.decide`, `hr.leave.adjust` sensitif (urgent sama dengan
+  menyetujui). HRD: view, submit, decide; Atasan: view, submit, urgent.
+  Halaman `/pengajuan` (area `pengajuan`) di Web, Desktop, dan Mobile; tab Cuti
+  di rincian karyawan dan jenis + aturan cuti di tab Organisasi `/hris`.
+
 ## Domain contoh
 
 `master_item` dan `log_aktivitas` adalah tabel peraga yang memperagakan pola
