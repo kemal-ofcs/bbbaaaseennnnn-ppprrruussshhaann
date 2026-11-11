@@ -70,6 +70,10 @@ const expectedRoutes = [
   "hr-leave-adjustment/create",
   // HRIS fase 4 (v39): pembayaran terpisah reimbursement.
   "hr-reimburse-payment/create",
+  // HRIS fase 6 (v41): penilaian kinerja.
+  "hr-performance-template/save",
+  "hr-performance/save",
+  "hr-performance-decision/create",
   "installment/activate",
   "installment/reapprove",
   "installment/close",
@@ -168,6 +172,13 @@ const expectedSnapshotTriples = [
   // HRIS fase 4 (v39): pembayaran terpisah reimbursement.
   "hrReimbursePayments|hr-reimburse-payment|hr_reimburse_bayar",
   "hrReimbursePaymentLines|hr-reimburse-payment-line|hr_reimburse_bayar_baris",
+  // HRIS fase 6 (v41): penilaian kinerja.
+  "hrPerformanceTemplates|hr-performance-template|hr_kinerja_template",
+  "hrPerformanceAspects|hr-performance-aspect|hr_kinerja_aspek",
+  "hrPerformancePositions|hr-performance-position|hr_kinerja_jabatan",
+  "hrPerformanceReviews|hr-performance|hr_kinerja_penilaian",
+  "hrPerformanceScores|hr-performance-score|hr_kinerja_nilai",
+  "hrPerformanceDecisions|hr-performance-decision|hr_kinerja_keputusan",
 ].sort();
 
 // Tabel DDL lokal (storage.rs) yang memang TIDAK ikut snapshot sync.

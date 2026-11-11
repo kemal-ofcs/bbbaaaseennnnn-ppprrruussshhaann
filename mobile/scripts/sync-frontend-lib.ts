@@ -23,6 +23,9 @@ const filesToCopy = [
   "components/hris/PengajuanWorkspace.tsx",
   // Pembayaran terpisah reimbursement (HRIS v39), dipakai PengajuanWorkspace.
   "components/hris/PembayaranReimburse.tsx",
+  // Penilaian kinerja HRIS (v41): tab Penilaian `/pengajuan` Mobile dan tab
+  // Kinerja `/hris` Web/Desktop memakai komponen yang sama (§21.9).
+  "components/hris/PenilaianKinerja.tsx",
   "components/ui/KonfirmasiData.tsx",
   // Pengirim notifikasi Telegram: berjalan di setiap sesi login, identik di kedua build.
   "components/AutoTelegramRunner.tsx",

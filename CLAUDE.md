@@ -1208,6 +1208,66 @@ Rincian dan keputusan pemilik di `prd-hris.md` §20 (Q-63 sampai Q-70). Logika
   (`KeluarWorkspace.tsx`, termasuk alasan dan pengali). Halaman Karyawan Web
   menampilkan "Keluar <tanggal>".
 
+## HRIS fase 6: penilaian kinerja (schema versi 41)
+
+Rincian dan keputusan pemilik di `prd-hris.md` §21 (Q-71 sampai Q-85). Logika
+`desktop/hr_kinerja.rs` (disalin ke Mobile) ↔ `validations/hr-kinerja.ts` +
+`services/hr-kinerja.ts`, vektor sama; SQL kembar (masukan disiplin, tulis
+cloud, baca) diperiksa harfiah oleh `hr-kinerja.test.ts`. Sentinel `-2037`,
+`REQUIRED_TABLE_COUNT` 96.
+
+- **Tersinkron semua** (Q-71), termasuk ke terminal scanner: `hr_kinerja_template`,
+  `hr_kinerja_aspek`, `hr_kinerja_jabatan` (PK `id_jabatan` = satu template per
+  jabatan tanpa `UNIQUE`), `hr_kinerja_penilaian`, `hr_kinerja_nilai`,
+  `hr_kinerja_keputusan`. Rute `hr-performance-template/save` (template +
+  aspek + pemetaan yang berubah), `hr-performance/save` (header + semua
+  nilai), `hr-performance-decision/create`. Hanya `hr_kinerja_nilai`
+  `delete_missing: true`, dilindungi `PendingGuard::induk_tertunda` (id
+  `<id_penilaian>:<id_aspek>`). Tanpa seed template.
+- **Status, nilai berlaku, dan tanda TIDAK disimpan** (`status_kinerja` ↔
+  `statusKinerja`): Dibatalkan, Final (sidik cocok), Diajukan (Ajukan terakhir
+  lebih baru dari Kembalikan terakhir, sidik sekarang), Draf. Urutan keputusan
+  = `urut_keputusan` pengajuan; `waktu_perangkat` keputusan dihitung database
+  berpresisi milidetik dan selalu sesudah keputusan sebelumnya
+  (`WAKTU_KEPUTUSAN_SQL`), karena Ajukan dan Kembalikan bisa jatuh di detik
+  yang sama. Koreksi = penilaian baru ber-`id_ref` akar; nilai berlaku = Final
+  paling akhir di keluarga itu (`kinerja_berlaku`).
+- **Handler cloud**: template siapa terakhir menang, `is_bawaan = 1` mematikan
+  bawaan lain (aturan 34), `tipe` aspek terkunci, melepas jabatan hanya bila
+  masih milik template pengirim. Penilaian ditulis hanya selama belum ada
+  `Final`/`Batal` di cloud (event yang kalah dilewati, tidak ditolak);
+  perangkat menolak simpan yang akan dilewati itu (`PESAN_FINAL_LAMA`).
+  Keputusan append-only, tidak pernah ditolak karena urutan.
+- **Disiplin otomatis** (`hitung_disiplin` ↔ `hitungDisiplin`): klasifikasi
+  per tanggal sama dengan `susunLaporanKehadiran` + hari perjalanan driver =
+  tepat; P = ⌊(2·tepat + telat)·1000 / 2D⌋ ke skor lewat
+  `hr_kinerja_ambang_disiplin`. `rincian` teks kanonik ikut sidik; D = 0 =
+  skor manual dengan catatan wajib. Ajukan ditolak bila `rincian` ≠ hitungan
+  kini (`PESAN_DISIPLIN_BERUBAH`); gateway Desktop/Mobile menjalankan
+  `syncNow()` dan menyimpan ulang draf dulu (Q-72).
+- Nilai akhir ×100 = Σ bobot × 25 × (skor − 1), tanpa pembulatan; predikat
+  dari `hr_kinerja_predikat`, keduanya dibekukan ke keputusan `Final`.
+  Pengaturan `hr_kinerja_*` lewat `setting/update`, validator sendiri, TIDAK
+  lewat `BATAS_PENGATURAN`.
+- RBAC (Q-83 sampai Q-85): `hr.performance.view` dan `hr.performance.assess`
+  rahasia (`CONFIDENTIAL_PERMISSIONS`), `hr.performance.finalize` sensitif
+  (`SENSITIVE_MUTATION_PERMISSIONS`, mengembalikan, memfinalkan, dan membuat
+  koreksi), `hr.performance.config` ikut paket Admin. HRD keempatnya, Atasan
+  `assess`. Semua aksi ditolak atas diri sendiri; penilaian atas diri sesi
+  baru terbaca setelah Final lewat `view`. Area `pengajuan` juga menerima
+  `assess`/`view`. Command `desktop_hr_performance_templates`,
+  `_template_save`, `_settings_save`, `_list`, `_detail`, `_save`,
+  `_decide`; Web `POST /api/hris/performance`. `_list` dengan `id_karyawan`
+  = riwayat semua periode, setiap baris bertanda `berlaku`.
+- Layar: `/hris` tab Kinerja (`KinerjaWorkspace.tsx`: Penilaian dan, untuk
+  `config`, Template + pengaturan di `TemplateKinerja.tsx`), tab Kinerja
+  rincian karyawan (`view`, `RiwayatKinerjaKaryawan`), dan Mobile `/pengajuan`
+  tab Penilaian. `PenilaianKinerja.tsx` (di `filesToCopy`) dipakai keduanya;
+  `modeHp` menyembunyikan Kembalikan, Final, dan Koreksi (Q-72). Tombol aksi
+  mengikuti peta `boleh` dari backend.
+- **Semua perangkat wajib diperbarui sebelum penilaian dipakai**: perangkat
+  v40 tidak mengenal tiga rute baru dan enam tabel snapshot.
+
 ## Domain contoh
 
 `master_item` dan `log_aktivitas` adalah tabel peraga yang memperagakan pola

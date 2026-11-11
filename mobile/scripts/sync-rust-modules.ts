@@ -44,6 +44,9 @@ const filesToSync = [
   // HRIS fase 5: aturan SP, status keluar, dan usulan pesangon wajib identik
   // dengan Desktop dan TS.
   "hr_keluar.rs",
+  // HRIS fase 6: template, status, disiplin otomatis, dan nilai akhir
+  // penilaian kinerja wajib identik dengan Desktop dan TS.
+  "hr_kinerja.rs",
   "commands.rs",
   // Tarif default payroll: satu sumber untuk SQLite lokal dan Turso cloud, di
   // kedua workspace. Perbedaan sekecil apa pun di sini membuat baris seed lokal

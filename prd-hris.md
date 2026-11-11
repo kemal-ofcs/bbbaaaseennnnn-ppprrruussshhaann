@@ -11,7 +11,9 @@ Q-58; catatan dan penyimpangan di §18.11), `bun run check` penuh lulus
 (10 Nov 2026). **Fase 4 dibangun** (§19, jawaban Q-59 sampai Q-62; catatan
 dan penyimpangan di §19.11), `bun run check` penuh belum dijalankan (pemilik).
 **Fase 5 dibangun** (§20, jawaban Q-63 sampai Q-70; catatan dan penyimpangan
-di §20.13), `bun run check` penuh belum dijalankan (pemilik).
+di §20.13), `bun run check` penuh belum dijalankan (pemilik). **Fase 6
+dirancang dan disetujui pemilik** (§21, jawaban Q-71 sampai Q-85, 12 Nov
+2026); belum ada kode.
 
 ---
 
@@ -2415,3 +2417,528 @@ Penyimpangan dan catatan, untuk ditinjau:
   `turso.rs` + `-2036`, daftar versi migrasi tes RBAC + 40, daftar tabel
   `schema-consistency.test.ts` + 4. Daftar harapan tabel khusus cloud
   `audit-sync-contract.ts` + 4 (pengetatan, bukan pelonggaran).
+
+## 21. Urutan pengerjaan fase 6
+
+**Disetujui pemilik (12 Nov 2026) dan dibangun (catatan di §21.14).** Ditulis setelah
+menelusuri kode (11 Nov 2026). Q-71 sampai Q-85 sudah dijawab (§21.13) dan
+rancangan utuhnya, termasuk penanda di §21.12, disetujui. Bila §11.1 atau §12
+dan bagian ini berbeda, **bagian ini yang berlaku** (terutama: enam tabel,
+bukan empat, dan semuanya tersinkron).
+
+### 21.1 Temuan dari kode
+
+- **`hr_jabatan`** hanya `id_jabatan`, `nama`, `is_aktif`, `created_at`,
+  `updated_at` (tersinkron, `delete_missing: false`, rute
+  `hr-position/save`). Tidak ada tempat untuk template; menambah kolom berarti
+  mengubah handler `hr-position/save` dan pola "hanya menimpa bila payload
+  membawa kuncinya" untuk perangkat v40. `master_data.id_jabatan` boleh kosong
+  (karyawan yang teks jabatannya belum dipetakan, §16.3).
+- **Atasan langsung**: `master_data.id_atasan`, dijaga `periksa_atasan` ↔
+  `periksaAtasan` (bukan diri sendiri, ada, tanpa lingkaran) dan
+  `dalam_siklus_atasan` untuk siklus dari dua perangkat offline. Tidak
+  membatasi akses (Q-38).
+- **"Tidak untuk diri sendiri"**: `OperatorUser.id_karyawan` (dari
+  `master_operator.id_karyawan`). `hr_pengajuan.rs` memakainya lewat
+  `KeadaanAksi.karyawan_sendiri` + `PESAN_DIRI_SENDIRI`, juga untuk
+  Superadmin; `hr_keluar.rs` lewat `tolak_diri_sendiri`. Akun tanpa
+  `id_karyawan` tidak pernah tertolak aturan ini.
+- **Sumber disiplin**:
+  - `absensi_harian` (tersinkron) memuat `status_kehadiran`, `jam_masuk`,
+    `menit_terlambat` per sesi. Definisi hadir/terlambat/sakit/izin/dispen/Alfa
+    per HARI ada di `LAPORAN_KEHADIRAN_SQL.hari` (`report.ts` ↔
+    `administration.rs`, satu baris per karyawan per tanggal, multi-sesi
+    digabung; terlambat = `MAX(menit_terlambat) > 0`).
+  - **Matriks laporan hanya ada di TS** (`susunLaporanKehadiran`,
+    `validations/laporan-kehadiran.ts`): Rust hanya mengirim data mentah.
+    Matriks itu sudah menggabungkan `wajibMasuk`, whitelist libur
+    (`evaluateHolidayScan`), tukar shift (`LAPORAN_TUKAR_SQL`), dan pengajuan
+    berlaku (`LAPORAN_PENGAJUAN_SQL`, `KELOMPOK_TIDAK_HADIR`): Hadir menang
+    atas pengajuan (Q-34), pengajuan menang atas koreksi S/I/D dan Alfa, dan
+    hari wajib tanpa catatan menjadi `-`. Padanan Rust untuk
+    `wajib_masuk` (`hari_kerja.rs`) dan `evaluate_holiday_scan`
+    (`scanner.rs`) sudah ada; padanan Rust untuk klasifikasi per hari belum.
+  - **Rentang laporan dibatasi 92 hari** (`MAKS_HARI_LAPORAN` kembar), dan
+    kuerinya memuat semua karyawan. Periode semester/tahunan tidak bisa
+    memakai `getLaporanKehadiran` apa adanya.
+  - **Laporan kehadiran tidak membaca laporan perjalanan driver**: hari driver
+    di jalan tanpa scan tampil `-`, padahal Generate Alfa, audit, dan
+    `HARI_HADIR_SQL` menganggapnya bekerja (`PELAPOR_PERJALANAN_SQL`).
+  - Rekap bulanan (`REKAP_BULANAN_SQL` kembar) per bulan kalender, tanpa
+    hari wajib dan tanpa tukar shift; tidak cocok sebagai sumber rasio.
+  - Generate Alfa hanya menilai kemarin dan hari ini, jadi tanggal lampau yang
+    terlewat tetap tanpa catatan (`-`).
+- **Pola final berjejak**: `hr_pengajuan` + `hr_pengajuan_keputusan`
+  (append-only, `sidik` SHA-256 hex dari isian kanonik digabung `\u{1f}`,
+  status = keputusan final pertama menurut `urut_keputusan` yang sidiknya
+  cocok, `Batal` menang, `diterima_cloud` jam cloud). Isi + baris anak dalam
+  satu event dengan `PendingGuard::induk_tertunda` ada di `trip/save` +
+  `drv_muatan`. Handler yang menulis hanya selama keadaan masih terbuka ada di
+  servis aset (`CLAUDE.md` "Servis aset", rute `inventory-service/*`).
+- **SP** (`hr_sp`) khusus cloud: tidak terbaca dari SQLite perangkat.
+  Command fase 5 membaca SQLite lokal dulu lalu memanggil `TursoClient`.
+- **Pengaturan HRIS** lewat rute `setting/update` yang sudah ada
+  (`hris::simpan_pengaturan`: upsert `setting_gex_system` + outbox, event lama
+  kunci yang sama dibuang). `BATAS_PENGATURAN` hanya angka dan
+  `validasi_pengaturan` mewajibkan semua kuncinya; nilai teks (pola
+  `hr_lembur_mode`, `hr_reimburse_bayar`) punya validatornya sendiri.
+- **RBAC**: `catalog.ts` belum memuat `hr.performance.*`. Area `hris` =
+  `employees.view` (Atasan sudah bisa membuka `/hris` di Web/Desktop), area
+  `pengajuan` = `hr.request.view`. Seed HRD/Atasan Rust (`turso.rs`, daftar
+  `IN`) ↔ `DEFAULT_ROLE_PERMISSIONS`; Admin Rust = semua di luar `NOT IN`.
+- **Layar**: `HrisWorkspace` (tab Karyawan, Struktur, Keluar, Organisasi),
+  `RincianKaryawan` (Kerja, Pribadi, Keuangan, Kontrak, Dokumen, Cuti, SP).
+  Mobile punya `/pengajuan` (`PengajuanWorkspace`, di `filesToCopy`) tetapi
+  tidak punya `/hris`.
+- Skema sekarang: v40, sentinel `-2036`, `REQUIRED_TABLE_COUNT` 90, 62 tabel
+  snapshot, 87 rute, command Desktop 279 / Mobile 285.
+
+### 21.2 Model data (skema v41, sentinel `-2037` `hris-kinerja-v1`)
+
+**Tersinkron** (Q-71; keempat lapis, `SNAPSHOT_TABLES` ↔ `SNAPSHOT_SOURCES`
+identik, `storage.rs` Desktop DAN Mobile diubah manual, `SNAPSHOT_TABLES.columns`
+Desktop dan Mobile). Tanpa `UNIQUE` selain PK. Menggantikan empat tabel usulan
+§12: pemetaan jabatan dan keputusan butuh tabel sendiri.
+
+| Tabel | Kolom |
+| :-- | :-- |
+| `hr_kinerja_template` | `id_template` PK (`ktp-<acak>`); `nama` NOT NULL; `keterangan`; `is_bawaan` INTEGER NOT NULL DEFAULT 0 CHECK (0,1); `is_aktif` INTEGER NOT NULL DEFAULT 1 CHECK (0,1); `diubah_oleh` NOT NULL; `created_at`, `updated_at` |
+| `hr_kinerja_aspek` | `id_aspek` PK (`<id_template>:<acak>`); `id_template` NOT NULL; `nama` NOT NULL; `tipe` CHECK IN (`Manual`, `Otomatis Disiplin`); `bobot` INTEGER NOT NULL CHECK 1–100; `panduan` (teks untuk penilai); `urutan` INTEGER NOT NULL DEFAULT 0; `is_aktif` CHECK (0,1); `created_at`, `updated_at`. Indeks `id_template` |
+| `hr_kinerja_jabatan` | `id_jabatan` PK; `id_template` (kosong = dilepas); `diubah_oleh` NOT NULL; `updated_at`. PK memastikan satu jabatan paling banyak satu template tanpa `UNIQUE` |
+| `hr_kinerja_penilaian` | `id_penilaian` PK (`knj-<acak>`); `id_karyawan` NOT NULL; `id_ref` (koreksi: id penilaian AKAR); `alasan_koreksi`; `periode_jenis` CHECK IN (`Bulanan`, `Kuartal`, `Semester`, `Tahunan`); `periode_mulai`, `periode_selesai` NOT NULL, CHECK `periode_selesai >= periode_mulai`; `id_template` NOT NULL, `template_nama` NOT NULL (salinan); `id_jabatan`, `jabatan_nama` (salinan saat dibuat); `id_penilai` (id karyawan penilai, boleh kosong); `penilai_oleh` NOT NULL (username penyimpan terakhir); `catatan`; `sidik` NOT NULL; `dibuat_oleh` NOT NULL; `waktu_perangkat` NOT NULL; `created_at`, `updated_at`. Indeks `(id_karyawan, periode_mulai)`, `id_ref` |
+| `hr_kinerja_nilai` | `id_nilai` PK (`<id_penilaian>:<id_aspek>`); `id_penilaian` NOT NULL; `id_aspek` NOT NULL; `aspek_nama` NOT NULL, `tipe` CHECK sama, `bobot` INTEGER NOT NULL CHECK 1–100, `urutan` (salinan template, Q-78); `skor` INTEGER CHECK (`skor IS NULL OR skor BETWEEN 1 AND 5`); `catatan`; `rincian` (teks kanonik disiplin §21.6, hanya `Otomatis Disiplin`). Indeks `id_penilaian` |
+| `hr_kinerja_keputusan` | `id_keputusan` PK; `id_penilaian` NOT NULL; `jenis` CHECK IN (`Ajukan`, `Kembalikan`, `Final`, `Batal`); `sidik` NOT NULL; `alasan`; `nilai_akhir` INTEGER CHECK (`nilai_akhir IS NULL OR nilai_akhir BETWEEN 0 AND 10000`, hanya `Final`, ×100); `predikat` (salinan teks, hanya `Final`); `oleh` NOT NULL; `waktu_perangkat` NOT NULL; `diterima_cloud`; `created_at`. Indeks `id_penilaian` |
+
+**Rute dan snapshot** (tiga rute baru, 87 → 90; enam tabel snapshot, 62 → 68):
+
+| Rute | Isi event | Tabel |
+| :-- | :-- | :-- |
+| `hr-performance-template/save` | header template + semua aspek + baris pemetaan jabatan yang diubah | `hr_kinerja_template`, `hr_kinerja_aspek`, `hr_kinerja_jabatan` |
+| `hr-performance/save` | header penilaian + semua baris nilai | `hr_kinerja_penilaian`, `hr_kinerja_nilai` |
+| `hr-performance-decision/create` | satu keputusan | `hr_kinerja_keputusan` |
+
+- `delete_missing: false` untuk lima tabel (tidak ada baris yang dihapus:
+  template dan aspek dinonaktifkan, pemetaan dilepas dengan `id_template`
+  kosong, penilaian dibatalkan). `hr_kinerja_nilai` `delete_missing: true`
+  (muat ulang template di draf bisa membuang aspek), dilindungi
+  `PendingGuard::induk_tertunda` selama event `hr-performance` induknya
+  tertunda (pola `drv_muatan`). Domain snapshot `hr-performance-aspect`,
+  `hr-performance-position`, `hr-performance-score` tanpa rute push.
+- **Handler cloud**:
+  - `hr-performance-template/save`: upsert ketiganya; bila `is_bawaan = 1`,
+    `UPDATE hr_kinerja_template SET is_bawaan = 0 WHERE id_template <> ?` di
+    transaksi yang sama (aturan 34).
+  - `hr-performance/save`: menulis header dan nilai **hanya bila** penilaian
+    itu belum punya keputusan `Final` atau `Batal` di cloud; selain itu event
+    dilewati, tidak ditolak (pola servis). Baris nilai yang tidak ada di
+    payload dihapus di transaksi yang sama.
+  - `hr-performance-decision/create`: `INSERT … ON CONFLICT DO NOTHING`,
+    `diterima_cloud = datetime('now')`. Tidak pernah menolak karena urutan.
+- **Validasi Rust sebelum SQLite + outbox** (aturan 43): semua enum, rentang
+  skor/bobot/`nilai_akhir`, panjang teks, dan bentuk `rincian` persis CHECK
+  cloud.
+- **Tanpa seed**: template bersifat milik perusahaan, jadi tidak ada template
+  bawaan yang ditanam (lihat §21.12).
+
+**Pengaturan** (`setting_gex_system` lewat rute `setting/update` yang sudah
+ada, validator sendiri `validasi_pengaturan_kinerja` ↔
+`validasiPengaturanKinerja`, **tidak** lewat `BATAS_PENGATURAN`, jadi tes
+`pengaturan_kontrak` tidak berubah):
+
+| Kunci | Bawaan | Aturan |
+| :-- | :-- | :-- |
+| `hr_kinerja_periode` | `Semester` | `Bulanan`, `Kuartal`, `Semester`, `Tahunan` |
+| `hr_kinerja_ambang_disiplin` | `950,900,800,700` | empat bilangan bulat 1–1000, turun tegas: permil minimal skor 5, 4, 3, 2 |
+| `hr_kinerja_predikat` | `9000:Sangat Baik\|7500:Baik\|6000:Cukup\|4000:Kurang\|0:Sangat Kurang` | 2–7 pasangan `ambang×100:nama`, ambang turun tegas, yang terakhir 0, nama 1–50 karakter tanpa `\|` dan `:` |
+
+Kosong atau rusak = bawaan (pola `dari_peta`). Kedua jalur:
+`CURRENT_SCHEMA_VERSION`/`CLIENT_SCHEMA_VERSION` 41, sentinel `-2037` + angka
+`ensure_schema_current`, `REQUIRED_TABLE_COUNT` 96, enam tabel ikut
+`PROMOTION_PLAN` dan dibuang saat pindah database.
+
+### 21.3 Template, aspek, dan pemetaan jabatan (Q-78, Q-79)
+
+- **Template** (`validasi_template` ↔ `validasiTemplate`): nama 1–100, unik di
+  aplikasi (tanpa `UNIQUE`; kembaran offline tampil sebagai tanda
+  `nama_ganda`); keterangan ≤ 1.000.
+- **Aspek aktif**: 1–20; nama 1–100 unik dalam template; bobot bilangan bulat
+  1–100 dan **total aspek aktif tepat 100**; paling banyak satu
+  `Otomatis Disiplin`; panduan ≤ 1.000. Aspek tidak pernah dihapus, hanya
+  dinonaktifkan; tipenya terkunci sejak dibuat.
+- **Bawaan** (Q-79): paling banyak satu template aktif ber-`is_bawaan = 1`;
+  template bawaan tidak bisa dinonaktifkan selagi bawaan. Dua perangkat
+  offline yang sama-sama menandai bawaan: yang terakhir sampai di cloud menang
+  (handler §21.2).
+- **Pemetaan**: satu template boleh untuk banyak jabatan; satu jabatan
+  paling banyak satu template (PK `hr_kinerja_jabatan`). Pemetaan disunting
+  dari form template; memindahkan jabatan ke template lain cukup menulis
+  barisnya dengan `id_template` baru.
+- **Template seorang karyawan** (`template_karyawan` ↔ `templateKaryawan`):
+  pemetaan jabatan `master_data.id_jabatan` ke template aktif; bila tidak ada
+  (jabatan tanpa template, `id_jabatan` kosong, atau template nonaktif) =
+  template bawaan aktif; bila tidak ada juga = "belum bisa dinilai".
+- **Mengubah template yang sudah dipakai** (Q-78): boleh. Penilaian menyalin
+  nama aspek, tipe, bobot, dan urutan ke `hr_kinerja_nilai` saat dibuat, jadi
+  perubahan hanya berlaku untuk penilaian sesudahnya. Draf bisa "Muat ulang
+  template" (menulis ulang baris nilai dari template kini; skor aspek yang
+  `id_aspek`-nya masih ada dipertahankan).
+
+### 21.4 Periode (Q-82, Q-80)
+
+- **Jenis** dari `hr_kinerja_periode`, dibekukan ke `periode_jenis` saat
+  penilaian dibuat. Rentang kalender (`periode_rentang` ↔ `periodeRentang`):
+  bulan (1 s.d. akhir bulan), kuartal (Jan–Mar, Apr–Jun, Jul–Sep, Okt–Des),
+  semester (Jan–Jun, Jul–Des), tahun. Payload menyebut jenis + tanggal mulai;
+  `periode_selesai` dihitung, dan pasangan yang tidak kanonik ditolak.
+- **Satu penilaian per karyawan per periode** (Q-73), ditegakkan di perangkat
+  dan Web: penilaian akar (tanpa `id_ref`) yang tidak dibatalkan dan rentangnya
+  bertumpuk dengan penilaian akar lain karyawan itu (jenis apa pun) ditolak.
+  Mengganti jenis tidak mengubah penilaian lama; periode baru yang bertumpuk
+  dengan periode lama ditolak. Dua perangkat offline yang membuat penilaian
+  untuk karyawan dan periode yang sama → tanda `penilaian_ganda` di keduanya;
+  HRD membatalkan salah satunya.
+- **Rentang aktif** (Q-80): `mulai_aktif` = max(`periode_mulai`,
+  `tanggal_daftar`); `akhir_aktif` = min(`periode_selesai`,
+  `tanggal_selesai_aktif` bila terisi). Rentang aktif kosong = tidak bisa
+  dinilai. Rentang aktif yang lebih pendek dari periode = tanda
+  `periode_tidak_penuh`.
+- **Membuat** penilaian baru: karyawan `status_aktif = 'Aktif'`. Setelah keluar
+  berlaku (`id_keluar` terisi), penilaian baru ditolak; draf dan penilaian
+  diajukan yang sudah ada tetap bisa difinalkan atau dibatalkan. Draf boleh
+  dibuat sejak `periode_mulai` ≤ hari ini; **Ajukan** terbuka sejak
+  `periode_selesai` ≤ hari ini (tanggal WIB SQLite perangkat; cloud tidak
+  memeriksa ulang).
+- **Draf offline, Ajukan mencoba sinkron dulu** (Q-72, jalan tengah). Simpan
+  draf selalu boleh offline. Di Desktop/Mobile, tombol Ajukan menjalankan
+  `syncNow()` lebih dulu, lalu menyimpan ulang draf supaya disiplin dihitung
+  dari data yang baru ditarik. Bila `rincian` disiplin berubah, Ajukan berhenti
+  dan layar menampilkan angka lama → baru untuk diperiksa; penilai menekan
+  Ajukan sekali lagi. Bila sinkron gagal (offline, `TURSO_NOT_CONFIGURED`),
+  Ajukan tetap jalan dengan peringatan "Data absensi mungkin belum terbaru;
+  angka disiplin dihitung dari data di perangkat ini." Web selalu membaca
+  cloud, jadi tanpa langkah sinkron. Tidak ada kolom yang mencatat apakah
+  sinkron berhasil; HRD tetap melihat `disiplin_berubah` di rincian.
+- **Template mengikuti jabatan saat penilaian dibuat** (Q-80); jabatan yang
+  berganti di tengah periode tidak mengubahnya, kecuali "Muat ulang template"
+  selama draf (yang membaca jabatan kini).
+
+### 21.5 Penilaian, status, dan finalisasi
+
+**Isian** (`validasi_penilaian` ↔ `validasiPenilaian`): skor bilangan bulat
+1–5 atau kosong selama draf; catatan aspek ≤ 1.000; catatan umum ≤ 2.000;
+aspek `Otomatis Disiplin` diisi sistem (§21.6), tidak dari payload, kecuali
+hari dinilai 0. Penilai = sesi penyimpan terakhir (`penilai_oleh`,
+`id_penilai` dari `id_karyawan` sesi); penilai lain boleh mengambil alih
+selama draf, `dibuat_oleh` tetap. Penilai bawaan (atasan langsung) hanya
+menentukan daftar "Perlu saya nilai" dan tanda `bukan_atasan_langsung`.
+
+**Sidik** (`sidik_penilaian` ↔ `sidikPenilaian`, pola `sidik_pengajuan`:
+digabung `\u{1f}`, SHA-256 hex): `id_karyawan`, `id_ref`, `periode_mulai`,
+`periode_selesai`, `id_template`, `catatan`, lalu per baris nilai urut
+(`urutan`, `id_aspek`): `id_aspek`, `tipe`, `bobot`, `skor` (kosong bila
+null), `catatan`, `rincian`. Penilai tidak ikut sidik.
+
+**Status turunan** (`status_kinerja` ↔ `statusKinerja`, berurutan, keputusan
+diurutkan `urut_keputusan` yang sudah ada):
+
+1. `Dibatalkan`: ada keputusan `Batal`.
+2. `Final`: ada `Final` dengan sidik = sidik sekarang (yang pertama berlaku).
+3. `Diajukan`: `Ajukan` terakhir bersidik sekarang lebih baru daripada
+   `Kembalikan` terakhir bersidik sekarang.
+4. `Draf`.
+
+**Aksi** (`periksa_aksi_kinerja` ↔ `periksaAksiKinerja`; semuanya ditolak
+bila `id_karyawan` penilaian = `id_karyawan` sesi, termasuk Superadmin):
+
+| Aksi | Izin | Syarat |
+| :-- | :-- | :-- |
+| Simpan draf | `assess` | status Draf (atau baru) |
+| Ajukan | `assess` | Draf; semua skor terisi; `periode_selesai` ≤ hari ini; `rincian` disiplin tersimpan = hitungan saat ini (`PESAN_DISIPLIN_BERUBAH`, penjaga backend untuk §21.4) |
+| Kembalikan | `finalize` | Diajukan; alasan wajib (1–500) |
+| Final | `finalize` | Diajukan; menulis `nilai_akhir` dan `predikat` beku ke baris keputusan |
+| Batal | `assess` atau `finalize` | Draf atau Diajukan; alasan wajib. Final tidak bisa dibatalkan, hanya dikoreksi (§21.7) |
+
+**Tanda** (`tanda_kinerja` ↔ `tandaKinerja`): `penilaian_ganda`,
+`final_gugur` (ada `Final` yang sidiknya tidak cocok lagi: isi offline yang
+lebih dulu sampai menggugurkan final versi lama, pola ACC pengajuan),
+`final_dibatalkan` (`Batal` dari perangkat lain menang atas `Final`),
+`dinilai_dan_difinalkan_sama` (Q-28), `bukan_atasan_langsung`,
+`disiplin_manual`, `periode_tidak_penuh`. `disiplin_berubah` (hitungan hidup ≠
+`rincian` beku) hanya dihitung di layar rincian, bukan di daftar.
+
+### 21.6 Rumus Otomatis Disiplin (Q-75, Q-76, Q-77)
+
+Fungsi murni kembar `hitung_disiplin` ↔ `hitungDisiplin` dengan vektor uji
+yang sama; masukannya dibaca dengan SQL kembar baru (teks diperiksa harfiah):
+`DISIPLIN_KARYAWAN_SQL` (hari kerja + kode shift, pola
+`LAPORAN_KEHADIRAN_SQL.karyawan` untuk satu id), `DISIPLIN_HARI_SQL` (kolom
+sama dengan `LAPORAN_KEHADIRAN_SQL.hari` + saringan `id_karyawan`),
+`DISIPLIN_PENGAJUAN_SQL` dan `DISIPLIN_TUKAR_SQL` (`LAPORAN_PENGAJUAN_SQL` /
+`LAPORAN_TUKAR_SQL` + saringan `id_karyawan`), `DISIPLIN_PERJALANAN_SQL`
+(tanggal WIB `date(waktu_perangkat, '+7 hours')` laporan ber-`id_karyawan`,
+batas sama dengan `PELAPOR_PERJALANAN_SQL`); libur dan whitelist memakai
+`LAPORAN_KEHADIRAN_SQL.libur`/`.whitelist` apa adanya. Tidak lewat
+`getLaporanKehadiran`, jadi batas 92 hari tidak berlaku (periode maks 366 hari).
+Desktop/Mobile membaca SQLite lokal; Web membaca cloud.
+
+**Rentang dihitung**: `mulai_aktif` s.d. min(`akhir_aktif`, hari ini WIB).
+
+**Klasifikasi per tanggal** (yang pertama cocok):
+
+| # | Keadaan | Kelas |
+| :-- | :-- | :-- |
+| 1 | tercatat Hadir dan tidak terlambat (sel `H`) | tepat |
+| 2 | tercatat Hadir dan terlambat (sel `T`, `MAX(menit_terlambat) > 0`) | telat |
+| 3 | ada laporan perjalanan ber-`id_karyawan` di tanggal WIB itu | tepat |
+| 4 | pengajuan Cuti/Izin/Sakit/Dinas Luar berlaku, dan tanggal itu tercatat atau dijadwalkan | dikecualikan |
+| 5 | tercatat Sakit/Izin/Dispen (koreksi admin) | dikecualikan |
+| 6 | tercatat Alfa | alfa |
+| 7 | dijadwalkan (`wajib_masuk` dengan shift tukar dan whitelist libur, sama dengan laporan) tanpa catatan | kosong |
+| 8 | selain itu (libur, libur mingguan) | tidak dihitung |
+
+Urutan 1, 2, 4–8 sama dengan `susunLaporanKehadiran`; baris 3 menambahkan hari
+perjalanan (pola `HARI_HADIR_SQL`). Laporan kehadiran sendiri tidak diubah.
+
+**Aritmetika** (`i64` ↔ `number`, bilangan bulat; hasil kali maks
+2 × 366 × 1000, jauh di bawah 2^53):
+
+- `D` = tepat + telat + alfa + kosong (dikecualikan tidak masuk, Q-75; kosong
+  masuk, Q-76).
+- `P` (permil) = ⌊(2 × tepat + telat) × 1000 / (2 × D)⌋. Tepat = 1, telat = ½,
+  alfa dan kosong = 0.
+- Skor = 5 bila P ≥ a₅, 4 bila P ≥ a₄, 3 bila P ≥ a₃, 2 bila P ≥ a₂, selain itu
+  1; (a₅, a₄, a₃, a₂) dari `hr_kinerja_ambang_disiplin` (bawaan 950, 900, 800,
+  700).
+- `D = 0` (tidak ada hari dinilai): skor tidak dihitung; penilai mengisi skor
+  manual dengan catatan wajib, tanda `disiplin_manual`.
+- `rincian` = `D|tepat|telat|alfa|kosong|dikecualikan|P|a₅,a₄,a₃,a₂` (teks
+  kanonik, ikut sidik). Dihitung ulang setiap simpan draf; beku sejak Ajukan.
+  Layar menampilkan rumus dan setiap angkanya kepada penilai dan HRD.
+
+Vektor: D = 20 (tepat 17, telat 2, alfa 1) → P = 36.000 / 40 = 900 → skor 4.
+D = 21 (tepat 20, telat 1) → P = ⌊41.000 / 42⌋ = 976 → skor 5. D = 3 (kosong 3)
+→ P = 0 → skor 1. Tepat 10 + 4 hari cuti berlaku → D = 10, P = 1000 → skor 5.
+
+**SP** (Q-77): hanya informasi. Layar rincian membaca SP Berlaku dalam periode
+dari cloud (`TursoClient`, setelah koneksi SQLite lokal ditutup); offline
+tampil "butuh koneksi". Tidak mengubah angka disiplin dan tidak ikut sidik.
+
+### 21.7 Nilai akhir, predikat, dan koreksi (Q-74, Q-81)
+
+- **Nilai aspek** (Q-74) = (skor − 1) × 25: 1 = 0, 2 = 25, 3 = 50, 4 = 75,
+  5 = 100.
+- **Nilai akhir ×100** (`nilai_akhir` ↔ `nilaiAkhir`) = Σ bobot × 25 ×
+  (skor − 1), rentang 0–10.000. Karena Σ bobot = 100, hasilnya tepat nilai
+  0–100 dengan dua desimal; **tidak ada pembulatan**. Tampil `77,50`.
+- **Predikat** (`predikat` ↔ `predikatNilai`): pasangan pertama dari
+  `hr_kinerja_predikat` yang ambangnya ≤ nilai akhir ×100. Dibekukan ke
+  keputusan `Final`; mengubah pengaturan tidak mengubah penilaian final.
+- Vektor: bobot 40/35/25, skor 4/5/3 → 40 × 75 + 35 × 100 + 25 × 50 = 7.750
+  → 77,50 Baik. Semua 5 → 10.000 Sangat Baik. Semua 1 → 0 Sangat Kurang.
+- **Koreksi** (Q-81): penilaian baru ber-`id_ref` = id penilaian **akar**
+  (koreksi atas koreksi tetap merujuk akar), `alasan_koreksi` wajib (1–1.000),
+  baris nilai disalin dari penilaian berlaku (bukan dari template), lalu
+  melewati Draf → Diajukan → Final yang sama. Dibuat oleh pemegang
+  `finalize`; diisi pemegang `assess` atau `finalize`. Paling banyak satu
+  koreksi terbuka (Draf/Diajukan) per akar; akar harus Final.
+- **Nilai berlaku** per karyawan per periode (`kinerja_berlaku` ↔
+  `kinerjaBerlaku`): di antara akar dan koreksinya yang berstatus Final,
+  yang keputusan `Final`-nya paling akhir menurut `urut_keputusan`. Riwayat
+  menampilkan semuanya.
+
+### 21.8 Hak akses (Q-83, Q-84, Q-85)
+
+| Izin | Sensitif | Rahasia | Paket bawaan |
+| :-- | :-- | :-- | :-- |
+| `hr.performance.view` | | ya | HRD |
+| `hr.performance.assess` | | ya | HRD, Atasan |
+| `hr.performance.config` | | | HRD (dan Admin) |
+| `hr.performance.finalize` (baru, tidak ada di §10.1) | ya | | HRD |
+
+- Rahasia = `CONFIDENTIAL_PERMISSIONS` dan `NOT IN` seed Admin Rust; sensitif
+  = `SENSITIVE_MUTATION_PERMISSIONS` dan `NOT IN`. Seed HRD Rust +
+  `DEFAULT_ROLE_PERMISSIONS.hrd` empat izin; seed Atasan +
+  `DEFAULT_ROLE_PERMISSIONS.atasan` `hr.performance.assess`.
+- **Membaca** daftar dan rincian: `view`, `assess`, atau `finalize`
+  (`requireAnyWebPermission` / `require_any_permission`). Penilaian atas diri
+  sesi tidak pernah terbaca selama belum Final, dan sesudah Final hanya lewat
+  `view` (Q-85). Template: keempat izin.
+- **Menyunting** template, pemetaan, dan pengaturan kinerja: `config`.
+- Area: `/hris` tetap area `hris`, tab Kinerja memeriksa izinnya sendiri.
+  Area `pengajuan` juga menerima `hr.performance.assess` dan `view` (pola
+  `reimburse.decide`), supaya Atasan tanpa `hr.request.view` bisa membuka tab
+  Penilaian di Mobile. Backend memeriksa ulang (aturan 10).
+
+### 21.9 Command, rute, dan layar
+
+**Rust** (`desktop/hr_kinerja.rs` baru, disalin ke Mobile lewat daftar salin
+`sync-rust-modules.ts`; terdaftar di kedua `lib.rs`, `build.rs`,
+`capabilities/default.json`; mutasi lokal + outbox dalam satu transaksi):
+
+| Command | Izin |
+| :-- | :-- |
+| `desktop_hr_performance_templates` (template, aspek, pemetaan, pengaturan) | `view` / `assess` / `config` / `finalize` |
+| `desktop_hr_performance_template_save` | `config` |
+| `desktop_hr_performance_settings_save` | `config` |
+| `desktop_hr_performance_list` (per periode: penilaian, status, tanda, karyawan belum dinilai, "Perlu saya nilai") | `view` / `assess` / `finalize` |
+| `desktop_hr_performance_detail` (rincian, hitungan disiplin hidup, riwayat koreksi, SP dari cloud bila terhubung) | `view` / `assess` / `finalize` |
+| `desktop_hr_performance_save` (buat, ubah draf, muat ulang template, buat koreksi) | `assess`; koreksi `finalize` |
+| `desktop_hr_performance_decide` (Ajukan, Kembalikan, Final, Batal) | menurut §21.5 |
+
+Command Desktop 279 → 286, Mobile 285 → 292. Handler cloud tiga rute di
+`turso.rs` (`apply_event_to_turso`), `CANONICAL_SYNC_ROUTES` ↔
+`canonical_sync_route`.
+
+**Web**: `validations/hr-kinerja.ts` + `services/hr-kinerja.ts` (kembar Rust),
+rute `POST /api/hris/performance` (Zod `.strict()`, aksi per operasi, tanpa
+`GET`), gateway `gateways/hr-kinerja.ts`.
+
+**Layar**:
+
+1. `/hris` tab **Kinerja** (Web/Desktop, `KinerjaWorkspace.tsx`): pemilih
+   periode, daftar (Belum dinilai, Draf, Diajukan, Final, Dibatalkan, tanda),
+   rincian dengan form skor per aspek, panel rumus disiplin, SP Berlaku,
+   Ajukan / Kembalikan / Final / Batal / Buat koreksi (`konfirmasiData`
+   sebelum simpan dan sebelum Final), riwayat koreksi.
+2. `/hris` tab Kinerja bagian **Template** (`config`): template, aspek dan
+   bobot (penjumlah 100 hidup), pemetaan jabatan, template bawaan, pengaturan
+   periode, ambang disiplin, dan predikat.
+3. `RincianKaryawan` tab **Kinerja** (`view`): nilai berlaku per periode dan
+   riwayat koreksi.
+4. Mobile `/pengajuan` tab **Penilaian** (`assess`; komponen bersama
+   `PenilaianKinerja.tsx` di `filesToCopy`): daftar periode, "Perlu saya
+   nilai", isi skor dan catatan, rumus disiplin, Simpan (offline boleh),
+   Ajukan (sinkron dulu, §21.4). Template dan Final hanya Web/Desktop (Q-72).
+   Ajukan di tab Kinerja Desktop memakai alur sinkron yang sama.
+
+### 21.10 Tidak dikerjakan di fase ini
+
+- Penilaian diri oleh karyawan (Q-3) dan penilaian 360°/banyak penilai
+  (Q-73).
+- SP mengurangi nilai disiplin (Q-77); SP hanya informasi.
+- Kait nilai kinerja ke gaji, bonus, kenaikan, atau perpanjangan kontrak.
+- Target KPI numerik per aspek, kalibrasi, dan distribusi paksa.
+- Template bawaan yang ditanam saat provisioning.
+- Laporan kehadiran yang membaca perjalanan driver (hanya disiplin yang
+  membacanya).
+- Cetak A4 dan ekspor Excel hasil penilaian.
+- Kejadian Telegram (fase 8, Q-32).
+
+### 21.11 Langkah
+
+| # | Langkah | Gerbang |
+| :-- | :-- | :-- |
+| 1 | **Skema v41**: enam tabel di keempat lapis (`storage.rs` Desktop DAN Mobile diubah manual, tidak disalin `sync:mobile`), `SNAPSHOT_TABLES` (termasuk `columns`) Desktop dan Mobile ↔ `SNAPSHOT_SOURCES`, `delete_missing` §21.2, `PendingGuard::induk_tertunda` untuk `hr_kinerja_nilai`; indeks dibuat sesudah tabelnya (aturan 20); sentinel `-2037` + `ensure_schema_current`, `CURRENT_SCHEMA_VERSION`/`CLIENT_SCHEMA_VERSION` 41, `REQUIRED_TABLE_COUNT` 96, daftar `isDatabaseSchemaReady` (`db-schema.ts`), `schema-consistency.test.ts`, `PROMOTION_PLAN`, `CLOUD_MIRRORED_TABLES` dan pembuangan saat pindah database; daftar sentinel di tes `turso.rs` dan tes skema ikut disesuaikan. Tidak ada seed; bila pemilik meminta template bawaan, seed berjalan sesudah `ensure_column`/`hasColumn` di ketiga lapis. | `audit:schema` + tes sentinel/provisioning/pindah database Rust |
+| 2 | **Aturan kembar** `hr_kinerja.rs` ↔ `validations/hr-kinerja.ts`: `validasi_template`, `template_karyawan`, `periode_rentang`, rentang aktif, `validasi_penilaian`, `sidik_penilaian`, `status_kinerja`, `periksa_aksi_kinerja`, `tanda_kinerja`, `hitung_disiplin`, `nilai_akhir`, `predikat`, `kinerja_berlaku`, `validasi_pengaturan_kinerja`; SQL kembar `DISIPLIN_*_SQL` diperiksa harfiah. Vektor §21.6 dan §21.7. Pengaturan kinerja TIDAK masuk `BATAS_PENGATURAN` (tes `pengaturan_kontrak` dan "pengaturan kontrak" tidak berubah). | `bun run sync:mobile` dulu (tes teks SQL membaca salinan Mobile), lalu `bun run test` (per berkas; jumlah baris "0 fail" = jumlah berkas `*.test.ts`) + `cargo test hr_kinerja` |
+| 3 | **Handler cloud** tiga rute: template + bawaan idempoten, penilaian hanya selama belum Final/Batal, keputusan tanpa penolakan. | tes `TursoClient::local_file`: save sesudah Final dilewati; dua bawaan → satu; `Batal` menang; `final_gugur` |
+| 4 | **Command lokal + outbox** (transaksi tunggal), detail membaca SP cloud setelah koneksi SQLite ditutup; jumlah argumen `Statement` pas dengan placeholder. | tes alur Rust (`tests_alur::alur_fase6_kinerja`: buat, isi, ajukan, Ajukan ditolak saat `rincian` basi lalu lolos setelah simpan ulang, kembalikan, final, koreksi, diri sendiri ditolak, keluar berlaku) |
+| 5 | **Web**: service, rute `/api/hris/performance`, gateway. | `services/hr-kinerja.test.ts` (alur Web sama dengan langkah 4) |
+| 6 | **RBAC**: `catalog.ts` (4 izin), `CONFIDENTIAL_PERMISSIONS`/`SENSITIVE_MUTATION_PERMISSIONS`, baris izin + `NOT IN` seed Admin Rust, seed HRD dan Atasan Rust + `DEFAULT_ROLE_PERMISSIONS`, area `pengajuan`, `rbac-migration.test.ts` + versi 41; 7 command di keempat tempat; daftar harapan `audit-sync-contract.ts` (3 rute, 6 tabel snapshot, jumlah command; pengetatan, bukan pelonggaran) dan angka di dokumen skill; `hr.performance.finalize` tertulis di `CLAUDE.md`. | `audit:contract` + `audit:docs` + `web-rbac-boundary` |
+| 7 | **Layar** §21.9 (Web/Desktop dan tab Mobile). | typecheck + Biome |
+| 8 | `bun run sync:mobile`, bagian `CLAUDE.md` "HRIS fase 6", catatan "Sudah dibangun". | `audit:docs`; `bun run check` penuh oleh pemilik |
+
+### 21.12 Penanda yang ditinjau pemilik saat menyetujui
+
+- **Q-72 jalan tengah** (§21.4): draf offline, Ajukan sinkron dulu; bila
+  sinkron gagal, Ajukan tetap jalan dengan peringatan. Ini mengurangi, bukan
+  menghilangkan, angka disiplin yang basi dan penilaian ganda.
+- **Akibat Q-71**: nilai, skor, dan catatan penilai tersalin ke SQLite setiap
+  perangkat, termasuk terminal scanner (berbeda dengan Q-30 dan Q-63).
+  Kerahasiaan hanya dijaga izin di command dan rute.
+- Satu penilaian per periode hanya ditegakkan di perangkat; kembaran offline
+  menjadi tanda, bukan ditolak cloud.
+- Enam tabel, bukan empat (§12): pemetaan jabatan dan keputusan butuh tabel
+  sendiri; pemetaan tidak menambah kolom ke `hr_jabatan`.
+- Bawaan: periode `Semester`, ambang disiplin 950/900/800/700, predikat
+  90/75/60/40/0.
+- Skor disiplin tidak bisa ditimpa penilai, kecuali D = 0.
+- Hari perjalanan driver dihitung tepat waktu walau tanpa scan; laporan
+  kehadiran tetap menampilkannya `-`.
+- Ajukan terbuka sejak hari terakhir periode, memakai tanggal perangkat.
+- Koreksi dibuat pemegang `finalize` saja; penilai yang juga memfinalkan
+  diizinkan dengan tanda `dinilai_dan_difinalkan_sama` (preseden Q-28).
+- Template bawaan tidak ditanam; tanpa template bawaan, karyawan yang
+  jabatannya belum dipetakan belum bisa dinilai.
+- **Semua perangkat wajib diperbarui sebelum penilaian dipakai**: perangkat
+  v40 tidak mengenal tiga rute baru dan enam tabel snapshot.
+
+### 21.13 Jawaban fase 6 (11 Nov 2026)
+
+| No | Pertanyaan | Jawaban |
+| :-- | :-- | :-- |
+| Q-71 | Data kinerja khusus cloud atau tersinkron | Tersinkron semua (template, aspek, penilaian, nilai), termasuk ke terminal scanner |
+| Q-72 | Atasan menilai dari HP | Ya, Mobile juga (tab di `/pengajuan`); Final dan template tetap Web/Desktop. Dijawab ulang 12 Nov 2026: draf boleh offline, Ajukan menjalankan sinkron dulu dan menghitung ulang disiplin; bila sinkron gagal, tetap bisa diajukan dengan peringatan (§21.4) |
+| Q-73 | Jumlah penilai per karyawan per periode | Satu penilaian; bawaan atasan langsung, penilai lain boleh mengambil alih selama draf, namanya tercatat |
+| Q-74 | Skor 1–5 ke 0–100 | (skor − 1) × 25 |
+| Q-75 | Rumus disiplin | Rasio: tepat 1, terlambat ½, Alfa 0; Cuti/Izin/Sakit/Dinas Luar berlaku dan S/I/Dispen koreksi dikeluarkan dari pembagi; permil ke skor lewat ambang yang bisa disunting |
+| Q-76 | Hari wajib tanpa catatan | Sama dengan Alfa, ditampilkan terpisah sebagai "tanpa catatan" |
+| Q-77 | SP di penilaian | Informasi saja, tidak mengubah angka |
+| Q-78 | Template yang sudah dipakai | Boleh diubah; penilaian membekukan salinan aspek dan bobot, draf bisa muat ulang |
+| Q-79 | Jabatan tanpa template / karyawan tanpa jabatan | Template bawaan (satu, ditandai) |
+| Q-80 | Masuk/keluar/ganti jabatan di tengah periode | Dinilai atas rentang aktif dengan tanda; template menurut jabatan saat dibuat; sesudah keluar berlaku tidak ada penilaian baru, draf tetap bisa diselesaikan |
+| Q-81 | Bentuk koreksi | Penilaian koreksi utuh merujuk akar, alasan wajib, final ulang oleh HRD |
+| Q-82 | Bentuk periode | Kalender, satu jenis per perusahaan (`hr_kinerja_periode`); penilaian bertumpuk ditolak di perangkat |
+| Q-83 | Izin memfinalkan | Izin baru `hr.performance.finalize`, sensitif, paket HRD |
+| Q-84 | Kerahasiaan izin | `view` dan `assess` rahasia; `config` tidak |
+| Q-85 | Yang terbaca pemegang `assess` tanpa `view` | Semua penilaian, kecuali penilaian atas dirinya; itu hanya terbaca setelah Final lewat `view` |
+
+### 21.14 Sudah dibangun (12 Nov 2026)
+
+Langkah 1–8 dibangun. Gerbang yang dijalankan: `audit:schema` (96 tabel wajib,
+90 tabel dipromosikan), `audit:contract` (90 rute, 68 tabel snapshot, command
+Desktop 286 / Mobile 292), dan `audit:docs` lulus; `cargo test --lib` Desktop
+425 dan Mobile 429 lulus (termasuk `hr_kinerja::tests` dengan vektor §21.6 dan
+§21.7, `tests_alur::alur_fase6_kinerja`, `kinerja_cloud_bawaan_final_batal_dan_gugur`,
+`sentinel_2036_memicu_skema_kinerja`, dan `nilai_kinerja_terlindungi_oleh_outbox_penilaian`);
+runner tes TS kedua workspace (`bun run test`, 92 dan 83 berkas) lulus, termasuk
+`validations/hr-kinerja.test.ts` (vektor kembar, teks SQL dan pesan kembar
+Rust ↔ TS, juga salinan Mobile), `services/hr-kinerja.test.ts` (alur Web sama
+dengan alur Rust), dan `web-rbac-boundary.test.ts` (paket izin bawaan); typecheck
+kedua workspace dan Biome berkas yang diubah bersih. `bun run check` penuh belum
+dijalankan (pemilik). Layar belum dicoba di aplikasi yang berjalan.
+
+Penyimpangan dan catatan, untuk ditinjau:
+
+- **DDL lebih ketat dari §21.2**: `NOT NULL` pada `tipe` (aspek dan nilai),
+  `periode_jenis`, dan `jenis` keputusan; `is_aktif` aspek `NOT NULL DEFAULT 1`;
+  `urutan` nilai `NOT NULL DEFAULT 0`; `created_at`/`updated_at`
+  `NOT NULL DEFAULT (datetime('now'))`; CHECK periode tingkat tabel.
+- **Nama domain dan kunci payload** yang ditetapkan: `hr-performance-template`,
+  `hr-performance` (penilaian), `hr-performance-decision`; payload
+  `hrPerformanceTemplates`, `…Aspects`, `…Positions`, `…Reviews`, `…Scores`,
+  `…Decisions`. Bentuk event: `{ template, aspek, jabatan }`,
+  `{ penilaian, nilai }`, dan baris keputusan datar.
+- **`waktu_perangkat` keputusan berpresisi milidetik dan selalu sesudah
+  keputusan sebelumnya** (`WAKTU_KEPUTUSAN_SQL`, kembar): tanpa itu Ajukan dan
+  Kembalikan di detik yang sama berurutan acak dan statusnya ikut acak.
+- **Simpan ditolak bila sudah ada `Final`/`Batal` dengan sidik apa pun**
+  (`PESAN_FINAL_LAMA`), termasuk Draf karena `final_gugur`: cloud akan
+  melewatinya, jadi perangkat menolak daripada menyimpan diam-diam.
+- **Melepas jabatan di cloud** hanya berlaku bila jabatan itu masih milik
+  template pengirim (tidak tertulis di §21.2), supaya perangkat lama tidak
+  membatalkan pemindahan dari perangkat lain.
+- **`rincian` saat D = 0** berbentuk `0|0|0|0|0|<dikecualikan>||a5,a4,a3,a2`
+  (P kosong). `bukan_atasan_langsung` juga muncul bila penilai tidak punya
+  `id_karyawan`; `final_dibatalkan` = ada `Batal` dan ada `Final` sidik apa pun.
+- **Isian nilai kosong atau muat ulang template** mempertahankan skor
+  tersimpan. Karyawan, periode, dan `id_ref` tidak bisa diubah setelah
+  penilaian dibuat; koreksi wajib memakai karyawan dan periode akarnya.
+- **Libur dan whitelist disiplin** dibaca `muat_kalender` ↔ `muatKalender`
+  (isinya sama dengan `LAPORAN_KEHADIRAN_SQL.libur`/`.whitelist`).
+- **Tambahan di luar §21.9**: `daftar` menerima saringan `id_karyawan`
+  (riwayat semua periode, untuk tab Kinerja rincian karyawan) dan menandai
+  `berlaku` per penilaian. `hris::tulis_pengaturan` diekstrak dari
+  `simpan_pengaturan` dan dipakai pengaturan kinerja.
+- **Urutan langkah**: RBAC dan pendaftaran tujuh command dikerjakan bersama
+  langkah 5 (rute Web memakai `PermissionKey`, gateway memanggil command), sisa
+  langkah 6 (area `pengajuan`, dokumen skill, tes batas) sesudahnya.
+- **Gateway Ajukan** menyimpan ulang isian form di kedua jalur sebelum
+  memutus; Desktop/Mobile menjalankan `syncNow()` lebih dulu (Q-72).
+- **Belum dikerjakan**: perlindungan `PendingGuard` untuk baris aspek dan
+  pemetaan yang menumpang event template (tidak diminta §21.2; aspek bisa
+  dijaga lewat awalan `<id_template>:`, pemetaan tidak). Tab Kinerja `/hris`
+  butuh area `hris` (`employees.view`); HRD dan Atasan bawaan memegangnya.
+- Tes lama yang disesuaikan: daftar sentinel tes `turso.rs` + `-2037`, daftar
+  versi migrasi `rbac-migration.test.ts` + 41, daftar tabel
+  `schema-consistency.test.ts` + 6. Daftar harapan `audit-sync-contract.ts`
+  + 3 rute dan + 6 tabel snapshot (pengetatan, bukan pelonggaran).

@@ -1,18 +1,31 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { PengajuanWorkspace } from "@/components/hris/PengajuanWorkspace";
+import { PenilaianKinerja } from "@/components/hris/PenilaianKinerja";
 import { MobileAppShell } from "@/components/MobileAppShell";
-import { canAccessArea } from "@/lib/auth/access";
+import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useHydrated } from "@/lib/hooks/useHydrated";
+
+type Tab = "pengajuan" | "penilaian";
 
 export default function MobilePengajuanPage() {
   const isHydrated = useHydrated();
   const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const allowed = canAccessArea(user, "pengajuan");
+  // Area `pengajuan` juga terbuka untuk penilai kinerja (§21.8); tiap tab
+  // memeriksa izinnya sendiri dan backend memeriksa ulang.
+  const bolehPengajuan =
+    hasPermission(user, "hr.request.view") ||
+    hasPermission(user, "reimburse.decide");
+  const bolehPenilaian =
+    hasPermission(user, "hr.performance.assess") ||
+    hasPermission(user, "hr.performance.view");
+  const [pilihan, setPilihan] = useState<Tab | null>(null);
+  const tab: Tab = pilihan ?? (bolehPengajuan ? "pengajuan" : "penilaian");
 
   // Static export Mobile tidak punya rute /forbidden.
   useEffect(() => {
@@ -30,10 +43,42 @@ export default function MobilePengajuanPage() {
         <div>
           <h1 className="text-base font-bold text-white">Cuti & Izin</h1>
           <p className="text-xs text-slate-400">
-            Ajukan dan putuskan cuti, izin, dan sakit karyawan
+            Ajukan dan putuskan cuti, izin, dan sakit karyawan, serta nilai
+            kinerja bawahan
           </p>
         </div>
-        {isAuthenticated && allowed ? <PengajuanWorkspace /> : null}
+        {isAuthenticated && allowed && bolehPengajuan && bolehPenilaian ? (
+          <div
+            className="flex flex-wrap gap-2"
+            role="tablist"
+            aria-label="Bagian pengajuan"
+          >
+            {(
+              [
+                ["pengajuan", "Cuti & Izin"],
+                ["penilaian", "Penilaian"],
+              ] as Array<[Tab, string]>
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                id={`pengajuan-tab-${id}`}
+                type="button"
+                role="tab"
+                aria-selected={tab === id}
+                onClick={() => setPilihan(id)}
+                className={`min-h-10 rounded-xl px-4 text-sm font-bold ${tab === id ? "bg-sky-500 text-white" : "bg-slate-900 text-slate-300"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {isAuthenticated && allowed && tab === "pengajuan" && bolehPengajuan ? (
+          <PengajuanWorkspace />
+        ) : null}
+        {isAuthenticated && allowed && tab === "penilaian" && bolehPenilaian ? (
+          <PenilaianKinerja modeHp />
+        ) : null}
       </div>
     </MobileAppShell>
   );
