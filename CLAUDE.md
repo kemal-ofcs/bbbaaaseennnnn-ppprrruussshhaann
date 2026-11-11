@@ -1096,6 +1096,118 @@ tabel, rute, command, atau izin baru: lima kolom di `hr_pengajuan`
   perangkat v37 memakai `PENGAJUAN_RENTANG_SQL` lama dan melewatkan Alfa
   karyawannya.
 
+## HRIS fase 4: reimbursement (schema versi 39)
+
+Rincian dan keputusan pemilik di `prd-hris.md` §19 (Q-59 sampai Q-62). Logika
+di `desktop/hr_pengajuan.rs` (disalin ke Mobile) ↔ `validations/hr-pengajuan.ts`
++ `services/hr-pengajuan.ts`, vektor sama (`hr-pengajuan-reimburse.test.ts` ↔
+`fase4_*`), SQL kembar diperiksa harfiah oleh `hr-pengajuan.test.ts`. Sentinel
+`-2035`, `REQUIRED_TABLE_COUNT` 86.
+
+- **Klaim = baris `hr_pengajuan` berkelompok `Reimburse`**, kategori = jenis
+  pengajuan (lima bawaan `jns-rmb-*`, pemutus `reimburse.decide`, wajib nota).
+  Kolom baru tanpa CHECK: `hr_jenis_pengajuan.batas_bulanan`,
+  `hr_pengajuan.nominal`, `hr_pengajuan_keputusan.nominal_disetujui`; ketiganya
+  di `SNAPSHOT_TABLES.columns`. Seed jenis kini menulis `batas_bulanan`, jadi di
+  ketiga lapis seed berjalan SESUDAH kolomnya dipastikan ada (`storage.rs` kedua
+  workspace, `db-migrations.ts`). Handler `hr-request-type/save` menimpa
+  `batas_bulanan` hanya bila payload membawa kuncinya (perangkat v38).
+- **Isian**: satu tanggal biaya (tidak di masa depan), nominal 1–1.000.000.000,
+  tanpa urgent (dipaksa 0 saat jenis disimpan), sidik + nominal. Klaim tidak
+  pernah bertumpuk (`bentrok_pengajuan` cabang pertama) dan tidak diperiksa
+  periode gaji `PAID`.
+- **Setujui** Reimburse wajib `nominal_disetujui` 1–nominal (lebih kecil = alasan
+  wajib); nominal berlaku = nominal disetujui keputusan yang berlaku, kosong =
+  diajukan (`KLAIM_BERLAKU_SQL`). Batal ditolak bila klaim sudah dibayar atau ada
+  di proses gaji tidak ditolak. Tanda: `lewat_batas` (peringatan batas bulanan),
+  `dibayar_ganda`, `dibayar_batal`; nota kosong tampil di rincian.
+- **Status bayar tidak disimpan** (`status_bayar` ↔ `statusBayar`): Dibayar
+  (pembayaran terpisah aktif atau `breakdown_snapshot.reimburse` run `PAID`),
+  Dalam proses gaji, Belum dibayar. Pembayaran terpisah `hr_reimburse_bayar` +
+  `_baris` (rute `hr-reimburse-payment/create`, pola `drv_upah_bayar`, pembatalan
+  `batal-<id_bayar>`) selalu tersedia, juga untuk cuti diuangkan (`uang:`,
+  Q-62); total dari nominal berlaku, satu karyawan per pembayaran. Penyesuaian
+  `uang:` yang sudah dibayar tidak bisa dibatalkan. Pembukuannya jurnal manual.
+- **Mode `hr_reimburse_bayar`** (`terpisah` bawaan / `gaji`, lewat aksi aturan
+  cuti): `reimburse_gaji` ↔ `reimburseGaji` di rekap DAN pembekuan, ditambahkan
+  SESUDAH kasbon (`net = pay.net − kasbon + reimburse`), bruto/PPh/BPJS tidak
+  berubah. Saat `PAID`, `periksa_reimburse_run` ↔ `periksaReimburseRun` (di
+  `catat_pembayaran_payroll_tx` ↔ `catatPembayaranPayrollTx`) menolak klaim yang
+  tidak berlaku, berubah nominal, atau sudah dibayar di tempat lain; jurnal
+  `pay-<run>` mendebit `akun-beban-reimburse` (5-1650, akun sistem baru).
+- RBAC: `reimburse.decide` sensitif (memutus jenisnya, mencatat dan membatalkan
+  pembayaran, membaca ringkasan), tidak ikut paket Admin. Daftar, rincian, dan
+  lampiran juga terbuka untuk `reimburse.decide` tanpa `hr.request.view`, tetapi
+  hanya klaim Reimburse; area `pengajuan` menerima keduanya. Lampiran boleh
+  diubah pemegang pemutus jenisnya. Command baru `desktop_hr_reimburse_overview`,
+  `desktop_hr_reimburse_pay`, `desktop_hr_reimburse_pay_cancel`; Web aksi
+  `bayar-ringkasan`, `bayar`, `batal-bayar` di `/api/hris/requests`.
+- Layar: saringan Reimburse dan tab Pembayaran (`PembayaranReimburse.tsx`, di
+  `filesToCopy`) di `/pengajuan`; pemutus, batas, dan cara bayar di Organisasi
+  `/hris`; baris "Reimburse" di sel Gaji Bersih dan bagian reimbursement di slip.
+- **Semua perangkat wajib diperbarui** sebelum klaim dipakai: perangkat v38
+  menolak cuti di tanggal berklaim dan bisa memutus klaim tanpa nominal.
+
+## HRIS fase 5: surat peringatan dan karyawan keluar (schema versi 40)
+
+Rincian dan keputusan pemilik di `prd-hris.md` §20 (Q-63 sampai Q-70). Logika
+`desktop/hr_keluar.rs` (disalin ke Mobile) ↔ `validations/hr-keluar.ts` +
+`services/hr-keluar.ts`, vektor sama; SQL kembar diperiksa harfiah oleh
+`hr-keluar.test.ts`. Sentinel `-2036`, `REQUIRED_TABLE_COUNT` 90.
+
+- **Khusus cloud** (Q-63): `hr_sp`, `hr_keluar`, `hr_keluar_rincian`,
+  `hr_keluar_alasan` (alasan bawaan dari `validations/hr-keluar-alasan-bawaan.json`,
+  `INSERT OR IGNORE` hanya di `turso.rs` dan `db-migrations.ts`). Tidak ada
+  rute outbox. Yang tersinkron hanya kolom `master_data.id_keluar`, yang
+  **hanya** ditulis transaksi cloud Berlakukan/Batalkan (`BERLAKUKAN_SQL`,
+  `BATALKAN_SQL`, kembar) dan tidak pernah ditulis handler `employee/*`.
+- **Status SP dan keluar tidak disimpan** (`status_sp`, `status_keluar`).
+  Pencabutan SP dan pembatalan keluar adalah kolom yang diisi sekali, bukan
+  baris `batal-<id>` (tabelnya khusus cloud). Masa SP `hr_sp_masa_bulan`
+  (entri `BATAS_PENGATURAN`, bawaan 6) dibekukan per SP.
+- **Berlakukan** terbuka sejak `tanggal_terakhir` (jam database WIB), satu batch:
+  `hr_keluar.berlaku_*` + potret checklist, `master_data` Nonaktif +
+  `tanggal_selesai_aktif` + `id_keluar`, `master_operator.status` Nonaktif, dan
+  sesi Web akun itu dicabut. Ditolak untuk diri sendiri dan untuk karyawan yang
+  tertaut ke Superadmin aktif terakhir. **Batalkan** mengembalikan
+  `master_data`, tidak pernah mengaktifkan akun.
+- **Anti-zombie** (aturan 33): selama `id_keluar` terisi, handler cloud
+  `employee/create|update|status` dan Web `services/employee.ts` memaksa
+  `Nonaktif` dan mempertahankan `tanggal_selesai_aktif`
+  (`STATUS_AKTIF_KELUAR_SQL`, `TANGGAL_SELESAI_KELUAR_SQL`); lokal
+  `update_employee`/`set_employee_status` menolak mengaktifkan
+  (`PESAN_SUDAH_KELUAR`). Normalisasi ada di biner pengirim, jadi **semua
+  perangkat wajib diperbarui sebelum fitur keluar dipakai**.
+- **Sesi personil nonaktif** (Q-70): `require_any_permission` dan login offline
+  menolak akun yang `id_karyawan`-nya menunjuk personil tidak Aktif di SQLite
+  lokal (`tolak_personil_nonaktif`), untuk semua akun termasuk Superadmin.
+- **Gaji terakhir** (Q-67): rekap Rust dan `computePayrollRecap` memakai
+  `KARYAWAN_REKAP_SQL` (Aktif, atau `id_keluar` terisi dan
+  `tanggal_selesai_aktif` ≥ awal periode).
+- **Pesangon** (§20.5): usulan bilangan bulat, dibulatkan ke rupiah terdekat.
+  Upah sebulan FLAT_DAILY = 30 × harian, HOURLY = tarif × 173, tunjangan tetap
+  diisi HRD; UP/UPMK menurut tahun masa kerja dari `tanggal_daftar` × pengali
+  persen per alasan; UPH Cuti = sisa cuti periode berjalan × `upah_harian`;
+  kompensasi PKWT = upah × bulan / 12. Nominal dan upah yang berbeda dari usulan
+  wajib beralasan; rincian beku sejak berlaku. Kasbon dan klaim belum dibayar
+  hanya checklist (Q-68); pembayaran pesangon jurnal manual.
+- Checklist dibaca dari SQLite lokal di Desktop (`muat_lokal`) dan dari cloud di
+  Web: pinjaman barang (`PINJAMAN_PERSONIL_SQL`), sisa kasbon
+  (`sisa_kasbon_karyawan`), klaim/`uang:` belum dibayar, pengajuan sesudah hari
+  terakhir (`PENGAJUAN_SESUDAH_SQL`), akun tertaut, kartu ID (centang).
+- RBAC (Q-69): `hr.warning.view`, `hr.warning.manage`, `hr.offboard.view`
+  rahasia (`CONFIDENTIAL_PERMISSIONS`, paket HRD); `hr.warning.cancel` dan
+  `hr.offboard.manage` sensitif tanpa paket. Command `desktop_hr_warnings`,
+  `desktop_hr_warning_save`, `desktop_hr_warning_revoke`,
+  `desktop_hr_offboardings`, `desktop_hr_offboarding`,
+  `desktop_hr_offboarding_save`, `desktop_hr_offboarding_apply`,
+  `desktop_hr_offboarding_cancel`, `desktop_hr_exit_reasons_save`; Web
+  `POST /api/hris/offboarding`.
+- Layar (Web/Desktop): tab SP di rincian karyawan (`SuratPeringatanPanel.tsx`,
+  cetak A4 `cetakSuratPeringatan.ts`) dan tab Keluar di `/hris`
+  (`KeluarWorkspace.tsx`, termasuk alasan dan pengali). Halaman Karyawan Web
+  menampilkan "Keluar <tanggal>".
+
 ## Domain contoh
 
 `master_item` dan `log_aktivitas` adalah tabel peraga yang memperagakan pola

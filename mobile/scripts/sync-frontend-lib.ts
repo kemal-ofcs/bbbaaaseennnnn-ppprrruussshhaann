@@ -21,6 +21,8 @@ const filesToCopy = [
   "components/personnel/IsianOrganisasi.tsx",
   // Pengajuan cuti/izin/sakit HRIS (v37, Q-52): satu layar untuk kedua build.
   "components/hris/PengajuanWorkspace.tsx",
+  // Pembayaran terpisah reimbursement (HRIS v39), dipakai PengajuanWorkspace.
+  "components/hris/PembayaranReimburse.tsx",
   "components/ui/KonfirmasiData.tsx",
   // Pengirim notifikasi Telegram: berjalan di setiap sesi login, identik di kedua build.
   "components/AutoTelegramRunner.tsx",

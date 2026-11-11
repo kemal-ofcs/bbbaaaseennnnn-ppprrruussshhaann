@@ -8,7 +8,10 @@ A-4, A-5 disetujui; A-2 ditolak (Q-38). "Urutan pengerjaan fase 1" ada di §16
 Q-47 sampai Q-54; catatan dan penyimpangan di §17.12), `bun run check` penuh
 belum dijalankan (pemilik). **Fase 3 dibangun** (§18, jawaban Q-55 sampai
 Q-58; catatan dan penyimpangan di §18.11), `bun run check` penuh lulus
-(10 Nov 2026).
+(10 Nov 2026). **Fase 4 dibangun** (§19, jawaban Q-59 sampai Q-62; catatan
+dan penyimpangan di §19.11), `bun run check` penuh belum dijalankan (pemilik).
+**Fase 5 dibangun** (§20, jawaban Q-63 sampai Q-70; catatan dan penyimpangan
+di §20.13), `bun run check` penuh belum dijalankan (pemilik).
 
 ---
 
@@ -1590,3 +1593,825 @@ Penyimpangan dan catatan, untuk ditinjau:
   irisan jam dinilai di garis waktu tanggal itu.
 - Tidak ada tes Rust khusus untuk audit dengan tukar shift; penggantian shiftnya
   satu baris dan diuji di TS (`hr-pengajuan-fase3.test.ts`).
+
+## 19. Urutan pengerjaan fase 4
+
+Ditulis setelah menelusuri kode (10 Nov 2026). Q-59 sampai Q-62 dijawab
+pemilik (§19.9) dan isi bagian ini mengikuti jawabannya. Bila §8 dan bagian ini
+berbeda, **bagian ini yang berlaku**.
+
+### 19.1 Temuan dari kode
+
+- CHECK `hr_jenis_pengajuan.kelompok`/`hr_pengajuan.kelompok` sudah memuat
+  `Reimburse` dan CHECK `izin_pemutus` sudah memuat `reimburse.decide`; handler
+  cloud `hr-request-type/save` dan `hr-request/save` juga sudah menerimanya.
+  Yang menolak hanya aplikasi: `KELOMPOK_AKTIF`, `validasi_jenis` (memaksa
+  `izin_pemutus = hr.request.decide`), dan `SEED_JENIS_SQL` (menanam
+  `'hr.request.decide'` sebagai literal).
+- `putuskan` sudah membaca `izin_pemutus` dari jenisnya, jadi pemutus per jenis
+  tinggal dipakai. Gerbang command `desktop_hr_request_decide` masih
+  `hr.request.submit`/`hr.request.decide` saja; `desktop_hr_requests` dan
+  halaman `/pengajuan` butuh `hr.request.view`.
+- **`bentrok_pengajuan` akan menolak klaim**: lengan bawaannya (`a.tidak_hadir()
+  || b.tidak_hadir()`) dan lengan Lembur membuat klaim di tanggal cuti atau
+  lembur dianggap bertumpuk. Reimburse wajib dikecualikan paling awal.
+- `tolak_bila_dibayar` (`PERIODE_DIBAYAR_SQL`) dipanggil saat ajukan, Setujui,
+  dan Batal. Untuk klaim ini salah sasaran: nota bulan lalu yang gajinya sudah
+  dibayar justru kasus biasa.
+- Pembaca absensi dan gaji fase 2–3 (`PENGAJUAN_RENTANG_SQL`,
+  `LAPORAN_PENGAJUAN_SQL`, `SPL_RENTANG_SQL`, `TUKAR_RENTANG_SQL`,
+  `tanggal_wajib`, `hadir_saat_cuti`) sudah menyaring kelompok, jadi klaim tidak
+  menyentuh Alfa, audit, laporan, `cuti_dibayar`, atau SPL.
+- `hr_pengajuan_keputusan` append-only (`ON CONFLICT DO NOTHING`) dan tidak
+  punya kolom nominal. Nominal yang disetujui adalah milik keputusan, bukan isi
+  pengajuan, jadi menaruhnya di keputusan tidak menyentuh sidik.
+- **Kait gaji kasbon**: `pinjaman_aktif` membaca potongan yang sudah masuk
+  proses gaji lewat `json_each(breakdown_snapshot, '$.kasbon')` dari run yang
+  tidak `REJECTED`; saat `PAID`, `periksa_potongan_payroll` menolak bila
+  kasbonnya sudah tidak sah ("Tolak proses gaji ini lalu buat ulang"), lalu
+  `catat_pembayaran_payroll_tx` menulis angsuran dan jurnal `pay-<run>`. Kasbon
+  yang masih ada di proses gaji belum dibayar tidak bisa dibatalkan
+  (`PESAN_POTONGAN_TERTUNDA`).
+- Engine gaji: HOURLY `net = gross − potongan − BPJS karyawan − PPh 21`,
+  FLAT_DAILY `net = gross − potongan`; kasbon dikurangkan SESUDAH engine.
+  Tambahan yang ditempel sesudah engine otomatis tidak kena pajak/BPJS.
+- Rekap gaji hanya memuat `master_data.status_aktif = 'Aktif'`: klaim karyawan
+  yang sudah keluar tidak pernah ikut gaji.
+- `susun_jurnal_payroll`: `potongan_lain = gross − net − pph21 − bpjs_k −
+  kasbon`. Menambah reimbursement ke `net` tanpa suku baru membuat baris
+  Potongan Gaji Lain ter-debit.
+- Slip (`SlipGajiPrintView`) menampilkan `components` per kategori
+  ALLOWANCE/DEDUCTION; tunjangan dari komponen ikut bruto.
+- Cuti diuangkan: baris `uang:<karyawan>:<periode>` (`Diuangkan`, nominal
+  beku). `akhir_periode` menampilkan semua baris itu sebagai "Perlu dibayar"
+  tanpa status bayar.
+- Pola pembayaran terpisah ada di driver v35 (`drv_upah_bayar`/`_baris`,
+  `bayar_aktif`, `periksa_bayar_upah`, `periksa_batal_bayar`, `tanda_upah`).
+- Tidak ada role Keuangan bawaan (hanya Admin, HRD, Atasan, Driver).
+- Lampiran fase 2: pengaju atau `hr.request.decide` yang boleh mengubah.
+- **Perangkat v38** membaca baris klaim dari snapshot: `bentrok_pengajuan`
+  lamanya menolak cuti di tanggal yang punya klaim, daftar lamanya menampilkan
+  klaim tanpa nominal, dan ia bisa memutus klaim (izin dibaca dari jenis) tanpa
+  nominal disetujui. Semua perangkat wajib diperbarui sebelum klaim dipakai.
+
+### 19.2 Model data (skema v39, sentinel `-2035` `hris-reimburse-v1`)
+
+**Klaim = baris `hr_pengajuan` berkelompok `Reimburse`** (bukan tabel sendiri).
+Status, keputusan, Batal, sidik, lampiran, daftar, dan layar fase 2 dipakai apa
+adanya; tabel sendiri berarti menyalin seluruh mesin itu.
+
+**Kategori = jenis pengajuan berkelompok `Reimburse`** (Q-59), bukan
+`hr_reimburse_kategori`: jenis sudah punya nama, aktif/nonaktif,
+`izin_pemutus`, dan `wajib_dokumen` (= wajib nota).
+
+**Kolom baru** (`CREATE` di keempat lapis + `ensure_column`/`hasColumn`, tanpa
+CHECK, pola §18.2; WAJIB juga di `SNAPSHOT_TABLES.columns` Desktop dan Mobile):
+
+| Kolom | Arti |
+| :-- | :-- |
+| `hr_jenis_pengajuan.batas_bulanan` INTEGER | rupiah per karyawan per bulan, kosong = tanpa batas; hanya Reimburse; peringatan saja |
+| `hr_pengajuan.nominal` INTEGER | rupiah yang diajukan; hanya Reimburse, 1–1.000.000.000 |
+| `hr_pengajuan_keputusan.nominal_disetujui` INTEGER | hanya `Setujui` atas Reimburse, 1–`nominal` |
+
+- `UPSERT_JENIS_SQL`, `UPSERT_PENGAJUAN_SQL`, `INSERT_KEPUTUSAN_SQL`,
+  `CLOUD_INSERT_KEPUTUSAN_SQL` (Rust = TS) + kolomnya.
+- Handler `hr-request-type/save` menimpa `batas_bulanan` **hanya bila payload
+  membawa kuncinya** (pola `atribut` inventaris): perangkat v38 yang menyimpan
+  jenis lain tidak boleh menghapus batas. `nominal` tidak butuh itu (v38 tidak
+  pernah menyimpan Reimburse), keputusan insert-only.
+
+**Tabel tersinkron baru** (keempat lapis, `SNAPSHOT_TABLES` = `SNAPSHOT_SOURCES`,
+`delete_missing: false`, append-only, tanpa `UNIQUE` selain PK, tanpa
+`PendingGuard`), pola `drv_upah_bayar`:
+
+| Tabel | Kolom | Snapshot / rute |
+| :-- | :-- | :-- |
+| `hr_reimburse_bayar` | `id_bayar` PK (`rbb-<acak>`, pembatalan `batal-<id_bayar>`); `jenis` CHECK IN (`Bayar`, `Pembatalan`); `id_ref`; `id_karyawan` NOT NULL; `tanggal` NOT NULL (WIB); `total` INTEGER NOT NULL CHECK `>= 0`; `keterangan`; `dicatat_oleh` NOT NULL; `created_at`. Indeks `(id_karyawan, tanggal)` | `hr-reimburse-payment` / `hr-reimburse-payment/create` (header + baris satu event, pembatalan juga) |
+| `hr_reimburse_bayar_baris` | `id_baris` PK (`<id_bayar>:<id_klaim>`); `id_bayar` NOT NULL; `sumber` CHECK IN (`Reimburse`, `Cuti Diuangkan`); `id_klaim` NOT NULL (id pengajuan, atau id penyesuaian `uang:`); `nominal` INTEGER NOT NULL CHECK `>= 0` (disalin saat dibayar). Indeks `id_bayar`, `id_klaim` | domain snapshot `hr-reimburse-payment-line`, tanpa rute push |
+
+Handler cloud `ON CONFLICT DO NOTHING`, tidak pernah menolak karena aturan
+bisnis.
+
+**Seed** (`INSERT OR IGNORE`, tanpa outbox):
+
+- `hr-jenis-bawaan.json` + kunci opsional `izin_pemutus` (bawaan
+  `hr.request.decide`) dan `batas_bulanan`; `SEED_JENIS_SQL` membaca
+  `izin_pemutus` sebagai argumen, bukan literal. Lima jenis baru
+  `jns-rmb-transport`, `jns-rmb-kesehatan`, `jns-rmb-makan`, `jns-rmb-dinas`,
+  `jns-rmb-lainnya`: kelompok Reimburse, `reimburse.decide`, `wajib_dokumen` 1,
+  urgent tidak, batas kosong.
+- `akun-bawaan.json`: `akun-beban-reimburse` 5-1650 "Beban Reimbursement
+  Karyawan", Beban, `sistem: true` (Q-61).
+
+**Pengaturan** `setting_gex_system.hr_reimburse_bayar` = `gaji` | `terpisah`,
+bawaan **`terpisah`** (gaji tidak berubah sampai pemilik memilih), lewat
+`desktop_hr_leave_settings_save` / aksi `aturan` yang diperluas (pola §18.11).
+
+Kedua jalur: `CURRENT_SCHEMA_VERSION`/`CLIENT_SCHEMA_VERSION` 39, sentinel
+`-2035` + angka `ensure_schema_current`, `REQUIRED_TABLE_COUNT` 86,
+`PROMOTION_PLAN`, purge pindah database, dan `CLOUD_MIRRORED_TABLES` (kedua
+tabel baru).
+
+### 19.3 Klaim, sidik, dan status
+
+- **Isian** (`validasi_pengajuan`/`periksa_jenis` ↔ kembar): satu tanggal biaya
+  (`tanggal_mulai = tanggal_selesai`, tidak lewat hari ini WIB), `nominal`
+  1–1.000.000.000, `alasan` = keperluan, tanpa setengah hari dan kolom fase 3.
+- **Jenis Reimburse** (`validasi_jenis`): `dampak_gaji` dipaksa `Tidak
+  Berpengaruh`, `potong_jatah` 0, `maks_hari` kosong, **`boleh_urgent` dipaksa
+  0** (urgent = atasan menyetujui sendiri, melewati Keuangan). `izin_pemutus`
+  bisa dipilih `hr.request.decide` atau `reimburse.decide` untuk semua jenis
+  (Q-2); `batas_bulanan` kosong atau 1–1.000.000.000.
+- **Sidik**: sembilan bagian fase 2 + `nominal` untuk Reimburse; sidik kelompok
+  lain tidak berubah.
+- **Status, keputusan, Batal**: fase 2 apa adanya (`berlaku_sql!`).
+- **Bertumpuk**: `bentrok_pengajuan` ↔ `bentrokPengajuan` mengembalikan `false`
+  bila salah satunya Reimburse (cabang pertama).
+- **Periode gaji dibayar**: `tolak_bila_dibayar` dilewati untuk Reimburse;
+  gantinya Batal ditolak bila klaim **sudah dibayar atau ada di proses gaji
+  yang tidak ditolak** (§19.4), pesan pola `PESAN_POTONGAN_TERTUNDA`.
+- **Nominal disetujui** (`periksa_aksi` diperluas): `Setujui` atas Reimburse
+  wajib `nominal_disetujui` 1–`nominal`; lebih kecil dari `nominal` = alasan
+  wajib. Aksi lain dan kelompok lain menolak nilai ini. **Nominal berlaku**
+  (`nominal_berlaku` ↔ `nominalBerlaku`) = `nominal_disetujui` keputusan yang
+  berlaku, kosong (keputusan dari perangkat v38) = `nominal`.
+- `KLAIM_BERLAKU_SQL` (`?1` = sampai tanggal): klaim Reimburse berlaku +
+  nominal berlakunya, subkueri `nominal_disetujui` dengan `ORDER BY` yang sama
+  dengan `berlaku_sql!`; teks kembar Rust ↔ TS.
+- **Tanda baru** (tidak menolak): `lewat_batas` (jumlah klaim Menunggu +
+  berlaku karyawan itu, jenis itu, bulan tanggal biaya > `batas_bulanan`;
+  Menunggu dihitung `nominal`, berlaku `nominal` berlaku), `dibayar_ganda`
+  (§19.4), `dibayar_batal` (dibayar aktif padahal klaim tidak berlaku lagi,
+  lahir dari perangkat offline). `tanpa_nota` = `tanpa_dokumen` fase 2
+  (rincian, saat online).
+
+### 19.4 Pembayaran
+
+**Status bayar diturunkan** (`status_bayar` ↔ `statusBayar`), per klaim
+(Reimburse berlaku, atau baris `uang:` yang tidak dibatalkan):
+
+| Status | Syarat |
+| :-- | :-- |
+| Dibayar | ada pembayaran terpisah aktif (`Bayar` tanpa `batal-<id>`), atau ada di `breakdown_snapshot.reimburse` proses gaji `PAID` |
+| Dalam proses gaji | ada di `breakdown_snapshot.reimburse` proses gaji yang bukan `PAID`/`REJECTED` |
+| Belum dibayar | selain itu |
+
+Lebih dari satu pembayaran aktif (dua terpisah, atau terpisah + proses gaji
+tidak ditolak) = tanda `dibayar_ganda`.
+
+**Pembayaran terpisah** (selalu tersedia, apa pun modenya: karyawan yang sudah
+keluar, cuti diuangkan, dan kebutuhan mendesak tetap bisa dibayar):
+
+- `catat_bayar_reimburse` ↔ `catatBayarReimburse`: satu karyawan, klaim dan/atau
+  baris `uang:` miliknya yang Belum dibayar (`periksa_bayar_reimburse` ↔
+  `periksaBayarReimburse`, hanya di perangkat). `total` = jumlah nominal
+  berlaku saat dicatat, isian tidak membawa total. Tanggal WIB hari ini atau
+  isian (tidak di masa depan), keterangan opsional.
+- Pembatalan `batal-<id_bayar>` (`periksa_batal_bayar`, pola driver), alasan
+  wajib; klaimnya kembali Belum dibayar.
+- Pembukuan: jurnal manual (Q-31), tidak ada jurnal otomatis.
+
+**Mode `gaji`** (Q-20, A-4), pola kasbon:
+
+- `reimburse_gaji(conn, period_end)` ↔ `reimburseGaji`: per karyawan, klaim
+  Reimburse berlaku bertanggal ≤ `period_end` yang Belum dibayar. Hanya bila
+  `hr_reimburse_bayar = gaji`, dibaca saat rekap dihitung termasuk pembekuan
+  (pola Q-57). Cuti diuangkan tidak pernah lewat sini (Q-62).
+- Baris agregat rekap (Rust `desktop_get_payroll_recap` + pembekuan, TS
+  `computePayrollRecap`): kasbon tetap dipotong dari `pay.net` (reimbursement
+  tidak bisa termakan kasbon), lalu `net = pay.net − kasbon + reimburse`.
+  Bruto, PPh 21, BPJS, dan `components` tidak berubah. Baris rekap +
+  `est_reimburse`; `breakdown_snapshot.reimburse` = `[{ id_pengajuan, nominal }]`.
+- Proses gaji `REJECTED` mengembalikan klaimnya ke Belum dibayar dengan
+  sendirinya (`json_each` mengabaikan run ditolak).
+- Saat `PAID` (`catat_pembayaran_payroll_tx` ↔ `catatPembayaranPayrollTx`,
+  transaksi yang sama): `periksa_reimburse_payroll` ↔ kembar menolak bila klaim
+  di run itu sudah tidak berlaku, nominal berlakunya berubah, atau sudah punya
+  pembayaran terpisah aktif / ada di run `PAID` lain: "Tolak proses gaji ini
+  lalu buat ulang." (pola `periksa_potongan_payroll`).
+- Jurnal gaji `pay-<run>` (Q-61): `ItemPayroll.reimburse`, baris Debit
+  `akun-beban-reimburse`, dan `potongan_lain = gross + reimburse − net − pph21
+  − bpjs_k − kasbon`. Sumber tetap `Payroll`, CHECK tidak disentuh.
+- Slip: bagian baru "Reimbursement (tidak kena pajak)" dari
+  `breakdown_snapshot.reimburse`, di atas Gaji Bersih.
+
+**Ganti mode**: tidak ada salinan mode per klaim. `terpisah` → `gaji`: klaim
+Belum dibayar ikut proses gaji berikutnya. `gaji` → `terpisah`: klaim yang
+sudah ada di proses gaji tetap ikut proses itu (sudah dibekukan), sisanya
+menunggu dibayar terpisah. Dialog konfirmasi menyebutkan keduanya.
+
+**Cuti diuangkan** (Q-62): dibayar lewat pembayaran terpisah
+(`sumber = 'Cuti Diuangkan'`). "Perlu dibayar" di tab Cuti dan daftar akhir
+periode menjadi status bayar turunan. PPh 21 atas uang itu dihitung manual.
+Membatalkan penyesuaian `uang:` yang sudah dibayar ditolak.
+
+### 19.5 Hak akses
+
+| Izin | Sensitif | Paket bawaan |
+| :-- | :-- | :-- |
+| `reimburse.decide` | ya | — (diberikan Superadmin; tidak ada role Keuangan bawaan) |
+
+- Masuk `catalog.ts` (grup Kepegawaian), `SENSITIVE_MUTATION_PERMISSIONS`, dan
+  `NOT IN` seed Admin Rust.
+- `reimburse.decide` mencakup memutus dan membatalkan klaim berjenis
+  `reimburse.decide`, mencatat dan membatalkan pembayaran terpisah, dan
+  membaca daftar pembayaran. Tidak ada izin bayar terpisah: §10.1 hanya
+  menyebut satu izin.
+- Daftar pengajuan (`desktop_hr_requests`, Web `query`) dan halaman
+  `/pengajuan` (area `pengajuan`): `hr.request.view` ATAU `reimburse.decide`;
+  tanpa `hr.request.view` hanya klaim Reimburse yang dikembalikan (Keuangan tidak
+  melihat alasan sakit). `desktop_hr_request_decide` + `reimburse.decide`.
+- Mengajukan klaim: `hr.request.submit`. Lampiran (nota) bisa diubah pengaju,
+  `hr.request.decide`, atau pemegang `izin_pemutus` jenisnya.
+- Aturan `hr_reimburse_bayar` dan jenis: `hr.org.manage`.
+
+### 19.6 Command, rute, dan layar
+
+**Rust** (`hr_pengajuan.rs`, disalin ke Mobile): perluasan
+`desktop_hr_request_save` (`nominal`), `desktop_hr_request_decide`
+(`nominalDisetujui`), `desktop_hr_requests` (status bayar, nominal berlaku,
+tanda), `desktop_hr_request_types_save` (`batas_bulanan`, pemutus),
+`desktop_hr_leave_settings_save` (`hr_reimburse_bayar`). Baru:
+`desktop_hr_reimburse_overview` (Belum dibayar dan Dalam proses gaji per
+karyawan, riwayat pembayaran `dari`..`sampai`), `desktop_hr_reimburse_pay`,
+`desktop_hr_reimburse_pay_cancel` (ketiganya `reimburse.decide`). Rekap gaji
+dan `catat_pembayaran_payroll_tx` di `payroll/commands.rs` + `loan.rs`.
+
+**Web**: `validations/hr-pengajuan.ts` + `services/hr-pengajuan.ts`, aksi baru
+di `POST /api/hris/requests` (Zod `.strict()`), gateway `gateways/hr-pengajuan.ts`,
+`payroll-recap.ts`, `PATCH /api/payroll/runs`.
+
+**Layar** (Web, Desktop, Mobile kecuali disebut):
+
+1. `PengajuanWorkspace`: isian Reimburse (kategori = jenis, tanggal biaya,
+   nominal rupiah, keperluan; pemakaian bulan itu dibanding batas); saringan
+   "Reimburse"; rincian dengan nominal diajukan/disetujui, status bayar, dan
+   nota; dialog Setujui Reimburse dengan nominal (bawaan = diajukan) dan alasan
+   bila lebih kecil.
+2. Bagian **Pembayaran** di `/pengajuan` (hanya pemegang `reimburse.decide`):
+   Belum dibayar per karyawan (klaim + cuti diuangkan), pilih lalu Bayar
+   (`konfirmasiData`), Dalam proses gaji (baca saja), riwayat + Batalkan.
+3. Organisasi `/hris` (Web/Desktop): jenis Reimburse dengan pemutus dan batas
+   bulanan; "Aturan cuti dan lembur" + cara bayar reimbursement.
+4. Rekap gaji: baris kecil "Reimburse Rp…" di sel Gaji Bersih (pola SPL §18.11,
+   tanpa kolom baru); slip + bagian reimbursement.
+5. Tab Cuti di rincian karyawan dan daftar akhir periode: status bayar cuti
+   diuangkan.
+
+### 19.7 Tidak dikerjakan di fase ini
+
+- Jurnal otomatis pembayaran terpisah (Q-31), tanda terima cetak, dan tautan
+  klaim ke pengajuan Dinas Luar (uang dinas cukup kategori Dinas).
+- Rentang tanggal per klaim: satu nota satu tanggal; perjalanan beberapa hari
+  diajukan per nota.
+- Kejadian Telegram (fase 8).
+
+### 19.8 Penanda yang ditinjau pemilik saat menyetujui
+
+- Bawaan `hr_reimburse_bayar` = `terpisah`.
+- Urgent tidak berlaku untuk Reimburse.
+- `reimburse.decide` sekaligus izin membayar (tanpa `reimburse.pay`).
+- Pembayaran terpisah tersedia juga di mode `gaji`.
+
+### 19.9 Jawaban fase 4 (10 Nov 2026)
+
+| No | Pertanyaan | Jawaban |
+| :-- | :-- | :-- |
+| Q-59 | Kategori reimbursement | Jenis pengajuan berkelompok Reimburse + kolom `batas_bulanan`; tanpa `hr_reimburse_kategori` |
+| Q-60 | Foto nota | Lampiran khusus cloud Q-51 (`hr_pengajuan_berkas`); nota kosong = tanda `tanpa_nota` |
+| Q-61 | Jurnal gaji mode `gaji` | Akun bawaan baru `akun-beban-reimburse` 5-1650, di jurnal gaji `Payroll` |
+| Q-62 | Cuti diuangkan | Lewat pembayaran terpisah reimbursement apa pun modenya; PPh 21 manual |
+
+### 19.10 Langkah
+
+| # | Langkah | Gerbang |
+| :-- | :-- | :-- |
+| 1 | **Skema v39**: tiga kolom + dua tabel di keempat lapis, `SNAPSHOT_TABLES.columns`, seed jenis dan akun, sentinel `-2035`, `REQUIRED_TABLE_COUNT` 86, promosi, purge, klasifikasi. | `audit:schema` + tes sentinel/provisioning Rust |
+| 2 | **Aturan kembar** `hr_pengajuan.rs` ↔ `validations/hr-pengajuan.ts`: jenis dan isian Reimburse, sidik + nominal, bentrok, `periksa_aksi` + nominal disetujui, `nominal_berlaku`, `KLAIM_BERLAKU_SQL`, `lewat_batas`, `status_bayar`, `periksa_bayar_reimburse`, `periksa_reimburse_payroll`, jurnal gaji. | `bun test` + `cargo test hr_pengajuan loan` |
+| 3 | **Sinkronisasi**: rute `hr-reimburse-payment/create`, handler cloud jenis (kunci `batas_bulanan`), pengajuan, keputusan, pembayaran; penulisan lokal + outbox satu transaksi. | `audit:contract` + `tests_alur` |
+| 4 | **Kait gaji** kedua jalur: rekap, pembekuan, PAID, jurnal, slip. | tes `payroll-recap*`, `loan` + Rust payroll, vektor baru |
+| 5 | **Pembayaran terpisah** + cuti diuangkan. | tes kembar + `tests_alur` |
+| 6 | **RBAC + command + rute + gateway**. | tes Rust + `web-rbac-boundary` |
+| 7 | **Layar** Web/Desktop dan Mobile. | typecheck + Biome |
+| 8 | `bun run sync:mobile`, bagian `CLAUDE.md`, catatan "Sudah dibangun". | `audit:docs`; `bun run check` penuh oleh pemilik |
+
+### 19.11 Sudah dibangun (11 Nov 2026)
+
+Langkah 1–8 dibangun. Gerbang yang dijalankan: `audit:schema` (86 tabel wajib,
+685 kolom di 62 tabel snapshot, 80 tabel dipromosikan), `audit:contract` (87
+rute, 62 tabel snapshot, command Desktop 270 / Mobile 276), dan `audit:docs`
+lulus; `cargo test --lib` Desktop 397 dan Mobile 401 lulus (termasuk
+`tests_alur::alur_fase4_reimburse`, `fase4_*`, `jurnal_payroll` dengan vektor
+reimbursement, dan `sentinel_2034_memicu_skema_reimburse`); runner tes TS kedua
+workspace (`bun run test`) lulus, termasuk `hr-pengajuan-reimburse.test.ts`
+(vektor kembar), `hr-pengajuan.test.ts` (teks SQL kembar Rust ↔ TS, juga
+salinan Mobile), `services/hr-pengajuan-reimburse.test.ts` (alur Web: klaim,
+nominal disetujui, daftar Keuangan, rekap mode `gaji`, PAID dan jurnal
+`pay-<run>`, pembayaran terpisah), `loan.test.ts`, `accounting*`,
+`schema-consistency`, `rbac-migration`, `web-rbac-boundary`; typecheck kedua
+workspace dan Biome berkas yang diubah bersih. `bun run check` penuh belum
+dijalankan (pemilik).
+
+Penyimpangan dan catatan, untuk ditinjau:
+
+- **Keuangan tanpa `hr.request.view` juga hanya membaca rincian dan nota klaim
+  Reimburse** (riwayat keputusan, daftar dan isi lampiran), bukan hanya daftar.
+  §19.5 hanya menyebut daftar; tanpa ini nota cuti/sakit terbaca lewat id.
+- **Kunci `hr_reimburse_bayar` absen dari isian aturan = tidak disimpan**, tidak
+  ditolak seperti kunci lembur (§18.11): layar Organisasi selalu mengirimnya.
+- **Seed jenis bawaan dipindah ke sesudah `ensure_column`** di `storage.rs`
+  Desktop dan Mobile (dan sebelum seed di `db-migrations.ts`), karena seed kini
+  menulis `batas_bulanan`; tanpa itu database lama gagal di seed.
+- **`tanpa_nota` bukan tanda daftar**, sama seperti `tanpa_dokumen` fase 2
+  (§17.12): lampiran khusus cloud, jadi tampil di rincian saat online.
+- `KLAIM_BERLAKU_SQL` juga mengembalikan keterangan (`nama jenis: keperluan`)
+  dan `UANG_BERLAKU_SQL` keterangan periodenya, untuk layar Pembayaran.
+  `GAJI_REIMBURSE_SQL` (klaim di proses gaji tidak ditolak) adalah SQL kembar
+  ketiga.
+- Pesan PAID untuk klaim yang tidak berlaku lagi menyebut id klaim (tanggalnya
+  tidak terbaca dari daftar klaim berlaku); pesan lain menyebut tanggal biaya.
+- Tab "Cuti diuangkan" tetap butuh `hr.request.view` (backend akhir periode);
+  Keuangan membayar cuti diuangkan dari tab Pembayaran.
+- Tab Pembayaran ikut di Mobile karena `PengajuanWorkspace` satu komponen.
+  Halaman gaji Mobile hanya menampilkan total, jadi baris "Reimburse" dan
+  bagian slip hanya di Web/Desktop.
+- Memilih kelompok Reimburse di form jenis langsung mengisi pemutus
+  `reimburse.decide` dan wajib nota (bisa diubah).
+- Daftar harapan audit kontrak ditambah rute `hr-reimburse-payment/create` dan
+  dua tabel snapshot (pengetatan, bukan pelonggaran); hitungan bagan akun di
+  tes naik 27 → 28 (sistem 8 → 9) dan daftar versi migrasi tes RBAC + 39.
+
+## 20. Urutan pengerjaan fase 5
+
+Disetujui pemilik dan dibangun (catatan di §20.13). Ditulis setelah menelusuri
+kode (11 Nov 2026). Q-63 sampai Q-70 sudah dijawab (§20.11) dan isi bagian ini mengikuti
+jawabannya; yang belum disetujui adalah rancangan utuhnya, termasuk penanda di
+§20.10. Bila §9 dan bagian ini berbeda, **bagian ini yang berlaku**.
+
+### 20.1 Temuan dari kode
+
+- **`master_data.tanggal_selesai_aktif` sudah ada** di keempat lapis dan
+  `SNAPSHOT_TABLES`, tetapi hanya isian bebas "Tanggal Selesai Aktif
+  (Opsional)" di form Karyawan; tidak ada logika (scanner, Alfa, gaji) yang
+  membacanya. Kolom itu dipakai sebagai tanggal keluar; tidak ada kolom tanggal
+  baru.
+- **`status_aktif` adalah keadaan tersimpan, bukan turunan.** Scanner
+  (`scanner.rs`, "Karyawan berstatus nonaktif"), Generate Alfa, rekap gaji,
+  penerima `Personil` inventaris, dan daftar akhir periode cuti membaca
+  `status_aktif = 'Aktif'`. Karena itu "keluar" tetap menulis kolom ini, tidak
+  diturunkan dari tabel keluar.
+- **Zombie (aturan 33):** handler cloud `employee/update` menulis
+  `status_aktif = excluded.status_aktif` dengan bawaan `'Aktif'` bila payload
+  tidak membawanya, dan `tanggal_selesai_aktif` dari payload (kosong =
+  dikosongkan). Lokal `update_employee` menulis `status_aktif` dari draf form.
+  `employee/status` dan `desktop_set_employee_status` (`employees.manage`, yang
+  dipegang role HRD) bisa mengaktifkan siapa saja kapan saja. Event lama dari
+  perangkat offline akan menghidupkan karyawan yang sudah keluar.
+- **Handler cloud berjalan di biner pengirim** (`apply_event_to_turso` di
+  perangkat yang mendorong outbox). Normalisasi di handler hanya melindungi bila
+  pengirimnya sudah diperbarui: perangkat v39 tetap bisa mengirim `'Aktif'`
+  mentah.
+- **Rekap gaji hanya memuat `md.status_aktif = 'Aktif'`** (Rust
+  `payroll/commands.rs` di dua kueri, TS `payroll-recap.ts`). Karyawan yang
+  sudah dinonaktifkan tidak ikut proses gaji periode keluarnya.
+- **`master_operator` khusus cloud** (kolom `status`, bawaan `'Aktif'`), jadi
+  tidak bisa ikut transaksi SQLite lokal seperti tertulis di §9.2. Login online
+  sudah menolak akun yang `id_karyawan`-nya menunjuk personil tidak aktif
+  (`turso.rs`, kueri login), tetapi **login offline** (`desktop_login`, snapshot
+  vault) tidak memeriksa `master_data`; hanya laporan driver yang memeriksa ulang
+  personil sesi (`driver.rs`).
+- **Pinjaman barang**: `inventory_mutasi` `alasan = 'Peminjaman'`,
+  `penerima_tipe = 'Personil'`, `penerima_id` = id karyawan; belum kembali =
+  jumlah > jumlah `Pengembalian` (`id_ref`) yang tidak dibatalkan
+  (`list_loans` ↔ `listLoans`, inventaris). Pengembalian tidak membawa penerima,
+  jadi tetap bisa dicatat setelah karyawan keluar; Peminjaman baru ke personil
+  nonaktif sudah ditolak.
+- **Kasbon**: sisa efektif = pokok − angsuran − pelunasan − potongan di proses
+  gaji yang belum dibayar (`BAYAR_SQL`, `PENDING_SQL`, `loan.rs`). Pelunasan
+  Tunai (`pay_off_loan`, jurnal Kas/Piutang) sudah ada; tidak ada jenis mutasi
+  "potong dari pesangon" (CHECK `keu_pinjaman_mutasi.jenis` hanya empat nilai).
+- **Cuti**: `hitung_jatah` mengembalikan periode berjalan dan sisanya;
+  `upah_harian` (FLAT_DAILY = `daily_rate`, HOURLY = tarif × jam normal shift)
+  sudah dipakai cuti diuangkan. Baris `uang:` dan klaim reimburse punya status
+  bayar turunan (§19.4); `akhir_periode` hanya memuat karyawan Aktif.
+- **Dasar upah**: `salary_configs` hanya `HOURLY` (`rate_per_hour`) dan
+  `FLAT_DAILY` (`daily_rate`), berlaku menurut `effective_date`; tidak ada gaji
+  bulanan. `payroll_components` FIXED dibayar penuh per proses gaji (bisa harian
+  atau mingguan), PERCENTAGE dari gaji pokok, `applies_to` = `ALL` atau id
+  karyawan; tidak bisa dibaca sebagai "tunjangan tetap bulanan".
+- **Kontrak**: `kontrak_aktif`, `status_kerja`, `tambah_bulan`, `nomor_hari`
+  (`hris.rs`) dan `tambah_hari` (privat di `hr_pengajuan.rs`) cukup untuk
+  menghitung masa kerja dan kontrak PKWT yang berlaku.
+- **Cetak**: `cetakTandaTerimaUpah.ts` (A4, `#kos-print-root`, `@media print`)
+  memakai `getCompanyBranding` yang hanya nama + logo. Alamat dan nama pimpinan
+  ada di `getCompanyProfile`, yang butuh `settings.manage`.
+- **RBAC**: seed Admin Rust memberi semua izin di luar daftar `NOT IN`, jadi
+  izin baru yang tidak sensitif dan tidak rahasia otomatis ikut Admin. Seed
+  role HRD (`role_key = 'hrd'`, daftar `IN`) dijalankan setiap `ensure_schema`,
+  jadi izin baru di daftar itu ikut ke role HRD yang sudah ada. Tidak ada role
+  Keuangan bawaan.
+- Skema sekarang: v39, sentinel `-2035`, `REQUIRED_TABLE_COUNT` 86, 62 tabel
+  snapshot, 87 rute, command Desktop 270 / Mobile 276.
+
+### 20.2 Model data (skema v40, sentinel `-2036` `hris-keluar-v1`)
+
+**Khusus cloud** (Q-63; hanya `turso.rs` + `db-schema.ts`/`db-migrations.ts`;
+tidak di `storage.rs`, tidak di snapshot, tidak lewat outbox; pola `hr_profil`
+dan `hr_dokumen`). Dibaca dan ditulis command Rust lewat `TursoClient` (atau hub
+pada mode database lokal) dan route Web, hanya saat terhubung. Tanpa `UNIQUE`
+selain PK.
+
+| Tabel | Kolom |
+| :-- | :-- |
+| `hr_sp` | `id_sp` PK (`sp-<acak>`); `id_karyawan` NOT NULL; `tingkat` CHECK IN (`SP1`, `SP2`, `SP3`); `tanggal` NOT NULL (tanggal surat, WIB); `masa_bulan` INTEGER NOT NULL CHECK 1–12 (dibekukan dari pengaturan); `berlaku_sampai` NOT NULL; `nomor` (opsional); `pelanggaran` NOT NULL; `harapan` (perbaikan yang diminta, opsional); `usulan_tingkat` CHECK IN (`SP1`, `SP2`, `SP3`); `alasan_tingkat` (wajib bila `tingkat` ≠ usulan); `penanda_nama` NOT NULL, `penanda_jabatan` NOT NULL; `dicatat_oleh`, `created_at` (jam database); `diubah_oleh`, `diubah_pada`; `dicabut_oleh`, `dicabut_pada`, `alasan_cabut`. Indeks `(id_karyawan, tanggal)`, `berlaku_sampai` |
+| `hr_keluar_alasan` | `id_alasan` PK; `nama` NOT NULL; `pengali_up` INTEGER NOT NULL CHECK 0–1000 (persen dari kelipatan UP); `pengali_upmk` INTEGER NOT NULL CHECK 0–1000; `uph` INTEGER CHECK (0,1); `kompensasi_pkwt` INTEGER CHECK (0,1); `uang_pisah` INTEGER CHECK (0,1); `dasar_hukum`; `is_aktif`; `created_at`, `updated_at`. Menggantikan `hr_pesangon_pengali` di §12 (satu baris alasan sudah memuat pengalinya) |
+| `hr_keluar` | `id_keluar` PK (`klr-<acak>`); `id_karyawan` NOT NULL; `id_alasan` NOT NULL, `alasan_nama` (salinan); `id_sp` (SP yang mendasari, opsional); `tanggal_pemberitahuan` (opsional); `tanggal_terakhir` NOT NULL (hari kerja terakhir); `keterangan`; `masa_kerja_mulai` (salinan `tanggal_daftar`); `upah_pokok` INTEGER NOT NULL CHECK ≥ 0, `usulan_upah_pokok` INTEGER, `alasan_upah` (wajib bila berbeda), `tunjangan_tetap` INTEGER NOT NULL DEFAULT 0 CHECK ≥ 0; `kartu_ditarik` INTEGER CHECK (0,1), `catatan_checklist`; `checklist_saat_berlaku` (JSON potret saat Berlakukan); `dicatat_oleh`, `created_at`, `diubah_oleh`, `diubah_pada`; `berlaku_oleh`, `berlaku_pada`; `dibatalkan_oleh`, `dibatalkan_pada`, `alasan_batal`. Indeks `id_karyawan`, `tanggal_terakhir` |
+| `hr_keluar_rincian` | `id_rincian` PK (`<id_keluar>:<komponen>`); `id_keluar` NOT NULL; `komponen` CHECK IN (`UP`, `UPMK`, `UPH Cuti`, `UPH Ongkos Pulang`, `UPH Lainnya`, `Kompensasi PKWT`, `Uang Pisah`, `Lainnya`); `dasar` (teks hitungan, mis. "masa kerja 5 th: 6 × upah × 50%"); `usulan` INTEGER NOT NULL CHECK ≥ 0; `nominal` INTEGER NOT NULL CHECK ≥ 0; `alasan_ubah` (wajib bila `nominal` ≠ `usulan`); `urutan`. Indeks `id_keluar` |
+
+- Status SP dan status keluar **tidak disimpan** (§20.3, §20.4).
+- Pencabutan SP dan pembatalan keluar adalah **kolom**, bukan baris
+  `batal-<id>` seperti tertulis di §9.1: tabelnya khusus cloud, jadi tidak ada
+  dua perangkat offline yang perlu digabung. Kolomnya diisi sekali
+  (`WHERE dicabut_pada IS NULL`), dengan jam database (pola `hr_dokumen`).
+- **Seed alasan** `INSERT OR IGNORE` berid tetap dari
+  `validations/hr-keluar-alasan-bawaan.json` (Rust `include_str!`, TS import),
+  di `turso.rs` dan `db-migrations.ts` saja, sesudah `CREATE`. Aman di-seed
+  karena tidak pernah lewat outbox. Nilai bawaannya di §20.5.
+
+**Tersinkron** (keempat lapis): satu kolom baru `master_data.id_keluar` TEXT
+(boleh kosong). `CREATE` + `ensure_column`/`hasColumn`, **WAJIB** juga di
+`SNAPSHOT_TABLES.columns` `master_data` Desktop dan Mobile, dan di `storage.rs`
+Mobile yang diubah manual (tidak disalin `sync:mobile`). Kolom ini **hanya
+ditulis transaksi cloud** Berlakukan/Batal (§20.4) dan tertarik ke perangkat
+lewat snapshot; tidak ada rute, handler `employee/*` tidak pernah menulisnya,
+dan perangkat tidak pernah mengirimnya. Gunanya: perangkat offline tahu
+karyawan ini keluar (menolak "aktifkan lagi", tanda di daftar, rekap gaji
+§20.6) tanpa menyalin isi `hr_keluar`.
+
+**Pengaturan** (`setting_gex_system`, tanpa perubahan skema):
+`hr_sp_masa_bulan` = 6 (1–12), entri baru `BATAS_PENGATURAN` ↔ kembar, lewat
+`desktop_hr_settings_save` yang sudah ada.
+
+Kedua jalur: `CURRENT_SCHEMA_VERSION`/`CLIENT_SCHEMA_VERSION` 40, sentinel
+`-2036` + angka `ensure_schema_current`, `REQUIRED_TABLE_COUNT` 90, keempat
+tabel cloud ikut `PROMOTION_PLAN` (`hr_keluar_rincian` bergantung `hr_keluar`,
+keduanya bergantung `master_data`). Jumlah tabel snapshot (62) dan rute (87)
+tidak berubah.
+
+### 20.3 Surat peringatan
+
+- **Status turunan** (`status_sp` ↔ `statusSp`, per tanggal WIB): `Dicabut`
+  bila `dicabut_pada` terisi, `Berlaku` bila `tanggal` ≤ hari ini ≤
+  `berlaku_sampai`, selain itu `Berakhir`.
+- **Masa berlaku**: `berlaku_sampai` = `tambah_bulan(tanggal, masa_bulan)`
+  dikurangi satu hari (`tambah_hari(…, -1)`; `tambah_hari` dijadikan publik dan
+  dipakai bersama). 10 Jan + 6 bulan = berlaku s.d. 9 Jul; 31 Agu + 6 bulan =
+  s.d. 27 Feb (28 Feb dipotong ke akhir bulan, lalu dikurangi satu hari).
+  `masa_bulan` dibekukan per SP, jadi mengganti pengaturan tidak mengubah SP
+  lama.
+- **Eskalasi** (`usulan_tingkat` ↔ `usulanTingkat`): SP Berlaku tertinggi pada
+  tanggal SP baru + 1, tanpa SP Berlaku = SP1, maksimal SP3. Bila SP3 masih
+  Berlaku, usulan tetap SP3 dan hasilnya membawa `sp3_berlaku: true`; layar
+  menampilkan "Mulai proses keluar" (alasan bawaan PHK Pelanggaran, `id_sp`
+  terisi). Tingkat lain dari usulan = `alasan_tingkat` wajib.
+- **Isian** (`validasi_sp` ↔ `validasiSp`): karyawan Aktif; `tanggal` tidak di
+  masa depan (jam database WIB) dan tidak sebelum `tanggal_daftar`;
+  `pelanggaran` 1–2.000 karakter; `harapan` dan `alasan_tingkat` ≤ 1.000;
+  `nomor` ≤ 100; penanda tangan wajib (nama dan jabatan teks, layar mengisi
+  bawaan dari SP terakhir). Tidak untuk diri sendiri (`id_karyawan` sesi), baik
+  membuat, mengubah, maupun mencabut.
+- **Ubah**: hanya `nomor`, `pelanggaran`, `harapan`, penanda tangan, selama
+  tidak dicabut (`hr.warning.manage`). Tingkat dan tanggal terkunci; salah
+  tingkat = cabut lalu buat ulang.
+- **Cabut** (`hr.warning.cancel`): alasan wajib, sekali.
+- **Cetak A4** (`components/hris/cetakSuratPeringatan.ts`, pola
+  `cetakTandaTerimaUpah`): kop nama, logo, dan alamat; nomor, tanggal, kepada
+  (nama, jabatan, divisi kini), tingkat, pelanggaran, harapan, masa berlaku,
+  penanda tangan, dan kolom tanda terima karyawan. SP yang dicabut tercetak
+  dengan tanda DICABUT. Kop dibaca command SP dari `company_profile` cloud,
+  bukan dari `getCompanyProfile` (yang butuh `settings.manage`), jadi
+  `getCompanyBranding` tidak diubah. Hanya Web/Desktop (layar SP tidak ada di
+  Mobile, Q-43).
+
+### 20.4 Karyawan keluar
+
+**Status turunan** (`status_keluar` ↔ `statusKeluar`): `Dibatalkan` bila
+`dibatalkan_pada` terisi; `Berlaku` bila `berlaku_pada` terisi; `Jatuh tempo`
+bila `tanggal_terakhir` ≤ hari ini WIB; selain itu `Dijadwalkan` (Q-64).
+
+**Catat dan ubah** (`hr.offboard.manage`, selama Dijadwalkan atau Jatuh tempo):
+
+- Satu proses yang tidak dibatalkan per karyawan (diperiksa di transaksi cloud).
+  Karyawan Aktif. Tidak untuk diri sendiri.
+- `tanggal_terakhir` ≥ `tanggal_daftar`, boleh di masa depan;
+  `tanggal_pemberitahuan` ≤ `tanggal_terakhir`. Alasan harus aktif.
+- Setiap simpan menghitung ulang usulan (§20.5) dan menulis ulang
+  `hr_keluar_rincian` dalam satu transaksi; `nominal` yang tidak sama dengan
+  usulan wajib beralasan. Usulan dihitung Rust dari SQLite lokal (semua
+  masukannya tabel tersinkron: `salary_configs`, `hr_kontrak`, jatah cuti) dan
+  Web dari cloud, dengan fungsi kembar yang sama.
+- Selama belum berlaku, `master_data` tidak berubah: karyawan tetap bisa scan,
+  ikut Alfa, dan ikut gaji.
+
+**Checklist** (dibaca hidup, tidak menolak apa pun; command membaca SQLite
+lokal, Web membaca cloud; kueri kembar):
+
+| Butir | Sumber |
+| :-- | :-- |
+| Barang dipinjam belum kembali | `PINJAMAN_PERSONIL_SQL` (potongan `list_loans` + `penerima_tipe = 'Personil' AND penerima_id = ?`), teks kembar |
+| Sisa kasbon | pinjaman `Disetujui` dengan sisa efektif > 0 (`BAYAR_SQL`, `PENDING_SQL`) |
+| Reimburse dan cuti diuangkan belum dibayar | `KLAIM_BERLAKU_SQL`, `UANG_BERLAKU_SQL` + `status_bayar` (§19.4); dibayar lewat Pembayaran reimburse yang sudah ada |
+| Pengajuan sesudah tanggal terakhir | pengajuan Menunggu atau berlaku yang `tanggal_selesai` > `tanggal_terakhir` |
+| Akun operator tertaut | `master_operator.id_karyawan` (cloud; Desktop offline: "butuh koneksi") |
+| Kartu ID ditarik | centang manual `kartu_ditarik` |
+
+Ringkasan: total rincian, lalu baris informasi "dikurangi sisa kasbon" dan
+"perkiraan diterima" (Q-68). Tidak disimpan sebagai angka, kecuali di potret
+`checklist_saat_berlaku`.
+
+**Berlakukan** (`hr.offboard.manage`; terbuka sejak `tanggal_terakhir`, jam
+database WIB). Satu batch pipeline cloud (pola hapus dokumen §16.2), setiap
+statement dijaga keadaan `hr_keluar` yang sama sehingga tekan ganda tidak
+menggandakan:
+
+1. `hr_keluar`: `berlaku_oleh`, `berlaku_pada = datetime('now')`,
+   `checklist_saat_berlaku` (potret checklist + ringkasan); rincian terkunci
+   sejak ini.
+2. `master_data`: `status_aktif = 'Nonaktif'`, `tanggal_selesai_aktif =
+   tanggal_terakhir`, `id_keluar = id_keluar`.
+3. `master_operator`: `status = 'Nonaktif'` untuk akun ber-`id_karyawan` itu
+   (Q-70).
+
+Ditolak bila karyawan itu tertaut ke akun Superadmin aktif terakhir ("Pindahkan
+peran Superadmin dulu") atau ke akun sesi sendiri. Sesudahnya layar memanggil
+`syncNow()` supaya `master_data` perangkat langsung tertarik; trigger
+`sync_pulse` `master_data` memberi tahu perangkat lain. Dialog Berlakukan
+menyebut bahwa scan ditolak sejak saat itu (tekan setelah jam pulang hari
+terakhir), dan bila ditekan terlambat, jumlah Alfa sistem sesudah
+`tanggal_terakhir`.
+
+**Batalkan** (`hr.offboard.manage`, sensitif, Q-65): alasan wajib, kapan saja,
+tidak untuk diri sendiri. Bila sudah berlaku, batch yang sama mengembalikan
+`master_data` (`status_aktif = 'Aktif'`, `tanggal_selesai_aktif` dan
+`id_keluar` dikosongkan, hanya `WHERE id_keluar = ?`). Akun operator **tidak**
+diaktifkan lagi (Superadmin dari menu Operator). Bekerja kembali bertahun-tahun
+kemudian = data karyawan baru.
+
+**Normalisasi status** (melawan zombie, kembar di semua jalur penulis):
+
+- Handler cloud `employee/create|update` (upsert) dan `employee/status`:
+  `status_aktif = CASE WHEN master_data.id_keluar IS NOT NULL THEN 'Nonaktif'
+  ELSE <nilai payload> END`, dan `tanggal_selesai_aktif` dipertahankan bila
+  `id_keluar` terisi. Tidak menolak, pola normalisasi divisi §16.3. Jalur Web
+  `services/employee.ts` (buat, ubah, ubah status, impor) memakai potongan SQL
+  yang sama.
+- Lokal `update_employee`, `set_employee_status`, dan impor karyawan: bila
+  `id_keluar` lokal terisi, mengaktifkan ditolak ("Karyawan ini sudah keluar.
+  Batalkan proses keluarnya di HRIS untuk mengaktifkannya lagi.") dan isian
+  status/tanggal selesai dari draf diabaikan.
+- **Sesi personil nonaktif** (Q-70): login offline dan setiap command
+  (pemeriksaan di `require_permission`/`require_any_permission`) menolak sesi
+  yang `id_karyawan`-nya menunjuk personil tidak Aktif di SQLite lokal, pola
+  laporan driver. Berlaku untuk semua akun, termasuk Superadmin.
+
+### 20.5 Usulan pesangon
+
+Semua aritmetika `i64` ↔ `number` bilangan bulat (aturan 13); batas masukan
+menjaga hasil di bawah 2^53. Pembulatan: rupiah terdekat, setengah ke atas.
+Fungsi murni `usulan_pesangon` ↔ `usulanPesangon` dengan vektor uji yang sama.
+
+**Upah sebulan** (Q-66), dari `salary_configs` terakhir yang `effective_date` ≤
+`tanggal_terakhir`:
+
+| `salary_type` | Usulan upah pokok |
+| :-- | :-- |
+| `FLAT_DAILY` | 30 × `daily_rate` (Pasal 157 UU 13/2003 jo. UU 6/2023) |
+| `HOURLY` | `rate_per_hour` × 173 (pembagi upah sejam Kepmenakertrans 102/2004) |
+| tidak ada | 0, HRD wajib mengisi |
+
+Tunjangan tetap diisi HRD (bawaan 0); komponen ALLOWANCE aktif yang berlaku
+untuk karyawan itu ditampilkan sebagai acuan, tidak dijumlahkan. **Upah** =
+`upah_pokok` + `tunjangan_tetap`, maksimal 1.000.000.000.
+
+**Masa kerja**: dari `masa_kerja_mulai` (= `tanggal_daftar`, Q-41) sampai
+`tambah_hari(tanggal_terakhir, 1)` (eksklusif). `bulan_penuh(mulai, akhir)` =
+n terbesar dengan `tambah_bulan(mulai, n)` ≤ akhir; tahun = bulan_penuh / 12.
+`tanggal_daftar` kosong = UP dan UPMK tidak diusulkan (usulan 0, dasar "tanggal
+masuk kosong").
+
+| Komponen | Usulan |
+| :-- | :-- |
+| UP | kelipatan = min(tahun + 1, 9); `(upah × kelipatan × pengali_up + 50) / 100` |
+| UPMK | kelipatan = 0 bila tahun < 3, 10 bila tahun ≥ 24, selain itu tahun / 3 + 1; `(upah × kelipatan × pengali_upmk + 50) / 100` |
+| UPH Cuti | hanya bila alasan `uph`: sisa cuti periode yang memuat `tanggal_terakhir` (`hitung_jatah`, bukan `sebelum_berhak`, sisa > 0) × `upah_harian` yang sudah ada (Q-68) |
+| Kompensasi PKWT | hanya bila alasan `kompensasi_pkwt` dan kontrak berlaku pada `tanggal_terakhir` berjenis PKWT (`status_kerja`): bulan = max(`bulan_penuh(kontrak.tanggal_mulai, akhir)`, 1); `(upah × bulan + 6) / 12` (PP 35/2021 Pasal 16) |
+| UPH Ongkos Pulang, UPH Lainnya, Lainnya | 0, diisi HRD |
+| Uang Pisah | baris hanya muncul bila alasan `uang_pisah`; 0, diisi HRD menurut PK/PP/PKB |
+
+Contoh vektor: upah 5.000.000, masuk 2020-03-15, terakhir 2026-03-14 → 72
+bulan, 6 tahun; UP 7 × 5.000.000 = 35.000.000 × pengali; UPMK 3 × 5.000.000 =
+15.000.000 × pengali. Terakhir 2026-03-13 → 71 bulan, 5 tahun: UP 6×, UPMK 2×.
+
+**Alasan bawaan** (PP 35/2021, **wajib dicek ulang klien**; pengali dalam
+persen, semua bisa disunting):
+
+| `id_alasan` | Nama | UP | UPMK | UPH | Kompensasi PKWT | Uang pisah | Dasar |
+| :-- | :-- | --: | --: | :--: | :--: | :--: | :-- |
+| `klr-resign` | Resign | 0 | 0 | ya | | ya | Pasal 50 |
+| `klr-habis-kontrak` | Habis Kontrak | 0 | 0 | ya | ya | | Pasal 15–16 |
+| `klr-efisiensi` | PHK Efisiensi | 100 | 100 | ya | | | Pasal 43 ayat 2 (karena kerugian: 50) |
+| `klr-pelanggaran` | PHK Pelanggaran | 50 | 100 | ya | | | Pasal 52 ayat 1 (pelanggaran mendesak ayat 2: 0/0 + uang pisah) |
+| `klr-pensiun` | Pensiun | 175 | 100 | ya | | | Pasal 56 |
+| `klr-meninggal` | Meninggal | 200 | 100 | ya | | | Pasal 57 |
+| `klr-sakit` | Sakit Berkepanjangan | 200 | 100 | ya | | | Pasal 55 |
+| `klr-lainnya` | Lainnya | 0 | 0 | ya | | | diisi HRD |
+
+Mengubah alasan atau pengali tidak mengubah proses keluar yang sudah berlaku
+(rinciannya beku); proses yang masih Dijadwalkan memakai nilai baru saat
+disimpan berikutnya.
+
+### 20.6 Gaji terakhir (Q-67, perubahan A-4)
+
+- Rekap dan pembekuan gaji Rust (`payroll/commands.rs`, kedua kueri yang kini
+  `md.status_aktif = 'Aktif'`) dan `computePayrollRecap` (`payroll-recap.ts`)
+  memakai satu potongan SQL kembar `KARYAWAN_REKAP_SQL` (teks diperiksa identik
+  Rust ↔ TS): `md.status_aktif = 'Aktif' OR (md.id_keluar IS NOT NULL AND
+  md.tanggal_selesai_aktif >= <period_start>)`.
+- Absensi sesudah `tanggal_terakhir` tidak ada (scan ditolak, Alfa tidak
+  dibuat), jadi yang dibayar hanya sampai hari terakhir. Kasbon dan reimburse
+  mode `gaji` ikut kait yang sudah ada tanpa perubahan.
+- Baris rekap karyawan keluar diberi tanda "Keluar <tanggal>".
+- `id_keluar` dipakai, bukan `status_aktif = 'Nonaktif'` saja, supaya karyawan
+  yang dinonaktifkan manual dengan `tanggal_selesai_aktif` lama tidak ikut.
+
+### 20.7 Hak akses (Q-69)
+
+| Izin | Sensitif | Rahasia | Paket bawaan |
+| :-- | :-- | :-- | :-- |
+| `hr.warning.view` | | ya | HRD |
+| `hr.warning.manage` | | ya | HRD |
+| `hr.warning.cancel` | ya | | — |
+| `hr.offboard.view` (baru, tidak ada di §10.1) | | ya | HRD |
+| `hr.offboard.manage` | ya | | — |
+
+- Rahasia = `CONFIDENTIAL_PERMISSIONS` (tidak ikut paket Admin Web) dan `NOT
+  IN` seed Admin Rust; sensitif = `SENSITIVE_MUTATION_PERMISSIONS` dan `NOT
+  IN`. Seed role HRD Rust dan `DEFAULT_ROLE_PERMISSIONS.hrd` + tiga izin.
+- Membaca daftar dan rincian keluar: `hr.offboard.view` atau
+  `hr.offboard.manage` (`requireAnyWebPermission`). Membaca SP: `hr.warning.view`.
+- Menyunting alasan dan pengali: `hr.offboard.manage` (uang). Masa SP:
+  `hr.org.manage` (aksi pengaturan yang sudah ada).
+- Halaman `/hris` tetap area `hris`; tab SP dan Keluar memeriksa izinnya
+  sendiri, backend memeriksa ulang (aturan 10).
+
+### 20.8 Command, rute, dan layar
+
+**Rust** (`desktop/hr_keluar.rs` baru, disalin ke Mobile lewat daftar salin;
+terdaftar di kedua `lib.rs`, `build.rs`, `capabilities/default.json`; command
+khusus cloud memberi pesan "butuh koneksi ke database" saat
+`TURSO_NOT_CONFIGURED` atau jaringan gagal):
+
+| Command | Izin |
+| :-- | :-- |
+| `desktop_hr_warnings` (riwayat per karyawan + usulan tingkat, atau daftar SP Berlaku) | `hr.warning.view` |
+| `desktop_hr_warning_save` (buat dan ubah) | `hr.warning.manage` |
+| `desktop_hr_warning_revoke` | `hr.warning.cancel` |
+| `desktop_hr_offboardings` (daftar dan status) | `hr.offboard.view` / `manage` |
+| `desktop_hr_offboarding` (rincian atau pratinjau per karyawan: header, rincian, usulan, checklist) | `hr.offboard.view` / `manage` |
+| `desktop_hr_offboarding_save` | `hr.offboard.manage` |
+| `desktop_hr_offboarding_apply` (Berlakukan) | `hr.offboard.manage` |
+| `desktop_hr_offboarding_cancel` | `hr.offboard.manage` |
+| `desktop_hr_exit_reasons_save` | `hr.offboard.manage` |
+
+Perubahan yang ada: `desktop_hr_settings_save` (`hr_sp_masa_bulan`),
+`set_employee_status`/`update_employee`/impor (penjaga `id_keluar`), handler
+cloud `employee/*`, login offline dan pemeriksaan sesi, rekap gaji.
+
+**Web**: `validations/hr-keluar.ts` + `services/hr-keluar.ts` (kembar Rust),
+rute `POST /api/hris/warnings` dan `POST /api/hris/offboarding` (Zod
+`.strict()`, aksi per operasi, tanpa `GET`), gateway `gateways/hr-keluar.ts`,
+`services/employee.ts`, `payroll-recap.ts`.
+
+**Layar** (Web/Desktop; Mobile hanya butir 5, Q-43):
+
+1. Rincian karyawan `/hris`, tab **SP**: riwayat dengan status, Buat SP
+   (usulan tingkat, alasan bila berbeda, `konfirmasiData`), ubah teks, Cabut
+   (ketik alasan), Cetak.
+2. Tab **Keluar** di `/hris`: daftar Dijadwalkan / Jatuh tempo / Berlaku /
+   Dibatalkan; rincian dengan checklist, rincian pesangon (usulan, nominal,
+   alasan), ringkasan netto, Berlakukan, Batalkan. "Mulai proses keluar" dari
+   rincian karyawan dan dari SP3 Berlaku.
+3. Organisasi `/hris`: alasan keluar + pengali (`hr.offboard.manage`), masa SP
+   (`hr.org.manage`).
+4. Rekap gaji: tanda "Keluar <tanggal>" di baris karyawan keluar.
+5. Halaman Karyawan Web/Desktop dan Mobile: tanda "Keluar <tanggal>" dari
+   `id_keluar`; tombol Aktifkan dinonaktifkan dengan pesan.
+
+### 20.9 Tidak dikerjakan di fase ini
+
+- Jurnal otomatis pesangon (Q-31) dan status "pesangon sudah dibayar":
+  pembayarannya jurnal manual. PPh 21 final atas pesangon (PP 68/2009) dihitung
+  manual.
+- Potong kasbon dari pesangon secara otomatis (Q-68): pelunasan lewat
+  Pelunasan Tunai yang ada.
+- Kompensasi PKWT pada setiap perpanjangan kontrak (bukan saat keluar), dan
+  ganti rugi PKWT yang diputus sebelum waktunya (Pasal 62 UU 13/2003): baris
+  `Lainnya`.
+- Cetak surat keterangan kerja (paklaring) dan cetak rincian pesangon.
+- Surat jalan driver yang masih terbuka dan upah surat jalan belum dibayar di
+  checklist (bisa ditambah sebagai butir baru tanpa skema).
+- Nomor SP otomatis (nomor diisi HRD, pola nomor kontrak).
+- Kejadian Telegram "SP berakhir" (fase 8; isi SP tidak pernah dikirim, Q-32).
+
+### 20.10 Penanda yang ditinjau pemilik saat menyetujui
+
+- Pengali bawaan §20.5 (terutama Efisiensi 100 bukan 50, dan UPH/uang pisah per
+  alasan) dan konstanta 30 hari / 173 jam.
+- Pencabutan SP dan pembatalan keluar sebagai kolom, bukan baris `batal-<id>`;
+  `hr_pesangon_pengali` digabung ke `hr_keluar_alasan`.
+- Berlakukan terbuka sejak `tanggal_terakhir` (bukan H+1): ditekan di hari
+  terakhir menolak scan pulang hari itu; ditekan terlambat meninggalkan Alfa
+  sistem sesudah hari terakhir (jumlahnya ditampilkan di dialog, tidak dihapus).
+- Rincian pesangon beku sejak berlaku; koreksi sesudahnya = Batalkan lalu catat
+  ulang (yang ikut mengaktifkan karyawan sesaat).
+- UPH Cuti dihitung untuk setiap alasan ber-`uph`, apa pun aturan
+  `hr_cuti_sisa` (hangus/dibawa/diuangkan), karena itu hak saat putus hubungan
+  kerja.
+- Masa kerja dari `tanggal_daftar` saja; kontrak lama tidak disambung otomatis.
+- Proses gaji terakhir membayar tunjangan FIXED penuh (perilaku engine hari ini,
+  sama dengan karyawan yang masuk di tengah periode).
+- Penjaga sesi personil nonaktif berlaku untuk semua akun, termasuk Superadmin;
+  Berlakukan ditolak untuk karyawan yang tertaut ke Superadmin aktif terakhir.
+- **Semua perangkat wajib diperbarui sebelum fitur keluar dipakai**: perangkat
+  v39 menjalankan handler `employee/*` lama saat mendorong outbox dan bisa
+  mengirim `status_aktif = 'Aktif'` tanpa normalisasi.
+
+### 20.11 Jawaban fase 5 (11 Nov 2026)
+
+| No | Pertanyaan | Jawaban |
+| :-- | :-- | :-- |
+| Q-63 | SP dan keluar tersinkron atau khusus cloud | Khusus cloud (pola `hr_profil`); transaksi cloud mengubah `master_data` dan akun; kolom tersinkron `master_data.id_keluar` |
+| Q-64 | Tanggal efektif di masa depan | Dijadwalkan; "Berlakukan" terbuka sejak tanggal terakhir dan baru saat itu status Nonaktif ditulis |
+| Q-65 | Batal / aktif lagi | Batal kapan saja dengan alasan (`hr.offboard.manage`); mengaktifkan kembali karyawan, tidak akunnya; aktifkan dari halaman Karyawan ditolak selama keluar berlaku |
+| Q-66 | Dasar upah pesangon | Dari konfigurasi gaji (FLAT_DAILY 30 × harian, HOURLY tarif × 173) + tunjangan tetap diisi HRD; bisa diubah dengan alasan |
+| Q-67 | Gaji terakhir | Rekap gaji memuat karyawan keluar yang tanggal keluarnya di dalam periode |
+| Q-68 | Kasbon, klaim belum dibayar, sisa cuti | Kasbon dan klaim hanya checklist (dilunasi/dibayar lewat jalur yang ada); sisa cuti periode berjalan = baris UPH usulan |
+| Q-69 | Siapa membaca SP dan keluar | `hr.warning.view/manage` dan izin baru `hr.offboard.view` rahasia, paket HRD; `hr.offboard.manage` dan `hr.warning.cancel` sensitif tanpa paket |
+| Q-70 | Akun operator tertaut | Dinonaktifkan di transaksi cloud yang sama; login offline dan sesi menolak personil nonaktif |
+
+### 20.12 Langkah
+
+| # | Langkah | Gerbang |
+| :-- | :-- | :-- |
+| 1 | **Skema v40**: 4 tabel khusus cloud di `turso.rs` + `db-schema.ts`/`db-migrations.ts`, seed alasan dari JSON sesudah `CREATE`; kolom `master_data.id_keluar` di keempat lapis (`storage.rs` Desktop DAN Mobile diubah manual, `ensure_column`/`hasColumn`, `SNAPSHOT_TABLES.columns` Desktop dan Mobile); sentinel `-2036` + `ensure_schema_current`, `REQUIRED_TABLE_COUNT` 90, `PROMOTION_PLAN`; daftar sentinel di tes `turso.rs` dan tes skema ikut disesuaikan. | `audit:schema` + tes sentinel/provisioning Rust |
+| 2 | **Aturan kembar** `hr_keluar.rs` ↔ `validations/hr-keluar.ts`: `validasi_sp`, `status_sp`, `usulan_tingkat`, akhir masa SP, `validasi_keluar`, `status_keluar`, `bulan_penuh`, usulan upah, `usulan_pesangon`, validasi rincian; `tambah_hari` publik; teks SQL kembar `PINJAMAN_PERSONIL_SQL` dan `KARYAWAN_REKAP_SQL` diperiksa harfiah. Vektor uji yang sama (termasuk §20.5). | `bun run test` (per berkas) + `cargo test hr_keluar` |
+| 3 | **Normalisasi status**: handler cloud `employee/*`, lokal `update_employee`/`set_employee_status`/impor, Web `services/employee.ts`. | tes cloud `TursoClient::local_file`: event `employee/update` dan `employee/status` lama bernilai `'Aktif'` sesudah keluar tetap `Nonaktif`; tes TS |
+| 4 | **Transaksi cloud** catat/ubah/Berlakukan/Batalkan + akun operator; penjaga Superadmin terakhir dan diri sendiri; login offline dan sesi menolak personil nonaktif. | tes Rust (login offline, batch berlaku dan batal di `local_file`) + `services/hr-keluar.test.ts` |
+| 5 | **Kait gaji** (Q-67) di rekap dan pembekuan kedua jalur. | tes `payroll-recap*`, `loan` + Rust payroll dengan karyawan keluar di tengah periode |
+| 6 | **RBAC + command + rute + gateway**: `catalog.ts` (5 izin), `CONFIDENTIAL_PERMISSIONS`/`SENSITIVE_MUTATION_PERMISSIONS`, `NOT IN` seed Admin Rust, seed HRD Rust + `DEFAULT_ROLE_PERMISSIONS`, `rbac-migration.test.ts` + versi 40; 9 command di keempat tempat; daftar harapan `audit-sync-contract.ts` (jumlah command; rute dan tabel snapshot tidak berubah) dan angka di dokumen skill. | `audit:contract` + tes Rust + `web-rbac-boundary` |
+| 7 | **Layar** §20.8 + cetak SP. | typecheck + Biome |
+| 8 | `bun run sync:mobile`, bagian `CLAUDE.md`, catatan "Sudah dibangun". | `audit:docs`; `bun run check` penuh oleh pemilik |
+
+### 20.13 Sudah dibangun (11 Nov 2026)
+
+Langkah 1–8 dibangun. Gerbang yang dijalankan: `audit:schema` (90 tabel wajib,
+84 tabel dipromosikan), `audit:contract` (87 rute, 62 tabel snapshot, command
+Desktop 279 / Mobile 285), dan `audit:docs` lulus; `cargo test --lib` Desktop
+408 dan Mobile 412 lulus (termasuk `hr_keluar::tests` dengan vektor §20.5,
+`keluar_berlaku_menahan_event_lama_dan_bisa_dibatalkan`, dan
+`sentinel_2035_memicu_skema_keluar`); runner tes TS kedua workspace
+(`bun run test`, 90 dan 81 berkas) lulus, termasuk `validations/hr-keluar.test.ts`
+(vektor kembar dan teks SQL kembar Rust ↔ TS, juga salinan Mobile) dan
+`services/hr-keluar.test.ts` (alur Web: SP, catat, Berlakukan, aktifkan
+ditolak, rekap gaji, Batalkan); typecheck kedua workspace dan Biome berkas yang
+diubah bersih. `bun run check` penuh belum dijalankan (pemilik).
+
+Penyimpangan dan catatan, untuk ditinjau:
+
+- **Alasan keluar dan pengali disunting di tab Keluar**, bukan Organisasi
+  (§20.8 butir 3): izinnya `hr.offboard.manage`, yang tidak dipegang pemegang
+  `hr.org.manage` biasa. Masa SP tetap di Organisasi (form pengaturan kontrak
+  membaca `BATAS_PENGATURAN`, jadi kuncinya ikut tampil tanpa layar baru).
+- **Berlakukan juga mencabut sesi Web akun tertaut** (`app_session.revoked_at`,
+  statement keempat `BERLAKUKAN_SQL`). Tidak tertulis di §20.4; penjaga sesi Web
+  yang sudah ada juga menolaknya, ini hanya menutup sesi seketika.
+- **Penjaga sesi personil nonaktif** dipasang di `require_any_permission` dan
+  login offline (`tolak_personil_nonaktif`). Personil yang belum ada di SQLite
+  perangkat tidak ditolak (perangkat yang belum sinkron).
+- **Kait gaji**: satu kueri rekap Rust (`desktop_get_payroll_recap`, dipakai juga
+  pembekuan) dan `computePayrollRecap`. `desktop_bulk_apply_flat_daily` (atur
+  tarif massal) sengaja tetap hanya karyawan Aktif.
+- **Belum dikerjakan**: tanda "Keluar <tanggal>" di baris rekap gaji (§20.6) dan
+  di halaman Karyawan Mobile (§20.8 butir 5; Mobile menampilkan pesan penolakan
+  dari backend saat mengaktifkan). Halaman Karyawan Web/Desktop sudah.
+- **Tes yang belum ada**: tes Rust khusus login offline personil nonaktif dan
+  tes Rust payroll dengan karyawan keluar di tengah periode; padanannya diuji
+  di TS (`services/hr-keluar.test.ts`) dan di tes cloud Rust.
+- Daftar karyawan (Rust `get_employees`, Web `getDaftarKaryawan`) kini membawa
+  `id_keluar`. Usulan pesangon Desktop dihitung dari SQLite lokal (`muat_lokal`)
+  lalu ditulis ke cloud; Web menghitungnya dari cloud.
+- Tes lama yang disesuaikan: `pengaturan_kontrak` (Rust) dan "pengaturan
+  kontrak" (TS) kini membawa kunci `hr_sp_masa_bulan`, daftar sentinel tes
+  `turso.rs` + `-2036`, daftar versi migrasi tes RBAC + 40, daftar tabel
+  `schema-consistency.test.ts` + 4. Daftar harapan tabel khusus cloud
+  `audit-sync-contract.ts` + 4 (pengetatan, bukan pelonggaran).

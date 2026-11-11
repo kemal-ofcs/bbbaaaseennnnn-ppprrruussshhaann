@@ -22,6 +22,8 @@ mod driver;
 mod hris;
 // HRIS fase 2: SALINAN `desktop/hr_pengajuan.rs` oleh sync-rust-modules.ts.
 mod hr_pengajuan;
+// HRIS fase 5: SALINAN `desktop/hr_keluar.rs` oleh sync-rust-modules.ts.
+mod hr_keluar;
 // Notifikasi grup Telegram: SALINAN `desktop/telegram.rs` oleh sync-rust-modules.ts.
 pub mod telegram;
 // Lisensi offline Ed25519: SALINAN `desktop/license.rs` oleh sync-rust-modules.ts.

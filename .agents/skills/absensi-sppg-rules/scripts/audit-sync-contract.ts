@@ -68,6 +68,8 @@ const expectedRoutes = [
   "hr-request/save",
   "hr-request-decision/create",
   "hr-leave-adjustment/create",
+  // HRIS fase 4 (v39): pembayaran terpisah reimbursement.
+  "hr-reimburse-payment/create",
   "installment/activate",
   "installment/reapprove",
   "installment/close",
@@ -163,6 +165,9 @@ const expectedSnapshotTriples = [
   "hrRequests|hr-request|hr_pengajuan",
   "hrRequestDecisions|hr-request-decision|hr_pengajuan_keputusan",
   "hrLeaveAdjustments|hr-leave-adjustment|hr_cuti_penyesuaian",
+  // HRIS fase 4 (v39): pembayaran terpisah reimbursement.
+  "hrReimbursePayments|hr-reimburse-payment|hr_reimburse_bayar",
+  "hrReimbursePaymentLines|hr-reimburse-payment-line|hr_reimburse_bayar_baris",
 ].sort();
 
 // Tabel DDL lokal (storage.rs) yang memang TIDAK ikut snapshot sync.
@@ -217,6 +222,11 @@ const expectedCloudOnlyTables = [
   "hr_dokumen_berkas",
   // HRIS fase 2 (v37, Q-51): lampiran pengajuan (surat dokter).
   "hr_pengajuan_berkas",
+  // HRIS fase 5 (v40, Q-63): isi SP dan proses keluar karyawan.
+  "hr_sp",
+  "hr_keluar",
+  "hr_keluar_rincian",
+  "hr_keluar_alasan",
   "app_permission",
   "app_role",
   "app_session",
