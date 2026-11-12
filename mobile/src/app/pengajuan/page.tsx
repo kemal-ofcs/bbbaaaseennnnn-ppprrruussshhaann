@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { PengajuanWorkspace } from "@/components/hris/PengajuanWorkspace";
 import { PenilaianKinerja } from "@/components/hris/PenilaianKinerja";
 import { MobileAppShell } from "@/components/MobileAppShell";
@@ -11,7 +11,16 @@ import { useHydrated } from "@/lib/hooks/useHydrated";
 
 type Tab = "pengajuan" | "penilaian";
 
+// `useSearchParams` butuh Suspense untuk static export.
 export default function MobilePengajuanPage() {
+  return (
+    <Suspense fallback={null}>
+      <HalamanPengajuan />
+    </Suspense>
+  );
+}
+
+function HalamanPengajuan() {
   const isHydrated = useHydrated();
   const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
@@ -24,7 +33,11 @@ export default function MobilePengajuanPage() {
   const bolehPenilaian =
     hasPermission(user, "hr.performance.assess") ||
     hasPermission(user, "hr.performance.view");
-  const [pilihan, setPilihan] = useState<Tab | null>(null);
+  // `?tab=penilaian` dari kartu "Perlu perhatian" di /dashboard (§24.5).
+  const tabUrl = useSearchParams().get("tab");
+  const [pilihan, setPilihan] = useState<Tab | null>(
+    tabUrl === "penilaian" ? "penilaian" : null,
+  );
   const tab: Tab = pilihan ?? (bolehPengajuan ? "pengajuan" : "penilaian");
 
   // Static export Mobile tidak punya rute /forbidden.

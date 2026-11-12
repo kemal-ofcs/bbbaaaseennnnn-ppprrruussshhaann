@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { DashboardInsights } from "@/components/dashboard/DashboardInsights";
 import { EksporLaporanKehadiran } from "@/components/dashboard/EksporLaporanKehadiran";
+import { PerluPerhatian } from "@/components/hris/PerluPerhatian";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { Icon } from "@/components/ui/Icon";
 import { StatusBadge } from "@/components/ui/StatusBadge";
@@ -17,6 +18,7 @@ import {
   getRiwayatScan,
 } from "@/lib/gateways/report";
 import { useClock } from "@/lib/hooks/useClock";
+import { IZIN_PERHATIAN } from "@/lib/validations/telegram";
 
 export default function DashboardPage() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -129,6 +131,21 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Kartu "Perlu perhatian" (§24.5): hanya bila ada isinya. Mobile tidak
+            punya /hris, jadi nama tidak bisa diklik (Q-124). */}
+        {IZIN_PERHATIAN.some((izin) => hasPermission(user, izin)) ? (
+          <PerluPerhatian
+            sembunyiBilaKosong
+            onBukaKinerja={
+              canAccessArea(user, "pengajuan") &&
+              (hasPermission(user, "hr.performance.assess") ||
+                hasPermission(user, "hr.performance.view"))
+                ? () => router.push("/pengajuan?tab=penilaian")
+                : undefined
+            }
+          />
+        ) : null}
 
         {canExport ? (
           <button

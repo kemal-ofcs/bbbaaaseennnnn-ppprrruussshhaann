@@ -26,6 +26,8 @@ const filesToCopy = [
   // Penilaian kinerja HRIS (v41): tab Penilaian `/pengajuan` Mobile dan tab
   // Kinerja `/hris` Web/Desktop memakai komponen yang sama (§21.9).
   "components/hris/PenilaianKinerja.tsx",
+  // Kartu "Perlu perhatian" di /dashboard Mobile (fase 9, §24.5).
+  "components/hris/PerluPerhatian.tsx",
   "components/ui/KonfirmasiData.tsx",
   // Pengirim notifikasi Telegram: berjalan di setiap sesi login, identik di kedua build.
   "components/AutoTelegramRunner.tsx",

@@ -656,6 +656,15 @@ berlaku.
   dan beranda, dan pengaturan angka pengingat (§24); fase 10 = rencana dan
   anggaran pelatihan dan bagan struktur organisasi. Pelaporan BPJS/DJP/Wajib
   Lapor dan berkas transfer gaji ke bank dibahas sesudah fase 10.
+- **HRIS lengkap di Mobile untuk HRD** (diminta 12 Nov 2026): HRD harus bisa
+  bekerja di laptop maupun HP. Ini membalik Q-43 ("Mobile hanya form
+  karyawan").
+- **Urutan fase yang berlaku (12 Nov 2026, menggantikan butir urutan di
+  atas)**: fase 9 = §24 (tidak berubah); fase 10 = HRIS lengkap di Mobile
+  untuk HRD + bagan struktur organisasi di semua versi (bagan butuh halaman
+  HRIS Mobile, dan Q-124 ditinjau ulang di sana); fase 11 = rencana dan
+  anggaran pelatihan. Pelaporan BPJS/DJP/Wajib Lapor dan berkas transfer gaji
+  ke bank sesudah fase 11.
 
 ## 16. Urutan pengerjaan fase 1
 
@@ -4077,13 +4086,13 @@ Penyimpangan dan catatan, untuk ditinjau:
 
 ## 24. Urutan pengerjaan fase 9
 
-**Rancangan, belum disetujui pemilik.** Ditulis setelah menelusuri kode
-(12 Nov 2026). Q-113 sampai Q-124 (§24.11) menunggu jawaban; eksekusi belum
-boleh dimulai. Isinya butir yang ditunda §22.10 dan §23.7 dan diminta pemilik
+**Disetujui pemilik (12 Nov 2026).** Ditulis setelah menelusuri kode
+(12 Nov 2026); jawaban Q-113 sampai Q-124 di §24.12, semuanya sesuai usulan.
+Isinya butir yang ditunda §22.10 dan §23.7 dan diminta pemilik
 di §15.1: kejadian Telegram penilaian kinerja, rekrutmen, dan per pengajuan;
 kartu "Perlu perhatian" di Mobile dan di beranda; angka pengingat yang bisa
-diatur per perusahaan. Rencana dan anggaran pelatihan serta bagan struktur
-organisasi adalah fase 10.
+diatur per perusahaan. HRIS lengkap di Mobile dan bagan struktur organisasi
+adalah fase 10; rencana dan anggaran pelatihan fase 11 (§15.1).
 
 ### 24.1 Temuan dari kode
 
@@ -4252,8 +4261,9 @@ kejadian v33.
 
 ### 24.8 Tidak dikerjakan di fase ini
 
-- Rencana dan anggaran pelatihan, bagan struktur organisasi (fase 10).
-- Pelaporan BPJS/DJP/Wajib Lapor dan berkas transfer bank (sesudah fase 10).
+- HRIS lengkap di Mobile dan bagan struktur organisasi (fase 10); rencana dan
+  anggaran pelatihan (fase 11).
+- Pelaporan BPJS/DJP/Wajib Lapor dan berkas transfer bank (sesudah fase 11).
 - Pesan per penilaian kinerja (nama + nilai): hasil kinerja rahasia.
 - Kejadian per pelamar dan per tahap seleksi (nama pelamar, Q-86).
 - Grup Telegram per atasan atau per divisi; bot tetap satu arah ke grup bidang.
@@ -4305,3 +4315,63 @@ kejadian v33.
 | Q-122 | Bagian Kinerja di kartu: siapa yang melihat, dan isinya? | `hr.performance.finalize` atau `hr.performance.view`; hanya angka | Pemegangnya sudah bisa membuka daftar penilaian; angka cukup untuk tahu ada yang menunggu |
 | Q-123 | Kartu di beranda: selalu tampil, atau hanya bila ada isinya? | Hanya bila ada isinya | Beranda dipakai semua peran; "Tidak ada yang perlu perhatian" setiap hari hanya bising |
 | Q-124 | Kartu di Mobile: nama tidak bisa diklik (tidak ada `/hris`), atau membuka `/karyawan`? | Tidak bisa diklik; tautan Pengajuan/Penilaian tetap | `/karyawan` Mobile tidak punya tab Kontrak/Dokumen/SP; membukanya tidak menunjukkan alasan nama itu muncul |
+
+### 24.12 Jawaban fase 9 (12 Nov 2026)
+
+Semua jawaban sesuai usulan §24.11, jadi isi §24.2–§24.10 tidak berubah.
+Catatan Q-113: fase 8 sudah di-commit tetapi belum dirilis, jadi (a) tetap
+berlaku: fase 8 ditahan dan dirilis bersama fase 9.
+
+| No | Pertanyaan | Jawaban |
+| :-- | :-- | :-- |
+| Q-113 | Rilis fase 8 | (a) ditahan, dirilis bersama fase 9 (sudah di-commit, belum dirilis) |
+| Q-114 | Angka yang bisa diatur | Enam angka §24.3 |
+| Q-115 | Yang mengatur angka pengingat | `hr.org.manage`, tab Organisasi |
+| Q-116 | Id pengingat kontrak | Tahap `:jauh`/`:dekat` |
+| Q-117 | Kejadian kinerja | Ringkasan menunggu Final dan periode berakhir, tanpa nama |
+| Q-118 | "Wajib dinilai" | Semua karyawan Aktif yang rentang aktifnya beririsan dengan periode |
+| Q-119 | Kejadian rekrutmen | Pelamar baru harian per lowongan (tanpa nama) dan lowongan tutup H-3 |
+| Q-120 | Isi pesan per pengajuan | (b): nama + kelompok + tanggal, kecuali Sakit tanpa nama |
+| Q-121 | Per pengajuan diajukan dan diputus, klaim Reimburse ikut | Ya, ya, tanpa nominal; semuanya ke grup HRD |
+| Q-122 | Bagian Kinerja di kartu | `hr.performance.finalize` atau `hr.performance.view`; hanya angka |
+| Q-123 | Kartu di beranda | Hanya bila ada isinya |
+| Q-124 | Klik nama di kartu Mobile | Tidak bisa diklik; tautan Pengajuan/Penilaian tetap (ditinjau lagi bila Mobile mendapat HRIS lengkap) |
+
+### 24.13 Sudah dibangun (13 Nov 2026)
+
+Langkah 1–5 dibangun tanpa perubahan skema (versi 42, sentinel `-2038`, 68
+tabel snapshot, 90 rute, command Desktop 302 / Mobile 308, tanpa izin baru).
+Gerbang yang dijalankan: `audit:contract` dan `audit:docs` lulus; `cargo test
+telegram` Desktop dan Mobile 23 lulus (termasuk `ringkas_kinerja`,
+`isi_pesan_hrd_fase9`, `sql_hrd_fase9_di_skema_cloud`,
+`catat_hrd_fase9_dari_data_cloud`, `perhatian_kinerja`, dan
+`catat_hrd_dari_data_cloud` yang diperluas dengan angka diubah dan rusak);
+`cargo test hris` Desktop dan Mobile 11 lulus (termasuk `fragmen_ingat_sql`);
+`bun test` `validations/telegram.test.ts`, `validations/hris.test.ts`,
+`services/telegram.test.ts`, dan `web-rbac-boundary.test.ts` 59 lulus di
+Web/Desktop (tiga berkas pertama 50 lulus di Mobile); typecheck dan Biome
+kedua workspace bersih. `bun run check` penuh belum dijalankan (pemilik).
+Layar belum dicoba di aplikasi yang berjalan, dan belum ada pesan yang
+dikirim ke Telegram sungguhan.
+
+Penyimpangan dan catatan, untuk ditinjau:
+
+- **Id ringkasan pelamar** memakai tanggal hari ini (`hr-pelamar:<hari ini>`,
+  isinya pelamar kemarin), sama dengan pola ringkasan harian fase 8.
+- **"Paling lama sejak" ringkasan kinerja** = tanggal WIB `Ajukan` terakhir
+  yang tercatat di cloud.
+- **Ringkasan periode**: karyawan yang penilaiannya sudah Final tidak dihitung;
+  yang Diajukan dihitung "diajukan", penilaian lain "masih draf".
+- **Jendela "periode baru berakhir" di kartu = 1–7 hari**, sama dengan
+  kejadian Telegram (§24.5 tidak menyebut lamanya).
+- **Hitungan kinerja di kartu mencakup penilaian atas diri pemegang sesi**;
+  isinya tetap angka saja.
+- **Kartu di beranda dengan galat koneksi tetap tampil** ("Butuh koneksi ke
+  database"); yang disembunyikan hanya saat memuat dan bila kosong.
+- **Label sakelar fase 8** tidak lagi menyebut "30 dan 7 hari" atau "2 hari",
+  karena angkanya kini pengaturan.
+- **Tes fase 8 hanya menyalakan tujuh kejadian fase 8**; kejadian fase 9 punya
+  tesnya sendiri, dan ringkasan periode "hari ini" di tes bersyarat karena
+  bergantung tanggal kalender.
+- **Tautan Penilaian di Mobile** membuka `/pengajuan?tab=penilaian`; halaman
+  itu (milik Mobile) kini membaca parameter tersebut.

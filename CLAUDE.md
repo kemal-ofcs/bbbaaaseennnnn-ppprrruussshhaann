@@ -854,8 +854,9 @@ totalnya disembunyikan bila pegawainya < 3 (`MIN_PEGAWAI_NOMINAL_GAJI`);
 `payroll_items` tidak pernah dibaca. Kejadian sebelum `aktif_sejak` atau lebih
 dari 7 hari tidak dikirim. Menambah kejadian = satu SQL sumber + fungsi pesan
 kembar + entri `BIDANG_KEJADIAN`/`bidang_kejadian`. Enam kejadian perjalanan
-ke grup Armada ada di subbagian "Notifikasi armada" di bawah, dan tujuh
-pengingat HR ke grup HRD di "HRIS fase 8"; seluruhnya 20 kejadian.
+ke grup Armada ada di subbagian "Notifikasi armada" di bawah, dan tiga belas
+kejadian HR ke grup HRD di "HRIS fase 8" dan "HRIS fase 9"; seluruhnya 26
+kejadian.
 
 **Perangkat lama membatalkan kejadian yang tidak dikenalnya.** Semua build
 menguras antrean yang sama, dan `bidang_kejadian` = `None` membuat baris itu
@@ -1342,12 +1343,12 @@ izin baru. Aturan kembar `desktop/telegram.rs` ↔ `validations/telegram.ts` +
 - **Bidang `hrd`, tujuh kejadian** `hr_kontrak_akhir`, `hr_percobaan_akhir`,
   `hr_dokumen_kedaluwarsa`, `hr_sp_berakhir`, `hr_pengajuan_menunggu`,
   `hr_urgent_belum_diketahui`, `hr_ulang_tahun_kerja`. Semua dicatat
-  `catat_harian` ↔ `catatHarian` mulai 07.00 WIB jam database
-  (`catat_harian_pada` ↔ `catatHarianPada` menerima jamnya supaya bisa diuji).
-  Jendela tetap di kode: `HR_HARI_JAUH` 30, `HR_HARI_DEKAT` 7,
-  `HR_HARI_MENUNGGU` 2 (Q-106). Karyawan hanya yang Aktif; jabatan = master
-  jabatan, lalu `jabatan_status`.
-- **Id**: `hr-kontrak:<id>:30|:7` (sisa 8–30 dan 0–7), `hr-coba:<id>`,
+  `catat_harian` ↔ `catatHarian` mulai jam `hr_ingat_jam` WIB jam database
+  (`catat_harian_pada` ↔ `catatHarianPada` menerima jam dan jam HR-nya
+  supaya bisa diuji). Angka jendela dan jamnya kini pengaturan (lihat "HRIS
+  fase 9"); bawaannya tetap 30/7/7/30/2 dan 07.00. Karyawan hanya yang Aktif;
+  jabatan = master jabatan, lalu `jabatan_status`.
+- **Id**: `hr-kontrak:<id>:jauh|:dekat` (tahap, bukan angka, Q-116), `hr-coba:<id>`,
   `hr-dok:<id>:<tanggal_kedaluwarsa>` (diperpanjang = diingatkan lagi, Q-104),
   `hr-sp:<id>` (hari terakhir berlaku sampai 6 hari sesudahnya, disaring
   `aktif_sejak`), dan tiga ringkasan harian `hr-tunggu:`, `hr-urgent:`,
@@ -1383,6 +1384,73 @@ izin baru. Aturan kembar `desktop/telegram.rs` ↔ `validations/telegram.ts` +
   rincian karyawan pada tab Kontrak, Dokumen, SP, atau Kerja (`tabAwal`).
 - Grup Telegram adalah pembaca tanpa RBAC: kartu Notifikasi memperingatkannya
   di kolom grup HRD, dan sakelar `hr_*` lahir mati.
+
+## HRIS fase 9: angka pengingat, kejadian HR baru, kartu di beranda dan Mobile (tanpa perubahan skema)
+
+Rincian dan keputusan pemilik di `prd-hris.md` §24 (Q-113 sampai Q-124).
+Versi skema tetap 42, sentinel tetap `-2038`, tanpa tabel, kolom, rute,
+command, atau izin baru (Desktop 302 / Mobile 308). Fase 8 dan 9 dirilis
+BERSAMA (Q-113 (a)): fase 8 belum pernah dikirim ke klien, jadi id dan
+jendelanya boleh diganti dan kejadian baru tetap generasi parkir `gen:2`.
+
+- **Angka pengingat** (Q-114, Q-115): enam entri baru `BATAS_PENGATURAN`
+  (`hris.rs` ↔ `validations/hris.ts`), disimpan lewat `setting/update` dengan
+  izin `hr.org.manage`, diisi di tab Organisasi `/hris` (kelompok "Angka
+  pengingat HR" di bawah angka kontrak, satu tombol simpan):
+  `hr_ingat_kontrak_jauh` 30 (8–90), `hr_ingat_kontrak_dekat` 7 (1–30),
+  `hr_ingat_percobaan` 7 (1–30), `hr_ingat_dokumen` 30 (1–90),
+  `hr_ingat_menunggu` 2 (1–14), `hr_ingat_jam` 7 (0–23). Aturan silang:
+  dekat < jauh (`PESAN_INGAT_KONTRAK`), hanya saat disimpan.
+- SQL membaca angkanya lewat makro `ingat_*_sql!` di `hris.rs` (dibuka
+  `pub(crate) use`, dipakai `telegram.rs` dengan `concat!`) ↔ `INGAT_*_SQL`:
+  subkueri `setting_gex_system` berbatas pola `retensi_bulan_sql!`, kosong
+  atau rusak = bawaan, dihitung database. SQL sumber Telegram dan SQL kartu
+  fase 8 memakai fragmen yang sama; tes teks SQL memecah per fragmen
+  (`harapSqlDiRust`). Angka rusak dekat ≥ jauh: jendela jauh kosong, dekat
+  tetap (`max(jauh, dekat)`). Angka berlaku setelah terdorong ke cloud.
+- **Id kontrak** `hr-kontrak:<id>:jauh|:dekat` (`id_hr_kontrak(id, sisa,
+  dekat)`), jadi mengubah angka di tengah jendela tidak melahirkan pesan kedua.
+  **Jam**: `SQL_JAM_WIB` membawa `jam_hr`; stok tetap `JAM_RINGKASAN_STOK`.
+  Pesan menunggu menerima N (`pesan_hr_pengajuan_menunggu(…, hari)`), dan
+  baris `menunggu` kartu membawa `hari`. Jendela SP, ulang tahun kerja, dan
+  periode kinerja tetap 7 hari di kode (`HR_HARI_JENDELA`).
+- **Enam kejadian baru** (bidang `hrd`, lahir mati, diparkir; 20 → 26):
+  `hr_kinerja_menunggu` (`hr-kinerja-tunggu:<tanggal>`, hanya angka),
+  `hr_kinerja_periode` (`hr-kinerja-periode:<mulai>`, hari ke-1 sampai ke-7
+  sesudah periode `hr_kinerja_periode` berakhir, `periode_kinerja_berakhir`),
+  `hr_pelamar_baru` (`hr-pelamar:<tanggal>`, pelamar kemarin per judul
+  lowongan, tanpa nama), `hr_lowongan_tutup` (`hr-lowongan:<id>:<tanggal>`,
+  H-3 sampai hari H), `hr_pengajuan_baru` (`hr-ajuan:<id>`), dan
+  `hr_pengajuan_diputus` (`hr-putus:<id_keputusan>`). Empat pertama di
+  `catat_kinerja_rekrutmen` ↔ `catatKinerjaRekrutmen` (akhir `catat_hrd`,
+  ikut jam HR); dua terakhir di `catat_pengajuan_hr` ↔ `catatPengajuanHr`
+  (dari `catat_kejadian`, disaring `aktif_sejak` dan 7 hari jam cloud).
+- Status kinerja tidak di SQL: SQL sumber mengirim keputusan sebagai JSON,
+  lalu `status_kinerja` ↔ `statusKinerja`, `ringkas_kinerja_menunggu` ↔
+  `ringkasKinerjaMenunggu`, dan `ringkas_kinerja_periode` ↔
+  `ringkasKinerjaPeriode` (wajib dinilai = karyawan Aktif yang rentang
+  aktifnya beririsan, Q-118). Nilai akhir dan predikat tidak dibaca (Q-117).
+- **Per pengajuan** (Q-120 (b), Q-121): nama + kelompok + tanggal, kecuali
+  Sakit tanpa nama (`KELOMPOK_TANPA_NAMA`); klaim Reimburse ikut tanpa
+  nominal; keputusan = yang pertama bersidik isi sekarang tanpa `Batal`, jadi
+  keputusan ganda dan yang gugur tidak dikirim. Alasan tidak pernah dibaca.
+- **Kartu "Perlu perhatian"**: bagian `kinerja` (`{ menunggu, menunggu_sejak,
+  periode }`, hanya angka) dengan pembantu yang sama dengan Telegram
+  (`ringkas_menunggu_cloud`, `jenis_periode_cloud`, `ringkas_periode_cloud`
+  ↔ kembarannya). `IZIN_PERHATIAN` 9 (`hr.performance.view`,
+  `hr.performance.finalize`; `assess` tidak cukup, Q-122). `perhatian` →
+  `perhatian_pada(…, tanggal)` ↔ `perhatianHrPada` supaya jendela periode
+  bisa diuji.
+- **Layar**: `PerluPerhatian.tsx` (kini di `filesToCopy`) menerima
+  `onPilihKaryawan` opsional (tanpa itu nama tidak bisa diklik, Mobile,
+  Q-124), `onBukaKinerja`, dan `sembunyiBilaKosong` (beranda, Q-123: tidak
+  tampil selama memuat atau bila kosong; galat koneksi tetap tampil).
+  `TabRincian`/`TAB_RINCIAN` pindah ke `validations/telegram.ts`. Beranda
+  Web/Desktop (`app/page.tsx`) membuka `/hris?karyawan=<id>&tab=<tab>`,
+  `/hris?tab=kinerja`, dan `/hris?tab=rekrutmen`; `HrisWorkspace` membaca
+  parameter itu lewat `useSearchParams` (halaman `/hris` membungkusnya dengan
+  `Suspense`). Mobile `/dashboard` memasang kartu yang sama; tautan Penilaian
+  membuka `/pengajuan?tab=penilaian`.
 
 ## Domain contoh
 
