@@ -2942,3 +2942,663 @@ Penyimpangan dan catatan, untuk ditinjau:
   versi migrasi `rbac-migration.test.ts` + 41, daftar tabel
   `schema-consistency.test.ts` + 6. Daftar harapan `audit-sync-contract.ts`
   + 3 rute dan + 6 tabel snapshot (pengetatan, bukan pelonggaran).
+
+## 22. Urutan pengerjaan fase 7
+
+**Disetujui pemilik (12 Nov 2026) dan dibangun (catatan di §22.15).** Ditulis setelah menelusuri kode
+(12 Nov 2026). Q-86 sampai Q-100 sudah dijawab (§22.14), semuanya sesuai
+usulan, dan rancangan utuhnya, termasuk penanda di §22.12, disetujui. Bila
+§11.2, §10.1, atau §12 dan bagian ini berbeda, **bagian ini yang berlaku**
+(terutama: enam tabel bukan lima, semuanya khusus cloud, dan satu izin baru
+`hr.recruit.delete` di luar §10.1).
+
+### 22.1 Temuan dari kode
+
+- **Pola khusus cloud sudah lengkap dan bisa dipakai apa adanya.** `hr_profil`,
+  `hr_dokumen_jenis`, `hr_dokumen`, `hr_dokumen_berkas` (`turso.rs`, blok v36)
+  dan `hr_sp`, `hr_keluar*` (v40) hanya ada di `turso.rs` +
+  `db-schema.ts`/`db-migrations.ts`. Command-nya `async`, mengambil
+  `state.get_turso_client()` lalu memanggil fungsi modul (`hris::dokumen`,
+  `simpan_dokumen`, `hapus_dokumen`, `tambah_berkas`, `berkas`,
+  `hapus_berkas`); galat jaringan dipetakan `tak_terhubung`. Tulisan
+  multi-tabel memakai `TursoClient::execute_atomic` dengan setiap statement
+  dijaga keadaan yang sama (`BERLAKUKAN_SQL`, `hr_keluar.rs`), sehingga tekan
+  ganda tidak menggandakan. Pada mode database lokal `TursoClient` menunjuk
+  hub, jadi pola ini tetap jalan.
+- **Berkas**: `hris::validasi_berkas` ↔ `validasiBerkas` (MIME dari
+  `MIME_BERKAS` = JPEG/PNG/WEBP/PDF, `MAKS_BERKAS_BASE64` 1.398.104 karakter =
+  1 MB, `base64_sah`, tanda tangan bita `%PDF` / `FF D8` / `89 50 4E 47` /
+  `RIFF…WEBP`). Daftar dokumen tidak pernah membawa `data_base64`
+  (`length(b.data_base64) AS panjang`); isi diambil per berkas. Maksimal
+  `MAKS_BERKAS_PER_DOKUMEN` = 5, urutan = slot kosong terkecil.
+- **Jenis dokumen "Sertifikat" sudah ada**: `SEED_JENIS_DOKUMEN_SQL`
+  (`hris.rs`, kembar TS) menanam `dok-sertifikat` bersama delapan jenis lain
+  (`INSERT OR IGNORE`, dijalankan setiap `ensure_schema`; tes `turso.rs`
+  menghitung 9 baris). Jenis bisa dinonaktifkan HRD, dan `simpan_dokumen`
+  menolak jenis nonaktif untuk dokumen baru.
+- **`hr_dokumen.tanggal_kedaluwarsa` hari ini hanya disimpan dan
+  ditampilkan** (`RincianKaryawan.tsx`: "tanpa kedaluwarsa" atau tanggalnya).
+  Validasinya hanya "tidak sebelum tanggal terbit". Belum ada kueri, tanda,
+  atau pengingat yang membacanya, tetapi indeksnya sudah ada
+  (`idx_hr_dokumen_kedaluwarsa`), disiapkan untuk fase 8 (`hr-dok:<id>`).
+- **Membuat karyawan, Desktop/Mobile** (`operational::create_employee`,
+  command `desktop_create_employee`, izin `employees.manage`): `id_unik` dan
+  `kode_karyawan` datang DARI DRAF (layar membuatnya dengan
+  `createEmployeeIdentifiers(crypto.randomUUID())` →
+  `EMP_<12 karakter>` / `K<8 karakter>`, `validations/stabilization.ts`);
+  token dari `token_from_event(event_id)`, `qr_code = "{id}|{token}"`
+  (aturan 31); organisasi lewat `hris::org_dari_draft` + `tulis_org` +
+  `isi_payload_org`; `master_data`, `id_card`, dan outbox `employee/create`
+  dalam SATU transaksi. Fungsi ini membuka koneksi dan transaksinya sendiri,
+  jadi belum bisa digabung dengan tulisan lain.
+- **Kontrak** (`hris::catat_kontrak`, `hr.contract.manage`): transaksi
+  terpisah (`dalam_transaksi`), id acak `ktr-<hex>`, `INSERT_KONTRAK_SQL` +
+  `JENIS_DARI_KONTRAK_SQL` + outbox `hr-contract/create` (append-only, kiriman
+  ulang berhenti di PK). Karyawan + kontrak pertama hari ini DUA transaksi dan
+  dua tekan.
+- **Membuat karyawan, Web** (`services/employee.ts` `tambahKaryawan`): token
+  `generateRandomToken(10)`, lalu TIGA `db.execute` terpisah (`master_data`,
+  `id_card`, `tulisOrg`), tidak atomik hari ini.
+- **Handler cloud `employee/create|update`** (`turso.rs`) menjalankan
+  beberapa `query_one` berurutan, bukan satu batch, dan menolak payload tanpa
+  `divisi`. Tidak ada fungsi yang mengembalikan daftar `Statement`-nya, jadi
+  "menyisipkan karyawan baru langsung di cloud dalam satu batch bersama data
+  pelamar" berarti menulis ulang handler itu.
+- **Penghapusan berbasis jam database** (aturan 19): `driver::HAPUS_FOTO_LAMA_SQL`
+  (`datetime('now', '-90 days')`, teks kembar), command
+  `desktop_trip_photo_cleanup` (cukup `require_session`, lokal + cloud,
+  kegagalan cloud tidak membatalkan lokal), dipanggil `AutoFotoCleanupRunner`
+  (`AppShell`, 60 detik setelah login lalu tiap 6 jam, semua sesi). Tidak ada
+  server atau penjadwal di arsitektur 2-tier; satu-satunya "penjadwal" adalah
+  sesi yang sedang login.
+- **RBAC**: `catalog.ts` belum memuat `hr.recruit.*` maupun `hr.training.*`
+  (§10.1 sudah menyebut `view`/`manage` untuk keduanya). Admin Web = semua
+  izin di luar `SENSITIVE_MUTATION_PERMISSIONS` dan `CONFIDENTIAL_PERMISSIONS`;
+  Admin Rust = semua di luar daftar `NOT IN`. Seed HRD dan Atasan Rust
+  (`turso.rs`, daftar `IN`, dijalankan setiap `ensure_schema`) ↔
+  `DEFAULT_ROLE_PERMISSIONS`. HRD memegang `employees.manage` dan
+  `hr.contract.manage`. Area `hris` = `employees.view` (`access.ts`); setiap
+  tab memeriksa izinnya sendiri.
+- **Versi skema menghentikan perangkat lama dengan sendirinya**:
+  `sync.rs` (`is_client_schema_outdated`) dan `portability.rs` mengembalikan
+  `SCHEMA_VERSION_OUTDATED` bila versi cloud > `CLIENT_SCHEMA_VERSION`. Begitu
+  satu perangkat atau Web menaikkan cloud ke v42, perangkat v41 berhenti
+  sinkron sampai diperbarui, apa pun isi fase ini.
+- **`PROMOTION_PLAN`** ada di `lib/server/database-promotion.ts` (diperiksa
+  `schema-audit.ts`); daftar harapan tabel khusus cloud ada di
+  `audit-sync-contract.ts` (`.agents/skills/absensi-sppg-rules/scripts/`).
+- **Layar**: `HrisWorkspace` (Karyawan, Struktur, Keluar, Kinerja,
+  Organisasi), `RincianKaryawan` (Kerja, Pribadi, Keuangan, Kontrak, Dokumen,
+  Cuti, SP, Kinerja). Mobile tidak punya `/hris` (Q-43).
+- Skema sekarang: v41, sentinel `-2037`, `REQUIRED_TABLE_COUNT` 96, 68 tabel
+  snapshot, 90 rute, command Desktop 286 / Mobile 292.
+
+### 22.2 Model data (skema v42, sentinel `-2038` `hris-rekrutmen-v1`)
+
+**Semua khusus cloud** (Q-86, Q-87; hanya `turso.rs` +
+`db-schema.ts`/`db-migrations.ts`; tidak di `storage.rs`, tidak di
+`SNAPSHOT_TABLES`/`SNAPSHOT_SOURCES`, tidak lewat outbox). Tanpa `UNIQUE`
+selain PK. Alasannya per tabel:
+
+| Tabel | Kenapa khusus cloud |
+| :-- | :-- |
+| `hr_pelamar`, `hr_pelamar_tahap`, `hr_pelamar_berkas` | Data pribadi orang yang BUKAN karyawan (UU PDP), preseden Q-30 dan Q-63. Yang menentukan: retensi (Q-33) mewajibkan data benar-benar hilang. Baris tersinkron yang dihapus tetap tertinggal di SQLite perangkat yang offline atau jarang dibuka, dan terminal scanner tidak punya alasan memegangnya |
+| `hr_lowongan` | Tanpa data pribadi, tetapi hanya berguna bersama pelamar dan jangkar retensinya dibaca SQL cloud. Menyinkronkannya menambah empat lapis dan satu rute tanpa pemakai offline |
+| `hr_pelatihan`, `hr_pelatihan_peserta` | Sertifikatnya `hr_dokumen` (khusus cloud), jadi layar pelatihan tetap butuh koneksi. Tidak ada alur lapangan yang membacanya offline |
+
+Akibatnya fase ini **tanpa tabel snapshot baru (tetap 68) dan tanpa rute baru
+(tetap 90)**. Pembatalan dan penutupan memakai KOLOM yang diisi sekali, bukan
+baris `batal-<id>` (preseden §20.2: tidak ada dua perangkat offline yang perlu
+digabung).
+
+| Tabel | Kolom |
+| :-- | :-- |
+| `hr_lowongan` | `id_lowongan` PK (`low-<acak>`); `judul` NOT NULL; `id_jabatan`, `id_divisi`, `id_cabang` (boleh kosong; nama dibaca hidup dari master, Q-12); `jumlah` INTEGER NOT NULL CHECK 1–999; `tanggal_buka` NOT NULL; `tanggal_tutup` (rencana, boleh kosong), CHECK `tanggal_tutup IS NULL OR tanggal_tutup >= tanggal_buka`; `keterangan`; `ditutup_pada`, `ditutup_oleh` (jam database); `pelamar_dihapus` INTEGER NOT NULL DEFAULT 0 CHECK ≥ 0 (hitungan anonim, §22.6); `dicatat_oleh` NOT NULL, `created_at`; `diubah_oleh`, `diubah_pada`. Indeks `tanggal_buka` |
+| `hr_pelamar` | `id_pelamar` PK (`plm-<hex>`); `id_lowongan` NOT NULL; `nama` NOT NULL; `no_hp` (kanonik `+62…`, aturan 40); `email`; `lp` CHECK (`lp IS NULL OR lp IN ('L','P')`); `tanggal_lahir`; `alamat`; `pendidikan` CHECK sama dengan `hr_profil.pendidikan`; `sumber` (teks bebas ≤ 100); `tanggal_lamaran` NOT NULL; `catatan`; `id_karyawan`, `dijadikan_oleh`, `dijadikan_pada` (klaim "Jadikan karyawan", diisi sekali, §22.5); `dicatat_oleh` NOT NULL, `created_at`; `diubah_oleh`, `diubah_pada`. Indeks `id_lowongan`, `id_karyawan`. **Tanpa NIK, KK, rekening**: itu baru diisi di `hr_profil` setelah menjadi karyawan |
+| `hr_pelamar_tahap` | `id_tahap` PK (`<id_pelamar>:<urutan>`); `id_pelamar` NOT NULL; `urutan` INTEGER NOT NULL CHECK ≥ 1; `tahap` NOT NULL CHECK IN (`Lamaran`, `Seleksi Berkas`, `Wawancara`, `Tes`, `Penawaran`, `Diterima`, `Ditolak`, `Mundur`); `tanggal` NOT NULL (tanggal kejadian, WIB); `catatan`; `oleh` NOT NULL, `created_at` (jam database); `dibatalkan_oleh`, `dibatalkan_pada`, `alasan_batal`. Indeks `id_pelamar`. PK dari `urutan` membuat dua sesi yang mencatat tahap bersamaan bertabrakan di PK, bukan menghasilkan dua tahap "terakhir" |
+| `hr_pelamar_berkas` | `id_berkas` PK (`pb-<acak>`); `id_pelamar` NOT NULL; `urutan` INTEGER NOT NULL CHECK 1–3; `nama_berkas`; `mime_type` NOT NULL CHECK sama dengan `hr_dokumen_berkas`; `data_base64` NOT NULL; `created_at`. Indeks `id_pelamar` |
+| `hr_pelatihan` | `id_pelatihan` PK (`plt-<acak>`); `nama` NOT NULL; `penyelenggara`; `tanggal_mulai` NOT NULL, `tanggal_selesai` NOT NULL, CHECK `tanggal_selesai >= tanggal_mulai`; `lokasi`; `biaya` INTEGER NOT NULL DEFAULT 0 CHECK ≥ 0 (total satu pelatihan, aturan 13); `keterangan`; `dicatat_oleh` NOT NULL, `created_at`; `diubah_oleh`, `diubah_pada`; `dibatalkan_oleh`, `dibatalkan_pada`, `alasan_batal`. Indeks `tanggal_mulai` |
+| `hr_pelatihan_peserta` | `id_peserta` PK (`<id_pelatihan>:<id_karyawan>`, satu karyawan sekali per pelatihan tanpa `UNIQUE`); `id_pelatihan` NOT NULL; `id_karyawan` NOT NULL; `hasil` CHECK (`hasil IS NULL OR hasil IN ('Lulus','Tidak Lulus','Tidak Hadir')`); `id_dokumen` (sertifikat di `hr_dokumen`, boleh kosong); `catatan`; `dicatat_oleh` NOT NULL, `created_at`. Indeks `id_pelatihan`, `id_karyawan`, `id_dokumen` |
+
+- **Tanpa seed** dan tanpa perubahan `SEED_JENIS_DOKUMEN_SQL` (jenis
+  `dok-sertifikat` sudah ada; tes yang menghitung 9 jenis tidak berubah).
+- **Pengaturan** (`setting_gex_system`, tanpa perubahan skema):
+  `hr_pelamar_retensi_bulan` = 12 (1–60), entri baru `BATAS_PENGATURAN` ↔
+  kembar (pola `hr_sp_masa_bulan`), sehingga kuncinya tampil di form
+  pengaturan Organisasi tanpa layar baru (`hr.org.manage`). Tes
+  `pengaturan_kontrak` (Rust) dan "pengaturan kontrak" (TS) ikut bertambah satu
+  kunci.
+- **Indeks dibuat sesudah tabelnya** (aturan 20); tidak ada kolom hasil
+  migrasi di fase ini.
+- Kedua jalur: `CURRENT_SCHEMA_VERSION`/`CLIENT_SCHEMA_VERSION` 42, sentinel
+  `-2038` + angka `ensure_schema_current`, `REQUIRED_TABLE_COUNT` 102, enam
+  tabel ikut `PROMOTION_PLAN` (urutan: `hr_lowongan` → `hr_pelamar` →
+  `hr_pelamar_tahap`/`hr_pelamar_berkas`; `hr_pelatihan` →
+  `hr_pelatihan_peserta`, yang juga bergantung `master_data` dan `hr_dokumen`),
+  `isDatabaseSchemaReady`, `schema-consistency.test.ts` + 6, daftar harapan
+  tabel khusus cloud `audit-sync-contract.ts` + 6. **Tidak ada yang dibuang
+  saat pindah database** karena tidak ada salinannya di SQLite perangkat;
+  `CLOUD_MIRRORED_TABLES` tidak berubah.
+
+### 22.3 Lowongan dan pelamar (data, sumber, CV)
+
+**Lowongan** (`validasi_lowongan` ↔ `validasiLowongan`):
+
+- `judul` 1–100; `jumlah` 1–999; `keterangan` ≤ 2.000. Jabatan, divisi, dan
+  cabang opsional tetapi bila diisi harus ada dan aktif di masternya saat
+  disimpan. Master tidak pernah dihapus, jadi nama dibaca hidup (`LEFT JOIN`),
+  tidak disalin.
+- **Status turunan** (`status_lowongan` ↔ `statusLowongan`, tanggal WIB jam
+  database): `Ditutup` bila `ditutup_pada` terisi ATAU `tanggal_tutup` < hari
+  ini; `Dijadwalkan` bila `tanggal_buka` > hari ini; selain itu `Dibuka`
+  (Q-88).
+- **Tanggal tutup efektif** (jangkar retensi, `TUTUP_EFEKTIF_SQL` kembar):
+  yang lebih awal di antara `date(ditutup_pada, '+7 hours')` dan
+  `tanggal_tutup` yang sudah lewat; kosong selama lowongan belum Ditutup.
+- **Tutup**: mengisi `ditutup_pada = datetime('now')` sekali. **Buka lagi**:
+  mengosongkan `ditutup_pada` dan memundurkan atau mengosongkan
+  `tanggal_tutup`; jam retensi ikut mulai dari nol (penanda §22.12).
+- Lowongan tidak dihapus. Lowongan salah input cukup ditutup; lowongan tanpa
+  pelamar boleh disunting bebas.
+- Daftar membawa hitungan per status pelamar, `pelamar_dihapus`, jumlah
+  diterima dibanding `jumlah`, dan "data pelamar dihapus pada <tanggal>" bila
+  jangkar sudah ada.
+
+**Pelamar** (`validasi_pelamar` ↔ `validasiPelamar`):
+
+- Wajib: lowongan (Q-89), `nama` 2–100, `tanggal_lamaran` (tidak di masa
+  depan, tidak sebelum `tanggal_buka`). Opsional: `no_hp` (dinormalkan
+  `normalize_operator_phone` / `contact.ts`), `email` (bentuk dasar, ≤ 255),
+  `lp`, `tanggal_lahir` (tidak di masa depan), `alamat` ≤ 1.000, `pendidikan`
+  (daftar `PENDIDIKAN` yang sudah ada), `catatan` ≤ 2.000.
+- **Sumber** (Q-90): teks bebas ≤ 100. Layar memberi saran dari daftar tetap
+  (`Jobstreet`, `LinkedIn`, `Glints`, `Instagram`, `Referensi Karyawan`,
+  `Datang Langsung`, `Lainnya`) ditambah nilai yang pernah dipakai; tidak ada
+  tabel master sumber.
+- Menambah pelamar hanya ke lowongan `Dibuka` atau `Ditutup` (lamaran yang
+  baru dicatat belakangan); menyimpan pelamar baru sekaligus menulis tahap
+  `Lamaran` urutan 1 di batch yang sama.
+- **Pelamar kembar** tidak ditolak: nama + no. HP yang sama di lowongan yang
+  sama menjadi tanda `mungkin_ganda` di daftar (dua HRD menginput orang yang
+  sama).
+- Mengubah data pelamar boleh selama belum dijadikan karyawan. Lowongannya
+  tidak bisa dipindah (retensi mengikuti lowongan); salah lowongan = hapus dan
+  catat ulang.
+
+**CV dan berkas** (`hr_pelamar_berkas`): opsional (Q-16), maksimal 3 per
+pelamar, memakai `validasi_berkas` ↔ `validasiBerkas` apa adanya (1 MB, empat
+MIME, tanda tangan bita) dan slot urutan kosong terkecil. Daftar tidak pernah
+membawa `data_base64`; isi diambil per berkas. Berkas tidak disalin ke
+`hr_dokumen` saat pelamar menjadi karyawan (Q-95).
+
+### 22.4 Tahap seleksi (append-only, status turunan, pembatalan)
+
+- **Riwayat append-only**: setiap perpindahan = satu baris `hr_pelamar_tahap`
+  ber-`urutan` berikutnya (`COALESCE(MAX(urutan), 0) + 1`, dihitung di
+  statement INSERT-nya sendiri). Baris tidak pernah diubah isinya dan tidak
+  pernah dihapus, kecuali oleh retensi (§22.6).
+- **Status turunan** (`status_pelamar` ↔ `statusPelamar`): `tahap` baris
+  ber-`urutan` terbesar yang `dibatalkan_pada`-nya kosong. Pelamar yang semua
+  tahapnya dibatalkan tidak mungkin ada: tahap `Lamaran` urutan 1 tidak bisa
+  dibatalkan.
+- **Urutan tahap** (`periksa_tahap` ↔ `periksaTahap`, Q-91): dari tahap
+  proses (`Lamaran`, `Seleksi Berkas`, `Wawancara`, `Tes`, `Penawaran`) boleh
+  ke tahap proses mana pun (maju, melompat, atau mengulang, misalnya wawancara
+  kedua) dan ke tahap akhir (`Diterima`, `Ditolak`, `Mundur`). Dari tahap
+  akhir tidak ada tahap baru. `tanggal` tidak di masa depan dan tidak sebelum
+  `tanggal_lamaran`; `catatan` ≤ 1.000, wajib untuk `Ditolak` dan `Mundur`.
+- **Batalkan tahap terakhir** (koreksi salah tekan): mengisi
+  `dibatalkan_oleh/pada/alasan_batal` pada baris terakhir yang belum
+  dibatalkan, alasan wajib, sekali per baris; status kembali ke tahap
+  sebelumnya. Ditolak bila baris itu `Lamaran` urutan 1, atau bila pelamar
+  sudah dijadikan karyawan (`id_karyawan` terisi).
+- **Lowongan Ditutup tidak mengunci tahap**: proses pelamar yang sudah masuk
+  boleh diselesaikan. Layar menandai pelamar yang masih di tahap proses pada
+  lowongan Ditutup, karena retensi tetap berjalan atas mereka.
+- **Kuota**: jumlah `Diterima` melebihi `hr_lowongan.jumlah` tidak ditolak,
+  hanya tanda `lewat_kuota` di lowongan.
+- Semua penulis memakai transaksi cloud; tidak ada "dua perangkat offline",
+  jadi tidak ada sidik, tanda gugur, atau `diterima_cloud` seperti fase 2
+  dan 6.
+
+### 22.5 Jadikan karyawan (alur, atomisitas, kontrak pertama, penandaan pelamar)
+
+**Peta atomisitas** (temuan §22.1):
+
+| Bagian | Tempat | Bisa satu transaksi dengan |
+| :-- | :-- | :-- |
+| Klaim pelamar (`hr_pelamar.id_karyawan`), isian awal `hr_profil` | cloud | sesama tulisan cloud (`execute_atomic` / `db.batch`) |
+| `master_data` + `id_card` + organisasi + `hr_kontrak` | Desktop/Mobile: SQLite lokal + outbox | satu transaksi SQLite (setelah `create_employee` dan `catat_kontrak` dipecah menjadi varian `_tx`) |
+| Semua di atas | Web: cloud | satu `db.batch` |
+
+Jadi **Web bisa atomik penuh; Desktop tidak bisa**, karena data pelamar di
+cloud dan `master_data` wajib lewat SQLite lokal + outbox (aturan 3). Yang
+dirancang untuk Desktop adalah dua langkah yang masing-masing atomik, dengan
+id deterministik supaya langkah kedua bisa diulang tanpa menggandakan (Q-92).
+
+**Id deterministik** (`id_dari_pelamar` ↔ `idDariPelamar`, vektor uji sama):
+
+- `id_unik` = `createEmployeeIdentifiers(<hex id_pelamar>)` →
+  `EMP_<12 karakter pertama>`; `kode_karyawan` usulannya dari fungsi yang sama
+  dan BOLEH disunting HRD di form. Padanan Rust ditulis kembar.
+- `id_kontrak` = `ktr-<id_pelamar>` (pola `brg-<id_baris>`,
+  `cil-<id_pengajuan>`); `hr-contract/create` sudah berhenti di PK.
+
+**Alur**:
+
+1. Syarat: status pelamar `Diterima`, `id_karyawan` kosong. Layar membuka form
+   karyawan terisi dari pelamar (nama, no. HP, L/P) dan lowongan (jabatan,
+   divisi, cabang); HRD melengkapi shift, tanggal masuk, atasan, dan kontrak
+   pertama (jenis, tanggal mulai, tanggal selesai, masa percobaan, nomor).
+2. **Semua validasi dijalankan dulu**, tanpa menulis apa pun: validasi
+   karyawan yang sudah ada (termasuk `org_dari_draft` dan keunikan
+   `kode_karyawan`), `validasi_kontrak`, dan status pelamar.
+3. **Klaim di cloud** (satu batch, `KLAIM_PELAMAR_SQL` kembar):
+   `UPDATE hr_pelamar SET id_karyawan = ?, dijadikan_oleh = ?, dijadikan_pada
+   = datetime('now') WHERE id_pelamar = ? AND id_karyawan IS NULL AND <status
+   Diterima>`; lalu isian awal `hr_profil` (`tanggal_lahir`,
+   `alamat_domisili`, `pendidikan`) `ON CONFLICT DO NOTHING`, dijaga klaim
+   yang sama (Q-94). Bila baris pelamar sudah diklaim dengan `id_karyawan`
+   yang sama, langkah ini dianggap sudah selesai (jalur "Lanjutkan").
+4. **Tulis karyawan**: Desktop/Mobile satu transaksi SQLite
+   (`create_employee_tx` + `catat_kontrak_tx` + dua baris outbox
+   `employee/create` dan `hr-contract/create`), lalu `syncNow()`. Web:
+   `master_data`, `id_card`, organisasi, `hr_kontrak`, dan
+   `JENIS_DARI_KONTRAK_SQL` di `db.batch` yang SAMA dengan langkah 3.
+   Token dan QR `id|token` dibuat jalur yang sudah ada (aturan 31), tidak ada
+   pembuat token kedua.
+
+**Mencegah dua kali**:
+
+- Dua perangkat menekan bersamaan: keduanya menghasilkan `id_unik` dan
+  `id_kontrak` yang sama; klaim hanya dimenangkan satu (`WHERE id_karyawan IS
+  NULL`), yang kalah berhenti sebelum menulis lokal dengan pesan "Pelamar ini
+  sudah dijadikan karyawan."
+- Klaim berhasil tetapi langkah 4 gagal (aplikasi ditutup, galat SQLite):
+  pelamar tampil **"Diterima, data karyawan belum lengkap"** (klaim terisi
+  tetapi `master_data` belum ada: Desktop memeriksa SQLite lokal, Web
+  memeriksa cloud) dengan tombol **Lanjutkan** yang mengulang langkah 4 dengan
+  id yang sama. Kontrak berhenti di PK. Handler cloud `employee/create`
+  adalah upsert yang MENIMPA `token_absensi` dan `qr_code`, jadi Lanjutkan di
+  Desktop hanya terbuka bila `master_data` itu belum ada di SQLite lokal DAN
+  belum ada di cloud (dibaca lewat `TursoClient` sesudah `syncNow()`); bila
+  sudah ada di salah satunya, layar cukup menarik data, tidak menulis ulang.
+  Yang tersisa: dua perangkat menekan Lanjutkan pada saat yang sama sebelum
+  salah satunya terdorong, dan token yang terakhir sampai yang berlaku
+  (kartu belum dicetak pada saat itu).
+- Satu pelamar tidak pernah menghasilkan dua karyawan, karena `id_unik`
+  diturunkan dari `id_pelamar`. Orang yang sama melamar dua kali (dua
+  `id_pelamar`) tetap bisa menjadi dua karyawan; itu sama dengan menambah
+  karyawan dua kali hari ini dan tidak dijaga.
+
+**Penandaan pelamar**: `id_karyawan` terisi = "Sudah menjadi karyawan" dengan
+tautan ke rincian karyawan. Sejak itu data pelamar, tahap, dan berkasnya
+terkunci (tidak bisa diubah, dibatalkan tahapnya, atau dihapus) dan
+**dikecualikan dari retensi selamanya**. Tidak ada "batal jadikan karyawan":
+salah orang diselesaikan lewat proses keluar fase 5 atau menonaktifkan
+karyawan.
+
+**Yang tidak ikut**: kartu ID (dibuat dari menu Kartu ID seperti biasa), akun
+operator, data keuangan `hr_profil`, dan jatah cuti (dihitung dari
+`tanggal_daftar` yang diisi di form).
+
+### 22.6 Retensi dan penghapusan (Q-33)
+
+- **Yang dihapus**: pelamar ber-`id_karyawan` KOSONG yang lowongannya punya
+  tanggal tutup efektif (§22.3) dan `date(<tutup efektif>, '+N months')` <
+  tanggal WIB jam database, N dari `hr_pelamar_retensi_bulan` (kosong atau di
+  luar 1–60 = 12). Itu mencakup `Ditolak`, `Mundur`, `Diterima` yang tidak
+  pernah dijadikan karyawan, dan pelamar yang prosesnya menggantung. Bersama
+  barisnya ikut terhapus seluruh `hr_pelamar_tahap` dan `hr_pelamar_berkas`.
+- **Yang tersisa** (Q-96): baris `hr_lowongan` dan satu angka anonim
+  `pelamar_dihapus` yang ditambah di batch yang sama. Tidak ada nama, sumber,
+  atau tahap yang disimpan; statistik per sumber hilang bersama datanya.
+- **Yang tidak pernah terhapus**: pelamar ber-`id_karyawan` (termasuk yang
+  klaimnya belum dilanjutkan), beserta tahap dan berkasnya.
+- **Satu batch `execute_atomic`** (`HAPUS_PELAMAR_LAMA_SQL`, teks kembar Rust
+  ↔ TS, pola `HAPUS_FOTO_LAMA_SQL`): tambah `pelamar_dihapus`, hapus berkas,
+  hapus tahap, hapus pelamar, semuanya dengan predikat yang sama dan pelamar
+  dihapus terakhir. Dua sesi yang menjalankannya bersamaan: yang kedua tidak
+  menemukan apa-apa. Tidak ada jam perangkat (aturan 19).
+- **Siapa yang menjalankan** (Q-93): tidak ada server atau penjadwal, jadi
+  sesi yang login. Panggilan baru di `AutoFotoCleanupRunner` yang sudah ada
+  (tidak menambah runner) ke command `desktop_hr_recruit_cleanup` (cukup
+  `require_session`, hanya mengembalikan hitungan, pola
+  `desktop_trip_photo_cleanup`) dan aksi Web yang setara. Akibatnya: bila
+  tidak ada yang login, tidak ada yang terhapus sampai login berikutnya.
+- **Peringatan**: daftar lowongan menampilkan "data pelamar dihapus pada
+  <tanggal>" sejak lowongan Ditutup, dan menonjolkannya 30 hari sebelum hari
+  itu. Mengubah `hr_pelamar_retensi_bulan` langsung berlaku untuk semua
+  lowongan, termasuk yang sudah tutup; memendekkannya bisa menghapus data
+  pada siklus berikutnya (dialog pengaturan menyebut ini).
+- **Hapus lebih cepat** (`hr.recruit.delete`): satu pelamar, kapan saja,
+  dengan mengetik `KONFIRMASI_HAPUS_PERMANEN` (konstanta yang sudah ada).
+  Statement yang sama untuk satu `id_pelamar`, tetap menambah
+  `pelamar_dihapus`, tetap menolak pelamar ber-`id_karyawan`.
+- **Cadangan**: ekspor database dan promosi membawa pelamar yang masih ada
+  saat itu. Berkas cadangan lama tidak ikut dibersihkan retensi; itu di luar
+  jangkauan aplikasi (penanda §22.12).
+
+### 22.7 Pelatihan, peserta, biaya (INTEGER, tanpa jurnal), sertifikat
+
+- **Pelatihan** (`validasi_pelatihan` ↔ `validasiPelatihan`): `nama` 1–100;
+  `penyelenggara` dan `lokasi` ≤ 100; `tanggal_selesai` ≥ `tanggal_mulai`,
+  boleh di masa depan (pelatihan terjadwal); `biaya` bilangan bulat
+  0–1.000.000.000 (aturan 13), satu angka total per pelatihan (Q-98);
+  `keterangan` ≤ 2.000.
+- **Status turunan** (`status_pelatihan` ↔ `statusPelatihan`): `Dibatalkan`
+  bila `dibatalkan_pada` terisi; `Dijadwalkan` bila `tanggal_mulai` > hari
+  ini; `Berlangsung`; `Selesai` bila `tanggal_selesai` < hari ini.
+- **Batal**: kolom, alasan wajib, sekali. Tidak ada hapus. Pelatihan yang
+  dibatalkan tidak muncul di riwayat karyawan.
+- **Peserta**: hanya karyawan `status_aktif = 'Aktif'` saat ditambahkan
+  (dibaca dari `master_data` cloud di transaksi yang sama); PK
+  `<id_pelatihan>:<id_karyawan>` menahan duplikat. `hasil` opsional dan bisa
+  diubah; `catatan` ≤ 1.000. **Melepas peserta** menghapus barisnya (tabel
+  khusus cloud, tidak ada yang bisa menghidupkannya kembali), ditolak selama
+  `id_dokumen` terisi (hapus sertifikatnya dulu). Riwayat tetap terbaca
+  setelah karyawan keluar.
+- **Biaya tanpa jurnal** (§11.2): tidak ada sumber jurnal baru, CHECK
+  `keu_jurnal.sumber` tidak disentuh, tidak ada "sudah dibayar". Pembukuannya
+  jurnal manual. Layar menampilkan biaya per peserta sebagai pembagian
+  tampilan saja, tidak disimpan.
+- **Sertifikat = `hr_dokumen` berjenis `dok-sertifikat`** (Q-97), tidak ada
+  tabel sertifikat. Dari baris peserta, "Tambah sertifikat" memanggil inti
+  `simpan_dokumen` dan `tambah_berkas` yang sudah ada dengan `id_jenis`
+  dikunci `dok-sertifikat` dan `id_karyawan` peserta, lalu mengisi
+  `hr_pelatihan_peserta.id_dokumen`, semuanya satu batch. Isiannya: nomor,
+  tanggal terbit, **tanggal kedaluwarsa** (opsional), catatan (bawaan: nama
+  pelatihan), berkas opsional (maks 5, 1 MB).
+  - Sertifikat itu otomatis tampil di tab Dokumen karyawan, tanpa kode baru.
+  - **Kait fase 8**: pengingat "Dokumen kedaluwarsa H-30" (`hr-dok:<id>`)
+    membaca `hr_dokumen.tanggal_kedaluwarsa` lewat indeks yang sudah ada,
+    jadi sertifikat pelatihan ikut tanpa perubahan di fase 8.
+  - `hapus_dokumen` ↔ kembaran TS mendapat satu statement tambahan di batch
+    yang sama: `UPDATE hr_pelatihan_peserta SET id_dokumen = NULL WHERE
+    id_dokumen = ?`, supaya menghapus dari tab Dokumen tidak meninggalkan
+    tautan mati.
+  - Jenis `dok-sertifikat` yang dinonaktifkan HRD membuat "Tambah sertifikat"
+    ditolak dengan pesan "Aktifkan jenis dokumen Sertifikat di Organisasi."
+  - Izin: `hr.training.manage` cukup untuk menulis dokumen yang jenisnya
+    `dok-sertifikat` DAN tertaut ke baris peserta; di luar itu tetap
+    `hr.document.manage` (penanda §22.12).
+- **Riwayat per karyawan**: tab Pelatihan di rincian karyawan (pelatihan
+  tidak dibatalkan, hasil, sertifikat dan kedaluwarsanya).
+
+### 22.8 Hak akses
+
+| Izin | Sensitif | Rahasia | Paket bawaan |
+| :-- | :-- | :-- | :-- |
+| `hr.recruit.view` | | ya | HRD |
+| `hr.recruit.manage` | | ya | HRD |
+| `hr.recruit.delete` (baru, tidak ada di §10.1) | ya | | HRD |
+| `hr.training.view` | | | HRD (dan Admin) |
+| `hr.training.manage` | | | HRD (dan Admin) |
+
+- Nama izin mengikuti §10.1 (`hr.recruit.*`), bukan `hr.recruitment.*`.
+- Rahasia = `CONFIDENTIAL_PERMISSIONS` dan `NOT IN` seed Admin Rust; sensitif
+  = `SENSITIVE_MUTATION_PERMISSIONS` dan `NOT IN`. `hr.recruit.delete` sensitif
+  tetapi masuk paket HRD (pola `hr.performance.finalize`), karena Q-33
+  menyebut HRD yang menghapus lebih cepat (Q-99).
+- **Jadikan karyawan tanpa izin baru** (Q-100): command dan rute mewajibkan
+  KETIGA izin `hr.recruit.manage`, `employees.manage`, dan
+  `hr.contract.manage` (aturan 44: aksi itu menulis data pelamar, karyawan,
+  dan kontrak). Paket HRD sudah memegang ketiganya.
+- Membaca lowongan, pelamar, tahap, dan berkas: `hr.recruit.view` atau
+  `hr.recruit.manage`. Membaca pelatihan: `hr.training.view` atau
+  `hr.training.manage`. Berkas sertifikat dari layar pelatihan mengikuti izin
+  pelatihan; dari tab Dokumen tetap `hr.document.view`.
+- Paket Atasan tidak berubah (pola fase 5).
+- Pembersihan retensi: cukup sesi (aturan tetap, tanpa pilihan pengguna,
+  hasilnya hanya hitungan).
+- Area: `/hris` tetap area `hris`; tab Rekrutmen dan Pelatihan memeriksa
+  izinnya sendiri, backend memeriksa ulang (aturan 10, 36).
+- Seed HRD Rust + `DEFAULT_ROLE_PERMISSIONS.hrd` + lima izin;
+  `rbac-migration.test.ts` + versi 42.
+
+### 22.9 Command, rute, dan layar
+
+**Rust** (`desktop/hr_rekrutmen.rs` dan `desktop/hr_pelatihan.rs` baru, disalin
+ke Mobile lewat daftar salin `sync-rust-modules.ts`; terdaftar di kedua
+`lib.rs`, `build.rs`, `capabilities/default.json`; doc comment sebelum
+`#[tauri::command]`, aturan 45; semuanya `async` lewat `TursoClient`, dengan
+pesan "butuh koneksi ke database" saat `TURSO_NOT_CONFIGURED` atau jaringan
+gagal):
+
+| Command | Izin |
+| :-- | :-- |
+| `desktop_hr_vacancies` (daftar, status, hitungan, tanggal hapus) | `recruit.view` / `manage` |
+| `desktop_hr_vacancy_save` (buat, ubah, tutup, buka lagi) | `recruit.manage` |
+| `desktop_hr_applicants` (pelamar satu lowongan, atau rincian satu pelamar: tahap + daftar berkas tanpa isi) | `recruit.view` / `manage` |
+| `desktop_hr_applicant_save` | `recruit.manage` |
+| `desktop_hr_applicant_stage` (catat tahap, batalkan tahap terakhir) | `recruit.manage` |
+| `desktop_hr_applicant_file` (isi satu berkas) | `recruit.view` / `manage` |
+| `desktop_hr_applicant_file_save` (tambah, hapus) | `recruit.manage` |
+| `desktop_hr_applicant_hire` (klaim + karyawan + kontrak, juga jalur Lanjutkan) | `recruit.manage` + `employees.manage` + `hr.contract.manage` |
+| `desktop_hr_applicant_delete` | `recruit.delete` |
+| `desktop_hr_recruit_cleanup` (retensi) | sesi |
+| `desktop_hr_trainings` (daftar, rincian + peserta, atau riwayat satu karyawan) | `training.view` / `manage` |
+| `desktop_hr_training_save` (buat, ubah, batal) | `training.manage` |
+| `desktop_hr_training_participants_save` (tambah, lepas, hasil) | `training.manage` |
+| `desktop_hr_training_certificate_save` (dokumen + berkas, hapus) | `training.manage` |
+| `desktop_hr_training_certificate_file` | `training.view` / `manage` |
+
+Command Desktop 286 → 301, Mobile 292 → 307. Perubahan yang ada:
+`operational::create_employee` dan `hris::catat_kontrak` dipecah menjadi
+varian `_tx` (perilaku command lama tidak berubah), `hris::hapus_dokumen`
+(+ satu statement), `BATAS_PENGATURAN` (+ satu kunci). **Tidak ada perubahan
+di `sync.rs`, `storage.rs`, `apply_event_to_turso`, maupun
+`CANONICAL_SYNC_ROUTES`.**
+
+**Web**: `validations/hr-rekrutmen.ts` + `services/hr-rekrutmen.ts` dan
+`validations/hr-pelatihan.ts` + `services/hr-pelatihan.ts` (kembar Rust,
+termasuk teks SQL), rute `POST /api/hris/recruitment` dan
+`POST /api/hris/training` (Zod `.strict()`, aksi per operasi, tanpa `GET`,
+body 25 MB hanya untuk aksi berkas), gateway `gateways/hr-rekrutmen.ts` dan
+`gateways/hr-pelatihan.ts`. `services/employee.ts` `tambahKaryawan` dipecah
+menjadi penyusun statement supaya bisa masuk `db.batch` jadikan karyawan
+(dan sekaligus membuat tambah karyawan biasa atomik).
+
+**Layar** (Web/Desktop saja, Q-43; Mobile tidak mendapat layar apa pun, tetapi
+modul dan command tetap terdaftar di biner Mobile seperti fase 5):
+
+1. `/hris` tab **Rekrutmen** (`RekrutmenWorkspace.tsx`): daftar lowongan
+   dengan status dan hitungan; rincian lowongan berisi pelamar per status,
+   tanda `mungkin_ganda`, `lewat_kuota`, dan tanggal hapus; rincian pelamar
+   dengan riwayat tahap, berkas, Catat tahap, Batalkan tahap terakhir, Jadikan
+   karyawan / Lanjutkan, Hapus. `konfirmasiData` sebelum simpan lowongan,
+   pelamar, tahap, dan jadikan karyawan; hapus memakai ketik konfirmasi.
+2. `/hris` tab **Pelatihan** (`PelatihanWorkspace.tsx`): daftar per tahun,
+   rincian dengan peserta (pemilih `PilihCari`), hasil, sertifikat.
+3. `RincianKaryawan` tab **Pelatihan** (`hr.training.view`).
+4. Organisasi `/hris`: `hr_pelamar_retensi_bulan` tampil di form pengaturan
+   yang sudah ada.
+5. `AutoFotoCleanupRunner`: panggilan pembersihan pelamar.
+
+### 22.10 Tidak dikerjakan di fase ini
+
+- Formulir lamaran publik dan unggah CV oleh pelamar (§15, Q-17).
+- Jurnal otomatis biaya pelatihan dan status "biaya sudah dibayar" (§11.2);
+  rencana dan anggaran pelatihan (§15, Q-26).
+- Menyalin CV pelamar ke Dokumen karyawan (Q-95).
+- Gaji yang diharapkan, penilaian wawancara berskor, jadwal wawancara, dan
+  pewawancara: cukup catatan tahap.
+- Surat penawaran dan surat penolakan (cetak atau email).
+- Talent pool lintas lowongan (pelamar tanpa lowongan), memindahkan pelamar
+  antar lowongan.
+- Statistik rekrutmen per sumber yang bertahan setelah retensi.
+- Pelatihan wajib per jabatan, matriks kompetensi, ikatan dinas.
+- Kejadian Telegram (lowongan, pelamar, sertifikat kedaluwarsa): fase 8.
+- Layar Mobile.
+- Membersihkan data pelamar dari berkas cadangan lama.
+
+### 22.11 Langkah
+
+| # | Langkah | Gerbang |
+| :-- | :-- | :-- |
+| 1 | **Skema v42**: enam tabel khusus cloud di `turso.rs` + `db-schema.ts`/`db-migrations.ts`, indeks sesudah tabelnya; sentinel `-2038` + `ensure_schema_current`, `CURRENT_SCHEMA_VERSION`/`CLIENT_SCHEMA_VERSION` 42 (Desktop DAN Mobile), `REQUIRED_TABLE_COUNT` 102, `isDatabaseSchemaReady`, `schema-consistency.test.ts` + 6, `PROMOTION_PLAN` + 6; daftar sentinel di tes `turso.rs` ikut disesuaikan. `storage.rs`, `sync.rs`, dan `CLOUD_MIRRORED_TABLES` TIDAK disentuh. | `audit:schema` + tes sentinel/provisioning Rust (`sentinel_2037_memicu_skema_rekrutmen`) |
+| 2 | **Aturan kembar** `hr_rekrutmen.rs` ↔ `validations/hr-rekrutmen.ts` dan `hr_pelatihan.rs` ↔ `validations/hr-pelatihan.ts`: `validasi_lowongan`, `status_lowongan`, `validasi_pelamar`, `periksa_tahap`, `status_pelamar`, `id_dari_pelamar`, `validasi_pelatihan`, `status_pelatihan`, validasi peserta; `BATAS_PENGATURAN` + `hr_pelamar_retensi_bulan`; teks SQL kembar `TUTUP_EFEKTIF_SQL`, `KLAIM_PELAMAR_SQL`, `HAPUS_PELAMAR_LAMA_SQL` diperiksa harfiah. Vektor uji yang sama. | `bun run sync:mobile` dulu (tes teks SQL membaca salinan Mobile), lalu `bun run test` (per berkas) + `cargo test hr_rekrutmen hr_pelatihan` |
+| 3 | **RBAC + pendaftaran command**: `catalog.ts` (5 izin), `CONFIDENTIAL_PERMISSIONS`/`SENSITIVE_MUTATION_PERMISSIONS`, baris izin + `NOT IN` seed Admin Rust, seed HRD Rust + `DEFAULT_ROLE_PERMISSIONS`, `rbac-migration.test.ts` + versi 42; 15 command (kerangka + guard izin) di keempat tempat; daftar harapan `audit-sync-contract.ts` (jumlah command, + 6 tabel khusus cloud; rute dan tabel snapshot tidak berubah; pengetatan, bukan pelonggaran). Ditaruh di sini karena rute Web memakai `PermissionKey` dan gateway memanggil command (pelajaran fase 6). | `audit:contract` + `web-rbac-boundary` |
+| 4 | **Transaksi cloud rekrutmen** (Rust): lowongan, pelamar + tahap pertama, tahap dan pembatalannya, berkas, hapus satu pelamar, retensi. | tes `TursoClient::local_file`: tahap sesudah tahap akhir ditolak; batalkan tahap terakhir; retensi menghapus pelamar + tahap + berkas, menambah `pelamar_dihapus`, dan melewati pelamar ber-`id_karyawan`; dijalankan dua kali hasilnya sama |
+| 5 | **Jadikan karyawan** (Rust): `create_employee_tx` + `catat_kontrak_tx`, klaim, Lanjutkan; command lama tetap lulus tesnya. | tes alur Rust (`tests_alur::alur_fase7_jadikan_karyawan`: klaim, karyawan + kontrak + dua outbox dalam satu transaksi, QR `id|token`, tekan kedua ditolak, klaim tanpa karyawan lalu Lanjutkan, pelamar terkunci, salah satu izin kurang ditolak) |
+| 6 | **Pelatihan** (Rust): pelatihan, peserta, sertifikat lewat inti dokumen, `hapus_dokumen` melepas tautan. | tes `local_file`: peserta ganda berhenti di PK; sertifikat tampil di `hris::dokumen`; hapus dokumen mengosongkan `id_dokumen`; lepas peserta bersertifikat ditolak |
+| 7 | **Web**: service, rute `/api/hris/recruitment` dan `/api/hris/training`, gateway; `tambahKaryawan` menjadi penyusun statement. | `services/hr-rekrutmen.test.ts` dan `services/hr-pelatihan.test.ts` (alur sama dengan langkah 4–6, jadikan karyawan satu `db.batch`) + tes karyawan yang sudah ada |
+| 8 | **Layar** §22.9, panggilan retensi di `AutoFotoCleanupRunner`, `bun run sync:mobile`, bagian `CLAUDE.md` "HRIS fase 7", angka di dokumen skill, catatan "Sudah dibangun". | typecheck + Biome + `audit:docs`; `bun run check` penuh oleh pemilik |
+
+### 22.12 Penanda yang ditinjau pemilik saat menyetujui
+
+- **Semua khusus cloud**: rekrutmen dan pelatihan tidak bisa dibuka tanpa
+  koneksi ke database, di Desktop sekalipun. Imbalannya: tanpa tabel snapshot
+  dan tanpa rute baru, dan data pelamar tidak pernah ada di perangkat.
+- **Enam tabel, bukan lima** (§12): `hr_pelamar_berkas` ditambahkan untuk CV.
+- **Jadikan karyawan di Desktop bukan satu transaksi**: klaim di cloud, lalu
+  karyawan + kontrak di SQLite lokal. Celahnya ditutup id deterministik dan
+  tombol Lanjutkan, bukan dihilangkan. Web atomik penuh.
+- `id_unik` karyawan hasil rekrutmen diturunkan dari id pelamar (bukan acak),
+  dan kontrak pertamanya berid `ktr-<id_pelamar>`.
+- Tidak ada "batal jadikan karyawan".
+- Jadikan karyawan menulis isian awal `hr_profil` (tanggal lahir, alamat
+  domisili, pendidikan) tanpa menuntut `hr.personal.manage`.
+- **Retensi hanya berjalan saat ada sesi yang login**, dan menghapus juga
+  pelamar yang prosesnya belum selesai ketika masanya habis.
+- Lowongan dianggap Ditutup otomatis setelah `tanggal_tutup` lewat; lowongan
+  tanpa tanggal tutup yang tidak pernah ditutup menyimpan pelamarnya tanpa
+  batas. Membuka lagi lowongan mengulang jam retensi.
+- Mengubah angka retensi berlaku surut untuk lowongan yang sudah tutup.
+- Setelah retensi hanya tersisa jumlah pelamar yang dihapus per lowongan.
+- Berkas cadangan lama tetap memuat data pelamar yang sudah dihapus.
+- Tahap boleh melompat dan mengulang; tahap tambahan `Mundur`.
+- Kuota lowongan dan pelamar kembar hanya tanda, tidak menolak.
+- `hr.training.manage` boleh menulis `hr_dokumen` berjenis Sertifikat yang
+  tertaut ke peserta, tanpa `hr.document.manage`.
+- Melepas peserta menghapus barisnya (satu-satunya hapus baris di pelatihan).
+- `hr.recruit.delete` sensitif tetapi ikut paket HRD.
+- **Perangkat v41**: tidak ada rute atau tabel snapshot yang tidak dikenalnya,
+  jadi tidak ada data yang bisa dirusaknya. Tetapi begitu cloud naik ke v42,
+  perangkat v41 berhenti sinkron (`SCHEMA_VERSION_OUTDATED`) sampai
+  diperbarui. Jadi semua perangkat tetap wajib diperbarui, kali ini karena
+  mekanisme versi, bukan karena isi fase.
+
+### 22.13 Pertanyaan untuk pemilik
+
+| No | Pertanyaan | Usulan | Alasan |
+| :-- | :-- | :-- | :-- |
+| Q-86 | Lowongan, pelamar, tahap, dan CV: khusus cloud atau tersinkron? | Khusus cloud semuanya | Data pribadi bukan-karyawan (UU PDP, preseden Q-30 dan Q-63). Penghapusan retensi hanya bisa dijamin bila datanya tidak pernah tersalin ke perangkat |
+| Q-87 | Pelatihan dan peserta: khusus cloud atau tersinkron (terbaca offline)? | Khusus cloud | Sertifikatnya `hr_dokumen` yang sudah khusus cloud, jadi layar itu tetap butuh koneksi; menyinkronkan menambah dua tabel empat lapis dan dua rute tanpa pemakai offline |
+| Q-88 | Lowongan tutup: hanya lewat tombol, atau otomatis setelah `tanggal_tutup`? | Keduanya: Ditutup bila ditekan ATAU tanggal tutup lewat | Tanpa otomatis, lowongan yang lupa ditutup membuat retensi tidak pernah mulai |
+| Q-89 | Pelamar wajib tertaut ke satu lowongan? | Ya; pelamar umum dicatat di lowongan "Umum" yang dibuat HRD | Retensi Q-33 dihitung dari tutupnya lowongan; pelamar tanpa lowongan butuh aturan retensi kedua |
+| Q-90 | Sumber pelamar: daftar tetap, master yang bisa disunting, atau teks bebas? | Teks bebas dengan saran | Tidak ada laporan yang mengelompokkan sumber di fase ini, dan datanya dihapus retensi; master sumber = tabel dan layar tambahan |
+| Q-91 | Urutan tahap ketat atau bebas? Perlu tahap "Mundur"? | Bebas di antara tahap proses (boleh melompat dan mengulang), tahap akhir mengunci; tambah `Mundur` | Tidak semua lowongan memakai Tes; wawancara bisa dua kali; pelamar yang menarik diri bukan "Ditolak" |
+| Q-92 | Jadikan karyawan di Desktop: (a) klaim cloud lalu karyawan + kontrak lewat SQLite lokal dan outbox, dengan id deterministik dan tombol Lanjutkan; atau (b) satu batch cloud yang menyisipkan `master_data` langsung? | (a) | (b) atomik penuh, tetapi menulis ulang handler `employee/create` sebagai penulis `master_data` kedua di cloud (token, organisasi, normalisasi) dan melewati outbox (aturan 3). (a) memakai jalur yang sudah teruji; celahnya bisa diulang dengan aman |
+| Q-93 | Siapa menjalankan penghapusan retensi? | Runner sesi login yang sudah ada (`AutoFotoCleanupRunner`), SQL berjam database di cloud | Arsitektur 2-tier tidak punya server atau penjadwal; pola foto laporan 90 hari sudah terbukti |
+| Q-94 | Jadikan karyawan ikut mengisi awal data pribadi (`tanggal_lahir`, alamat domisili, pendidikan) dari pelamar? | Ya, hanya bila profilnya belum ada | HRD tidak mengetik ulang; satu statement di batch klaim |
+| Q-95 | CV pelamar disalin ke Dokumen karyawan saat dijadikan karyawan? | Tidak; CV tetap terbaca dari tab Rekrutmen (pelamar itu tidak pernah terhapus) | Menyalin butuh jenis dokumen baru dan menggandakan berkas sampai 3 MB per orang |
+| Q-96 | Setelah retensi, apa yang tersisa? | Lowongan + jumlah pelamar yang dihapus (angka anonim) | Statistik per sumber atau per tahap berarti menyimpan turunan data yang seharusnya hilang, dan belum ada laporan yang memakainya |
+| Q-97 | Sertifikat pelatihan: `hr_dokumen` jenis Sertifikat, atau tabel sendiri? | `hr_dokumen` jenis `dok-sertifikat`, ditautkan dari baris peserta | Jenisnya, berkasnya, tab Dokumen, dan indeks kedaluwarsanya sudah ada; pengingat fase 8 (`hr-dok:<id>`) ikut tanpa kode tambahan |
+| Q-98 | Biaya pelatihan: satu total per pelatihan atau per peserta? | Satu total per pelatihan; per peserta hanya pembagian tampilan | Sesuai §11.2, dan belum ada jurnal atau ikatan dinas yang butuh angka per orang |
+| Q-99 | Izin menghapus pelamar | Izin baru `hr.recruit.delete`, sensitif, masuk paket HRD; `hr.recruit.view`/`manage` rahasia; `hr.training.*` biasa (ikut Admin) | Hapus permanen layak dipisah dari `manage`, tetapi Q-33 menyebut HRD yang melakukannya. Riwayat pelatihan bukan data rahasia |
+| Q-100 | Izin "Jadikan karyawan" | Tanpa izin baru: wajib memegang `hr.recruit.manage` + `employees.manage` + `hr.contract.manage` sekaligus | Aksi itu tidak memberi kuasa lebih dari tambah karyawan + catat kontrak yang sudah bisa dilakukan pemegang kedua izin itu (aturan 44) |
+
+### 22.14 Jawaban fase 7 (12 Nov 2026)
+
+Semua jawaban sesuai usulan §22.13, jadi isi §22.2–§22.12 tidak berubah.
+
+| No | Pertanyaan | Jawaban |
+| :-- | :-- | :-- |
+| Q-86 | Lowongan, pelamar, tahap, dan CV | Khusus cloud semuanya |
+| Q-87 | Pelatihan dan peserta | Khusus cloud |
+| Q-88 | Lowongan tutup | Keduanya: Ditutup bila ditekan ATAU `tanggal_tutup` lewat |
+| Q-89 | Pelamar wajib tertaut lowongan | Ya; pelamar umum dicatat di lowongan "Umum" yang dibuat HRD |
+| Q-90 | Sumber pelamar | Teks bebas dengan saran |
+| Q-91 | Urutan tahap | Bebas di antara tahap proses (melompat dan mengulang), tahap akhir mengunci; tambah `Mundur` |
+| Q-92 | Jadikan karyawan di Desktop | (a): klaim cloud, lalu karyawan + kontrak lewat SQLite lokal dan outbox, id deterministik dan tombol Lanjutkan |
+| Q-93 | Penjalan retensi | `AutoFotoCleanupRunner` yang sudah ada, SQL berjam database di cloud |
+| Q-94 | Isian awal data pribadi dari pelamar | Ya, hanya bila profilnya belum ada |
+| Q-95 | CV disalin ke Dokumen karyawan | Tidak |
+| Q-96 | Yang tersisa setelah retensi | Lowongan + jumlah pelamar yang dihapus (angka anonim) |
+| Q-97 | Sertifikat pelatihan | `hr_dokumen` jenis `dok-sertifikat`, ditautkan dari baris peserta |
+| Q-98 | Biaya pelatihan | Satu total per pelatihan; per peserta hanya pembagian tampilan |
+| Q-99 | Izin menghapus pelamar | `hr.recruit.delete` sensitif, paket HRD; `hr.recruit.view`/`manage` rahasia; `hr.training.*` biasa (ikut Admin) |
+| Q-100 | Izin Jadikan karyawan | Tanpa izin baru: `hr.recruit.manage` + `employees.manage` + `hr.contract.manage` sekaligus |
+
+### 22.15 Sudah dibangun (12 Nov 2026)
+
+Langkah 1–8 dibangun. Gerbang yang dijalankan: `audit:schema` (102 tabel wajib,
+96 tabel dipromosikan), `audit:contract` (90 rute, 68 tabel snapshot, command
+Desktop 301 / Mobile 307), dan `audit:docs` lulus; `cargo test --lib` Desktop
+436 dan Mobile 440 lulus (termasuk `hr_rekrutmen::tests` dan
+`hr_pelatihan::tests` dengan vektor §22.3–§22.7,
+`tutup_efektif_sql_sama_dengan_aturan_murni`,
+`rekrutmen_cloud_tahap_berkas_dan_retensi`,
+`tests_alur::alur_fase7_jadikan_karyawan`,
+`pelatihan_cloud_peserta_dan_sertifikat`, dan
+`sentinel_2037_memicu_skema_rekrutmen`); runner tes TS kedua workspace
+(`bun run test`, 96 dan 87 berkas) lulus, termasuk
+`validations/hr-rekrutmen.test.ts` dan `validations/hr-pelatihan.test.ts`
+(vektor kembar, teks SQL dan pesan kembar Rust ↔ TS, juga salinan Mobile),
+`services/hr-rekrutmen.test.ts` dan `services/hr-pelatihan.test.ts` (alur Web
+sama dengan alur Rust), dan `web-rbac-boundary.test.ts` (paket izin bawaan);
+typecheck kedua workspace dan Biome berkas yang diubah bersih. `bun run check`
+penuh belum dijalankan (pemilik). Layar belum dicoba di aplikasi yang berjalan.
+
+Penyimpangan dan catatan, untuk ditinjau:
+
+- **Alamat pelamar maksimal 255 karakter, bukan 1.000** (§22.3): alamat
+  menjadi isian awal `hr_profil.alamat_domisili` (Q-94), dan `validasi_pribadi`
+  membatasinya `MAKS_TEKS`. Email memakai validator email operator yang sudah
+  ada (maks 120, bukan 255).
+- **Tanggal hapus = `date(<tutup efektif>, '+N months', '+1 day')`**, dihapus
+  bila ≤ hari ini: sama dengan predikat `<` §22.6, tetapi tanggal yang tampil
+  persis hari penghapusannya. Bulan dihitung SQLite, jadi untuk tanggal akhir
+  bulan hasilnya bisa beberapa hari berbeda dari `tambah_bulan`; layar
+  memakai tanggal dari SQL yang sama.
+- **Satu kumpulan SQL untuk retensi dan hapus lebih cepat**
+  (`HAPUS_PELAMAR_LAMA_SQL`, `?1` NULL = retensi, `?1` = id). Konfirmasi
+  `Hapus Permanen` hanya di layar (pola inventaris); backend dijaga izin
+  sensitif.
+- **Klaim dan isian profil dua statement, bukan satu batch** (Desktop/Mobile):
+  yang kalah klaim hanya bisa dikenali dari `rows_affected` UPDATE-nya, karena
+  kedua perangkat menghasilkan `id_karyawan` yang sama. Isian profil idempoten,
+  dijaga klaim yang sama, dan diulang pada Lanjutkan. Jalur Lanjutkan dipilih
+  backend dari isi klaim, bukan flag.
+- **Web memakai `withTransaction`, bukan `db.batch`**: klaim yang kalah (0
+  baris) harus menghentikan seluruh tulisan. Tes membuktikan kegagalan di
+  tengah tidak meninggalkan klaim.
+- **Penjaga izin kedua di `jadikan_karyawan` ↔ `jadikanKaryawan`** selain di
+  command dan rute: gerbang sesi Desktop juga menegakkan lisensi, jadi syarat
+  "salah satu izin kurang ditolak" diuji di fungsi itu.
+- **Aturan sunting tambahan**: lowongan Ditutup tidak bisa disunting sebelum
+  dibuka lagi; tanggal buka tidak sesudah lamaran pertama; tanggal tutup baru
+  saat Buka lagi harus hari ini atau sesudahnya; tanggal lamaran tidak sesudah
+  tahap yang sudah dicatat (baris tahap `Lamaran` tetap, append-only); master
+  organisasi yang tidak diubah boleh tetap nonaktif. `menggantung` hanya
+  menghitung pelamar tanpa `id_karyawan`.
+- **Sertifikat tidak memanggil fungsi `simpan_dokumen`/`tambah_berkas`**,
+  karena keduanya menjalankan `query_one` sendiri; yang dipakai bersama SQL-nya
+  (`SIMPAN_DOKUMEN_SQL`, `INSERT_BERKAS_DOKUMEN_SQL`, kini satu baris dan kembar
+  dengan `validations/hris.ts`), `validasi_dokumen`, dan `validasi_berkas`.
+  Tambahan: aksi `hapus_berkas`, batas 500 peserta sekali tambah, dan bendera
+  `sertifikat_aktif` di rincian.
+- **Batas body rute**: rekrutmen 1,6 MB (satu berkas per aksi), pelatihan 8 MB
+  (sertifikat sampai 5 berkas); body dibaca sebelum aksinya diketahui.
+- **Urutan langkah**: daftar tabel khusus cloud `audit-sync-contract.ts` dan
+  versi 42 `rbac-migration.test.ts` dikerjakan di langkah 1 (keduanya langsung
+  gagal begitu DDL v42 ada). Skrip audit tidak menyimpan angka command, jadi
+  tidak ada daftar command yang diperketat.
+- **`create_employee` ↔ `tambahKaryawan`**: `create_employee_tx` dan
+  `periksa_draft_karyawan` diekstrak tanpa mengubah urutan tulisan; Web
+  `susunTambahKaryawan` membuat `tambahKaryawan` satu `db.batch`. Belum ada tes
+  layanan karyawan Web sebelumnya; tes baru "tambah karyawan biasa tetap jalan
+  sebagai satu batch" menutupnya. `catat_kontrak_tx` menerima id dari
+  pemanggil; command lama tetap membuat `ktr-<hex>`.
+- **Helper yang dibuka**: `hr_keluar::{Baris, teks_baris, angka_baris,
+  hari_ini_cloud}` menjadi `pub(super)` supaya dipakai ulang. `bacaBase64` dan
+  pembuka berkas pindah dari `RincianKaryawan.tsx` ke
+  `components/hris/berkas.ts`.
+- **Konstanta khusus tes**: `tutup_efektif`, `TUTUP_EFEKTIF_SQL`, dan
+  `RETENSI_BULAN_SQL` Rust hanya `#[cfg(test)]` (yang berlaku di cloud adalah
+  makronya); `SARAN_SUMBER`, `TANGGAL_HAPUS_SQL`, dan `STATUS_PELAMAR_SQL` hanya
+  di TS. `#![allow(dead_code)]` sementara sudah dilepas.
+- **Belum dikerjakan**: tabrakan PK dua sesi yang mencatat tahap bersamaan
+  tidak diuji (transport `local_file` serial); mekanismenya ada dan galat
+  `UNIQUE` diterjemahkan. Pengingat sertifikat kedaluwarsa tetap fase 8.

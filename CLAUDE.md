@@ -1268,6 +1268,67 @@ cloud, baca) diperiksa harfiah oleh `hr-kinerja.test.ts`. Sentinel `-2037`,
 - **Semua perangkat wajib diperbarui sebelum penilaian dipakai**: perangkat
   v40 tidak mengenal tiga rute baru dan enam tabel snapshot.
 
+## HRIS fase 7: rekrutmen dan pelatihan (schema versi 42)
+
+Rincian dan keputusan pemilik di `prd-hris.md` §22 (Q-86 sampai Q-100). Logika
+`desktop/hr_rekrutmen.rs` dan `desktop/hr_pelatihan.rs` (disalin ke Mobile) ↔
+`validations/hr-rekrutmen.ts` + `services/hr-rekrutmen.ts` dan
+`validations/hr-pelatihan.ts` + `services/hr-pelatihan.ts`, vektor sama; SQL
+kembar diperiksa harfiah oleh kedua `*.test.ts` (fragmen makro `concat!`
+dipecah lebih dulu). Sentinel `-2038`, `REQUIRED_TABLE_COUNT` 102.
+
+- **Semua khusus cloud** (Q-86, Q-87): `hr_lowongan`, `hr_pelamar`,
+  `hr_pelamar_tahap`, `hr_pelamar_berkas`, `hr_pelatihan`,
+  `hr_pelatihan_peserta` hanya di `turso.rs` + `db-schema.ts`/`db-migrations.ts`.
+  Tanpa tabel snapshot, rute, atau outbox baru; `storage.rs`, `sync.rs` (kecuali
+  `CLIENT_SCHEMA_VERSION`), dan `CLOUD_MIRRORED_TABLES` tidak disentuh. Layar
+  butuh koneksi ke database, Desktop sekalipun.
+- **Status tidak disimpan**: lowongan `Ditutup` bila tombol Tutup ditekan ATAU
+  `tanggal_tutup` lewat (Q-88), `Dijadwalkan`, `Dibuka`; pelamar = tahap
+  `urutan` terbesar yang tidak dibatalkan; pelatihan `Dibatalkan`,
+  `Dijadwalkan`, `Berlangsung`, `Selesai`. Tahap append-only, bebas di antara
+  tahap proses, tahap akhir (`Diterima`, `Ditolak`, `Mundur`) mengunci (Q-91);
+  urutan tahap dari bacaan terakhir, jadi dua sesi bersamaan bertabrakan di PK.
+- **Retensi** (Q-33, Q-93): `HAPUS_PELAMAR_LAMA_SQL` menghapus pelamar tanpa
+  `id_karyawan` bila `date(<tutup efektif>, '+N months', '+1 day')` ≤ tanggal
+  WIB jam database; N = `hr_pelamar_retensi_bulan` (`BATAS_PENGATURAN`, 1–60,
+  bawaan 12, berlaku surut). Satu batch: `pelamar_dihapus` (angka anonim, Q-96)
+  ditambah, berkas, tahap, lalu pelamar. `?1` NULL = retensi, `?1` = id = hapus
+  lebih cepat (`hr.recruit.delete`). Dijalankan `AutoFotoCleanupRunner`
+  (`desktop_hr_recruit_cleanup`, cukup sesi): tidak ada yang login, tidak ada
+  yang terhapus. Tanggal hapus yang tampil berasal dari SQL yang sama
+  (`tanggal_hapus_sql!` ↔ `TANGGAL_HAPUS_SQL`), bukan `tambah_bulan`.
+- **Jadikan karyawan** (Q-92 (a), Q-100): `id_unik`/`kode_karyawan` dari
+  `id_dari_pelamar` ↔ `idDariPelamar` (`createEmployeeIdentifiers` atas bagian
+  acak `plm-<hex>`), kontrak `ktr-<id_pelamar>`. Desktop/Mobile: validasi dulu,
+  klaim cloud `KLAIM_PELAMAR_SQL[0]` (yang kalah = 0 baris), isian awal
+  `hr_profil` (Q-94, idempoten), lalu `create_employee_tx` + `catat_kontrak_tx`
+  satu transaksi SQLite. Klaim terisi tanpa karyawan = Lanjutkan dengan id yang
+  sama; karyawan yang sudah ada di perangkat atau cloud tidak ditulis ulang
+  (`sudah_ada`), karena `employee/create` cloud menimpa token. Web atomik penuh
+  lewat `withTransaction` dengan `susunTambahKaryawan` (kini juga dipakai
+  `tambahKaryawan` sebagai satu batch). Wajib KETIGA izin `hr.recruit.manage`,
+  `employees.manage`, `hr.contract.manage`. Pelamar ber-`id_karyawan` terkunci
+  dan tidak pernah terhapus; tidak ada "batal jadikan karyawan".
+- **Sertifikat = `hr_dokumen` berjenis `dok-sertifikat`** (Q-97), ditulis satu
+  batch bersama berkas dan `hr_pelatihan_peserta.id_dokumen` lewat
+  `SIMPAN_DOKUMEN_SQL`/`INSERT_BERKAS_DOKUMEN_SQL` (kembar `hris.rs` ↔
+  `validations/hris.ts`). `HAPUS_DOKUMEN_SQL` melepas tautan peserta, jadi
+  tab Dokumen tidak meninggalkan tautan mati. `hr.training.manage` hanya menulis
+  sertifikat yang tertaut ke peserta; berkasnya terbaca lewat
+  `BERKAS_SERTIFIKAT_SQL` saja. Biaya satu total per pelatihan, tanpa jurnal.
+- RBAC: `hr.recruit.view`/`manage` rahasia (`CONFIDENTIAL_PERMISSIONS`),
+  `hr.recruit.delete` sensitif tetapi paket HRD, `hr.training.*` ikut Admin.
+  15 command `desktop_hr_vacanc*`/`applicant*`/`recruit_cleanup`/`training*`
+  (Desktop 301 / Mobile 307); Web `POST /api/hris/recruitment` dan
+  `/api/hris/training`.
+- Layar (Web/Desktop): tab Rekrutmen (`RekrutmenWorkspace.tsx`) dan Pelatihan
+  (`PelatihanWorkspace.tsx`) di `/hris`, tab Pelatihan rincian karyawan, dan
+  masa simpan pelamar di form pengaturan Organisasi (konfirmasi memperingatkan
+  bila dipendekkan). Mobile tanpa layar; modul dan command tetap di biner.
+- **Semua perangkat wajib diperbarui**: begitu cloud naik ke v42, perangkat v41
+  berhenti sinkron (`SCHEMA_VERSION_OUTDATED`).
+
 ## Domain contoh
 
 `master_item` dan `log_aktivitas` adalah tabel peraga yang memperagakan pola

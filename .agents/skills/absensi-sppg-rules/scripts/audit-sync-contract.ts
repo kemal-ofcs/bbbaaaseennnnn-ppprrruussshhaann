@@ -238,6 +238,14 @@ const expectedCloudOnlyTables = [
   "hr_keluar",
   "hr_keluar_rincian",
   "hr_keluar_alasan",
+  // HRIS fase 7 (v42, Q-86, Q-87): rekrutmen dan pelatihan. Data pelamar
+  // bukan karyawan wajib hilang saat retensi, jadi tidak pernah ke perangkat.
+  "hr_lowongan",
+  "hr_pelamar",
+  "hr_pelamar_tahap",
+  "hr_pelamar_berkas",
+  "hr_pelatihan",
+  "hr_pelatihan_peserta",
   "app_permission",
   "app_role",
   "app_session",
