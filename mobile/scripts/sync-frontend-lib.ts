@@ -19,15 +19,6 @@ const filesToCopy = [
   "components/ui/PilihCari.tsx",
   // Isian organisasi HRIS (v36) di form karyawan: cabang, divisi, jabatan, atasan.
   "components/personnel/IsianOrganisasi.tsx",
-  // Pengajuan cuti/izin/sakit HRIS (v37, Q-52): satu layar untuk kedua build.
-  "components/hris/PengajuanWorkspace.tsx",
-  // Pembayaran terpisah reimbursement (HRIS v39), dipakai PengajuanWorkspace.
-  "components/hris/PembayaranReimburse.tsx",
-  // Penilaian kinerja HRIS (v41): tab Penilaian `/pengajuan` Mobile dan tab
-  // Kinerja `/hris` Web/Desktop memakai komponen yang sama (§21.9).
-  "components/hris/PenilaianKinerja.tsx",
-  // Kartu "Perlu perhatian" di /dashboard Mobile (fase 9, §24.5).
-  "components/hris/PerluPerhatian.tsx",
   "components/ui/KonfirmasiData.tsx",
   // Pengirim notifikasi Telegram: berjalan di setiap sesi login, identik di kedua build.
   "components/AutoTelegramRunner.tsx",
@@ -120,6 +111,10 @@ for (const file of filesToCopy) {
 }
 
 const dirsToCopy = [
+  // Seluruh layar HRIS (fase 10, §25.3): `/hris`, `/pengajuan`, dan kartu
+  // "Perlu perhatian" di /dashboard. Di luar direktori ini hanya bergantung
+  // pada `PilihCari`, `KonfirmasiData`, `Modal`, dan `inventory/gaya`.
+  "components/hris",
   "lib/attendance",
   "lib/auth",
   "lib/client",

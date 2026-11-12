@@ -48,7 +48,6 @@ export default function MenuPage() {
     items: group.items.filter(
       (item) =>
         !BOTTOM_NAV_HREFS.has(item.href) &&
-        !item.desktopSaja &&
         canSeeItem(user, item) &&
         (!needle ||
           item.label.toLowerCase().includes(needle) ||

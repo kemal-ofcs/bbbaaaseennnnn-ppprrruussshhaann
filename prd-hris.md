@@ -4375,3 +4375,814 @@ Penyimpangan dan catatan, untuk ditinjau:
   bergantung tanggal kalender.
 - **Tautan Penilaian di Mobile** membuka `/pengajuan?tab=penilaian`; halaman
   itu (milik Mobile) kini membaca parameter tersebut.
+
+## 25. Urutan pengerjaan fase 10
+
+**Disetujui pemilik (13 Nov 2026).** Ditulis setelah menelusuri kode
+(13 Nov 2026); jawaban Q-125 sampai Q-136 di §25.12, semuanya sesuai usulan.
+Isinya dua butir §15.1 "Urutan fase yang berlaku": HRIS lengkap di Mobile untuk
+HRD (membalik Q-43) dan bagan struktur organisasi di Web, Desktop, dan Mobile.
+Q-124 ditinjau ulang di sini. Rencana dan anggaran pelatihan tetap fase 11.
+
+### 25.1 Temuan dari kode
+
+- **Biner Mobile sudah memuat seluruh backend HRIS.** Ke-69 command
+  `desktop_hr_*` sama persis di kedua `lib.rs`, kedua `build.rs`, dan kedua
+  `capabilities/default.json` (69 izin `allow-desktop-hr-*` di masing-masing).
+  `hris.rs`, `hr_pengajuan.rs`, `hr_keluar.rs`, `hr_kinerja.rs`,
+  `hr_rekrutmen.rs`, `hr_pelatihan.rs`, `telegram.rs`, dan `commands.rs` ada di
+  daftar salin `sync-rust-modules.ts`; semua gateway HRIS ada di
+  `lib/gateways` (disalin `dirsToCopy`). Yang belum ada di Mobile hanya
+  **layarnya**: fase 10 tidak butuh command, rute, izin, atau skema baru.
+- **Komponen HRIS di Mobile hari ini** (`filesToCopy`): `PengajuanWorkspace`,
+  `PembayaranReimburse`, `PenilaianKinerja`, `PerluPerhatian` (identik dengan
+  Web/Desktop). Belum disalin: `HrisWorkspace`, `RincianKaryawan`,
+  `JatahCutiPanel`, `SuratPeringatanPanel`, `cetakSuratPeringatan`,
+  `KinerjaWorkspace`, `TemplateKinerja`, `KeluarWorkspace`,
+  `RekrutmenWorkspace`, `PelatihanWorkspace`, `OrganisasiPanel`,
+  `PengaturanPengajuan`, `berkas.ts`.
+- **Dependensi komponen itu sudah ada di Mobile.** Di luar `components/hris/`
+  mereka hanya mengimpor `PilihCari`, `KonfirmasiData`, `inventory/gaya` (sudah
+  di `filesToCopy`) dan `lib/*` (sudah di `dirsToCopy`). Tidak ada yang
+  mengimpor `Modal`, `PageHeader`, `FeedbackBanner`, atau `AppShell`, yang
+  berbeda antara kedua workspace. Jadi seluruh `components/hris/` bisa disalin
+  apa adanya; yang perlu disesuaikan hanya perilaku di bawah.
+- **Bergantung pada sesuatu yang tidak ada (atau belum terbukti) di Mobile**:
+
+  | Hal | Letak | Keadaan di Mobile |
+  | :-- | :-- | :-- |
+  | Cetak A4 (`window.print`) | `cetakSuratPeringatan.ts` lewat tombol di `SuratPeringatanPanel` | WebView Android tidak punya dialog cetak; pola yang ada menyembunyikan tombolnya (`!isMobileRuntime()` di `RincianSuratJalan`, `UpahPanel`) |
+  | Buka berkas di tab baru (`window.open` atas URL blob) | `bukaBerkas` di `berkas.ts` (dokumen, CV, sertifikat) dan salinan sendiri di `PengajuanWorkspace` (`lihat`) | Belum terbukti; Tauri Android tidak membuka jendela baru, jadi diduga tidak terjadi apa-apa. Lampiran pengajuan di Mobile sudah memakai jalur ini sejak fase 2 dan belum pernah diuji di HP |
+  | Unggah berkas (`<input type="file">`) | Dokumen, nota, CV, sertifikat | Sudah dipakai Mobile (lisensi, cadangan database, foto personil, lampiran pengajuan), jadi pemilih berkas Android berjalan. Tetapi foto kamera HP biasanya 2–5 MB, sedangkan batas berkas HRIS 1 MB (`MAKS_BERKAS_BASE64`): sebagian besar foto langsung dari kamera akan ditolak backend |
+  | `window.confirm`, `window.prompt`, `window.alert` | `RincianKaryawan` (hapus berkas, hapus dokumen), `JatahCutiPanel` (alasan batal penyesuaian), `OrganisasiPanel` (galat Jadikan divisi) | Tidak ada kode Mobile yang memakainya hari ini; perilakunya di WebView Tauri belum terbukti |
+  | Simpan berkas | `saveFileWithPicker` (`lib/client/download.ts`) | Sudah benar di Mobile: SAF lewat `mobile_save_file_to_device` (aturan 28, 46) |
+  | Lebar layar | Daftar + rincian `lg:grid-cols-[22rem_1fr]` di `HrisWorkspace`, `KeluarWorkspace`, `RekrutmenWorkspace`, `PelatihanWorkspace`, `PenilaianKinerja` | Di bawah `lg` rincian jatuh DI BAWAH daftar (`max-h-[65vh]`), jadi di HP menekan nama tidak terlihat berbuah apa pun sampai layar digulir. `PenilaianKinerja` di `/pengajuan` Mobile sudah begini hari ini |
+  | Baris tab | `HrisWorkspace` (7 tab), `RincianKaryawan` (9 tab) | `flex-wrap`, di HP 360 px menjadi 2–3 baris tombol |
+  | Tabel lebar | `JatahCutiPanel` (`min-w-[34rem]` dalam `overflow-x-auto`), `KeluarWorkspace` | Tergulir di dalam kartunya sendiri; tidak memecah halaman |
+
+- **Tanpa koneksi.** Data khusus cloud (`hr_profil`, `hr_dokumen*`, `hr_sp`,
+  `hr_keluar*`, rekrutmen, pelatihan, lampiran pengajuan, kartu "Perlu
+  perhatian") dibaca command lewat `TursoClient`; `hris::tak_terhubung`
+  (dipakai bersama oleh `hr_pengajuan`, `hr_keluar`, `hr_kinerja`,
+  `hr_rekrutmen`, `hr_pelatihan`) hanya memetakan `TURSO_NOT_CONFIGURED` ke
+  "Data ini hanya tersimpan di database pusat dan butuh koneksi ke database.".
+  Jaringan putus menghasilkan `TURSO_NETWORK_ERROR` "Gagal menghubungi database
+  Turso: <galat reqwest>", yang memuat alamat database. Di laptop kantor itu
+  jarang; di HP HRD itu keadaan sehari-hari.
+- **Yang berjalan offline di perangkat** (SQLite lokal + outbox): daftar
+  karyawan, tab Kerja dan Kontrak, Struktur, Organisasi (`desktop_hr_org`,
+  termasuk `atasan_siklus` yang dihitung dari SQLite), jenis pengajuan dan
+  aturan cuti, jatah cuti, penilaian kinerja (draf; Ajukan menjalankan sinkron
+  dulu, Q-72), pembayaran reimburse.
+- **Navigasi Mobile**: menu `/menu` dibangun dari `NAVIGATION_GROUPS` dan
+  membuang butir ber-`desktopSaja`; satu-satunya butir itu adalah HRIS (grup
+  SDM), dan satu-satunya pembaca bendera itu adalah `mobile/src/app/menu/page.tsx`.
+  Navigasi bawah tetap Beranda, Karyawan, Scanner, Riwayat, Menu. Halaman
+  Mobile dijaga dengan `router.replace("/dashboard")` (static export tidak
+  punya `/forbidden`), pola `mobile/src/app/pengajuan/page.tsx`, dan
+  `useSearchParams` dibungkus `Suspense`. `KARYAWAN_SHORTCUT_AREAS` (pintasan di
+  `/karyawan` Mobile) belum memuat `hris`.
+- **Struktur hari ini** (`Struktur` di `HrisWorkspace.tsx`): daftar berjenjang
+  menurut `id_atasan`, berindentasi, dipotong di kedalaman 12. Komentarnya
+  menulis "dikelompokkan per cabang" dan §16.6 menjanjikan "per cabang/divisi",
+  tetapi kodenya tidak mengelompokkan: cabang hanya teks di tiap baris.
+  Karyawan nonaktif dibuang; bawahan yang atasannya nonaktif naik ke puncak
+  **tanpa tanda**; karyawan dalam `atasan_siklus` naik ke puncak bertanda.
+  Setiap karyawan tanpa atasan menjadi baris puncak, jadi di perusahaan yang
+  baru mulai mengisi atasan, puncaknya hampir seluruh karyawan.
+- **Data bagan sudah tersedia di ketiga versi tanpa bacaan baru**:
+  `getDaftarKaryawan` (nama, `id_atasan`, `id_cabang`, `id_divisi`,
+  `id_jabatan`, `divisi`, `jabatan_status`, `status_aktif`, `id_keluar`) dan
+  `ambilOrganisasi` (`cabang`, `divisi`, `jabatan`, `atasan_siklus`), keduanya
+  `employees.view`, lokal di Desktop/Mobile dan cloud di Web.
+- **Pemakaian ulang yang tersedia**: `optimizeImageFile`
+  (`lib/client/image-optimizer.ts`, `fit: "shrink"`, dipakai
+  `PersonnelPhotoField` dan `inventory/Pengajuan`) untuk mengecilkan foto;
+  `saveFileWithPicker` untuk PDF; `PengajuanWorkspace` punya salinan
+  `bacaBase64` sendiri yang sama dengan `berkas.ts`.
+- **Kartu "Perlu perhatian" di Mobile** (`/dashboard`) hari ini tanpa
+  `onPilihKaryawan` dan `onBukaRekrutmen` (Q-124); Kinerja membuka
+  `/pengajuan?tab=penilaian`. Beranda Web/Desktop sudah membuka
+  `/hris?karyawan=<id>&tab=<tab>`, `/hris?tab=kinerja`, `/hris?tab=rekrutmen`,
+  dan `HrisWorkspace` sudah membaca parameter itu.
+- Skema sekarang: v42, sentinel `-2038`, `REQUIRED_TABLE_COUNT` 102, 68 tabel
+  snapshot, 90 rute, command Desktop 302 / Mobile 308, 26 kejadian Telegram,
+  5 bidang. Fase 8 dan 9 sudah di-commit, belum dirilis (Q-113).
+
+### 25.2 Model data: tanpa perubahan skema
+
+Versi tetap 42, sentinel tetap `-2038`, tanpa tabel, kolom, indeks, rute, izin,
+atau command baru (Desktop 302 / Mobile 308). `storage.rs`, `sync.rs`, DDL
+`turso.rs`, `db-schema.ts`, `db-migrations.ts`, `PROMOTION_PLAN`, dan skrip
+audit tidak disentuh. Satu perubahan Rust kecil di luar skema: `tak_terhubung`
+(§25.3). Bagan dibangun dari data yang sudah dibaca tab Struktur (§25.5).
+
+### 25.3 HRIS di Mobile untuk HRD
+
+**Rute dan navigasi**
+
+- Halaman baru `mobile/src/app/hris/page.tsx` (milik Mobile, tidak disalin):
+  `MobileAppShell`, guard `canAccessArea(user, "hris")` →
+  `router.replace("/dashboard")`, `HrisWorkspace` di dalam `Suspense`. Area
+  tetap `hris` = `employees.view`, sama dengan Web/Desktop.
+- `desktopSaja` dibuang dari butir HRIS di `navigation.ts`; karena tidak ada
+  pemakai lain, bendera dan saringannya di `menu/page.tsx` ikut dihapus. HRIS
+  muncul di Menu grup SDM untuk setiap pemegang `employees.view` (HRD, Atasan,
+  Admin), sama dengan menu Web/Desktop.
+- `hris` ditambahkan ke `KARYAWAN_SHORTCUT_AREAS`, jadi `/karyawan` Mobile
+  punya pintasan ke HRIS. Navigasi bawah tidak berubah (lima slot sudah penuh).
+- `components/hris` pindah dari empat entri `filesToCopy` ke satu entri
+  `dirsToCopy`; komponennya tetap satu sumber di `web-desktop/`.
+
+**Tab yang ikut** (Q-126 sampai Q-128): semua tab `/hris` dan semua tab
+rincian karyawan, dijaga izin yang sama, karena backend-nya sudah ada di biner
+dan memeriksa ulang (aturan 10). Pengecualiannya hanya yang secara fisik tidak
+bisa di HP:
+
+| Bagian | Di Mobile | Catatan |
+| :-- | :-- | :-- |
+| Karyawan + kartu "Perlu perhatian" + rincian (Kerja, Pribadi, Keuangan, Kontrak, Dokumen, Cuti, SP, Kinerja, Pelatihan) | ya | Cabang/divisi/jabatan/atasan tetap diubah dari `/karyawan` (`IsianOrganisasi`, sudah ada di Mobile) |
+| Struktur (bagan, §25.5) | ya | |
+| Kinerja (Penilaian, Template) | ya, Q-128 | Tanpa `modeHp`: Kembalikan, Final, Koreksi, dan Template ikut, tetap dijaga peta `boleh` backend. `/pengajuan` tab Penilaian tetap `modeHp` |
+| Keluar | ya | Berlakukan/Batalkan sensitif dan butuh koneksi (khusus cloud) |
+| Rekrutmen (termasuk Jadikan karyawan) | ya | Jadikan karyawan menulis SQLite + outbox di HP, jalur yang sama dengan Desktop |
+| Pelatihan | ya | |
+| Organisasi (master, jenis pengajuan, aturan cuti, angka pengingat, masa simpan pelamar) | ya, Q-127 | Membalik bagian "pengaturan Web/Desktop" Q-52 |
+| Cetak SP A4 | **tidak** (Q-131) | Tombol disembunyikan `!isMobileRuntime()`, pola `UpahPanel`. SP tetap bisa dibuat, dilihat, dan dicabut di HP |
+
+**Mode HP**: tidak ada prop `modeHp` baru untuk tata letak; penyesuaian §25.4
+berlaku menurut lebar layar (Web di browser HP ikut untung), dan
+`isMobileRuntime()` hanya dipakai untuk dua hal yang memang khas WebView: cetak
+dan cara membuka berkas. `KinerjaWorkspace` tidak meneruskan `modeHp` (Q-128).
+
+**Tanpa koneksi**
+
+- Tab yang lokal berjalan penuh offline seperti di Desktop (§25.1).
+- Tab khusus cloud menampilkan pesan backend apa adanya. `tak_terhubung`
+  diperluas: `TURSO_NETWORK_ERROR` juga dipetakan ke pesan "butuh koneksi ke
+  database" yang sama, supaya HP tanpa sinyal tidak menampilkan galat reqwest
+  berisi alamat database. Satu fungsi di `hris.rs` (disalin ke Mobile),
+  berlaku untuk semua modul HR khusus cloud, juga di Desktop.
+- Tidak ada cache data khusus cloud di HP. Menyimpannya berarti menaruh NIK,
+  rekening, dan pindaian KTP di SQLite perangkat yang mudah hilang, melawan
+  Q-30/Q-45.
+
+**Q-124 dibuka** (Q-132): di `/dashboard` Mobile, kartu diberi tautan yang
+sama dengan beranda Web/Desktop: nama → `/hris?karyawan=<id>&tab=<tab>`,
+Kinerja → `/hris?tab=kinerja`, lowongan → `/hris?tab=rekrutmen`, masing-masing
+hanya bila `canAccessArea(user, "hris")` dan izin tabnya dipegang. Tautan
+Pengajuan ke `/pengajuan` tetap. Tanpa area `hris`, Kinerja tetap membuka
+`/pengajuan?tab=penilaian` seperti sekarang.
+
+### 25.4 Penyesuaian layar HP pada komponen bersama
+
+Semua di `web-desktop/src/components/hris/`, berlaku untuk ketiga versi.
+
+1. **Daftar atau rincian** di bawah `lg`: bila ada yang dipilih, daftar
+   disembunyikan dan rincian tampil dengan tombol "Kembali ke daftar"
+   (`lg:hidden`); di `lg` ke atas tetap dua kolom. Lima pemakai
+   (`HrisWorkspace`, `KeluarWorkspace`, `RekrutmenWorkspace`,
+   `PelatihanWorkspace`, `PenilaianKinerja`) memakai satu pembungkus kecil
+   `DaftarRincian.tsx` di `components/hris/`, bukan lima salinan kelas.
+   `PenilaianKinerja` di `/pengajuan` Mobile ikut membaik.
+2. **Baris tab** `HrisWorkspace` dan `RincianKaryawan`: satu baris yang bisa
+   digulir mendatar (`flex-nowrap overflow-x-auto`) di bawah `sm`, tetap
+   `flex-wrap` di atasnya.
+3. **Dialog bawaan browser diganti** (empat tempat, §25.1): hapus berkas dan
+   hapus dokumen memakai `konfirmasiData` dengan baris yang akan dihapus;
+   alasan batal penyesuaian cuti menjadi isian alasan di baris itu (pola
+   pembatalan kontrak); galat Jadikan divisi masuk pesan galat panel. Dengan
+   begitu tidak ada yang bergantung pada perilaku `window.confirm/prompt/alert`
+   di WebView.
+4. **Membuka berkas** (Q-129): `bukaBerkas` menjadi satu-satunya jalur
+   (`PengajuanWorkspace.lihat` dan salinan `bacaBase64`-nya dibuang, memakai
+   `berkas.ts`). Web/Desktop tetap tab baru. Mobile: gambar tampil di dialog
+   pratinjau (`<img>` dari data URL, tanpa salinan di HP); PDF diserahkan ke
+   `saveFileWithPicker` (SAF), dengan kalimat bahwa salinannya tersimpan di
+   folder yang dipilih.
+5. **Foto besar diperkecil sebelum diunggah** (Q-130): di `berkas.ts`, gambar
+   yang melebihi 1 MB dikecilkan dengan `optimizeImageFile` (`fit: "shrink"`,
+   sisi terpanjang 2000 px, JPEG), lalu dicoba sekali lagi dengan mutu lebih
+   rendah; MIME ikut menjadi `image/jpeg`. PDF tidak disentuh dan tetap ditolak
+   bila > 1 MB. Atribut `accept` tidak berubah, jadi pemilih Android tetap
+   menawarkan kamera.
+6. **Cetak SP** disembunyikan di Mobile (Q-131).
+
+### 25.5 Bagan struktur organisasi (Web, Desktop, Mobile)
+
+**Sumber data**: `getDaftarKaryawan` + `ambilOrganisasi` yang sudah dimuat
+`HrisWorkspace` (§25.1). Lokal di Desktop/Mobile, jadi bagan jalan offline;
+cloud di Web. Tidak ada command, kueri, atau tabel baru.
+
+**Aturan susun** (fungsi murni `susunBagan` di `validations/hris-bagan.ts`,
+disalin ke Mobile lewat `lib/validations`; tanpa kembaran Rust karena hanya
+layar yang membacanya, pola label box inventaris), diuji `bun test`:
+
+- Simpul = karyawan `status_aktif = 'Aktif'` (yang keluar sudah Nonaktif,
+  §20.4). Induk = `id_atasan` bila atasannya ada dan aktif.
+- Karyawan dalam `atasan_siklus` menjadi akar bertanda "Atasan membentuk
+  lingkaran" (`LABEL_TANDA_HRIS.atasan_siklus`, seperti sekarang). Bawahan yang
+  atasannya nonaktif atau tidak dikenal menjadi akar bertanda baru "Atasan
+  nonaktif" (hari ini naik diam-diam).
+- **Karyawan tanpa atasan DAN tanpa bawahan tidak digambar sebagai kotak**
+  (Q-135): mereka masuk kelompok "Belum punya atasan" per divisi, terlipat,
+  dengan jumlahnya. Akar bagan = yang punya bawahan, ditambah akar bertanda.
+- Urutan anak stabil menurut nama (lalu `id_unik`); kedalaman dijaga 12 seperti
+  sekarang, walaupun siklus sudah disingkirkan lebih dulu.
+- Isi kotak: nama, jabatan (`jabatan_status`), divisi, cabang, dan jumlah
+  bawahan langsung/total. Tidak ada NIK, kontak, foto, gaji, atau status
+  kontrak; isinya persis yang tab Struktur tampilkan hari ini.
+
+**Cara menggambar, tanpa dependensi baru**: kotak `div` + garis penghubung
+dari border dan pseudo-element Tailwind (`before:`/`after:`), tanpa SVG,
+canvas, atau paket bagan; warna dari kelas gelap yang sudah ada (tema terang
+lewat `globals.css`/variabel seperti komponen lain). Tidak ada CSS baru di
+`globals.css` kedua workspace. Komponen `BaganOrganisasi.tsx` di
+`components/hris/`.
+
+**Tampilan** (Q-133, usulan (b)):
+
+- **Bagan** (bawaan di layar `lg` ke atas): pohon atas-ke-bawah. Dua tingkat
+  pertama terbuka, sisanya terlipat dengan tombol "+n bawahan" per kotak.
+  Simpul yang bawahan langsungnya lebih dari 8 menumpuk anaknya ke bawah
+  (kolom), bukan ke samping, supaya lebar tetap terkendali. Lebar yang tersisa
+  digulir di dalam kartu bagan (`overflow-x-auto`), tidak pernah menggulir
+  halaman.
+- **Fokus** (bawaan di bawah `lg`, termasuk HP): satu tingkat sekaligus. Di
+  atas rantai atasan sampai akar (kotak ringkas, bisa ditekan), di tengah kotak
+  terpilih, di bawahnya bawahan langsung dalam kisi 1–2 kolom. Menekan kotak
+  bawahan turun satu tingkat; menekan rantai naik. Tanpa pilihan, yang tampil
+  akar-akar bagan. Selalu muat di 360 px tanpa gulir mendatar.
+- Keduanya bisa dipilih di semua lebar (dua tombol) dan memakai keluaran
+  `susunBagan` yang sama.
+- Kotak cari di atas bagan: memilih karyawan membuka Fokus padanya (di Bagan:
+  membuka rantai sampai dia).
+- Tombol "Lihat rincian" di kotak terpilih membuka tab Karyawan pada orang itu
+  (`setDipilih`), memakai alur yang sudah ada.
+
+**Menurut unit** (Q-134): tampilan ketiga di tab Struktur, Cabang → Divisi →
+karyawan (nama, jabatan) dengan `<details>` bawaan HTML dan jumlah per
+kelompok; "Tanpa cabang" dan "Tanpa divisi" di akhir. Ini yang §16.6 janjikan
+dan belum dibangun.
+
+**Batas ukuran**: Bagan menggambar paling banyak 400 kotak sekaligus; bila
+lebih, tingkat yang terbuka dikurangi dan tampil "Bagan dipersempit, pakai
+Fokus atau cari". Fokus dan Menurut unit tidak dibatasi (Fokus satu tingkat,
+unit terlipat). Kelompok "Belum punya atasan" menampilkan 200 nama pertama per
+divisi lalu "dan k lainnya" (pola `LIMIT 200` kartu).
+
+**Daftar berjenjang lama** (Q-134): diganti Bagan + Fokus + Menurut unit, karena
+Fokus menggantikan fungsinya di HP dan Bagan di laptop. Pilar 2.2 meminta
+persetujuan sebelum menghapusnya.
+
+### 25.6 Hak akses
+
+- **Tidak ada izin baru.** `catalog.ts`, seed role Rust,
+  `CONFIDENTIAL_PERMISSIONS`, `SENSITIVE_MUTATION_PERMISSIONS`, dan
+  `rbac-migration.test.ts` tidak berubah.
+- `/hris` Mobile dijaga area `hris` (`employees.view`); tiap tab dan tombol
+  memeriksa izinnya sendiri persis seperti Web/Desktop, dan backend memeriksa
+  ulang (aturan 10). Halaman di HP tidak membuka data yang tidak terbuka di
+  laptop untuk izin yang sama.
+- Bagan dan Menurut unit: `employees.view` (Q-136), data yang sama dengan tab
+  Struktur hari ini.
+- Konsekuensi yang perlu disadari (penanda §25.10): data rahasia
+  (`hr.personal.*`, `hr.finance.*`, `hr.document.*`) kini bisa dibuka dari HP
+  oleh pemegang izinnya.
+
+### 25.7 Command, rute, dan layar
+
+- **Rust**: hanya `tak_terhubung` di `hris.rs` (+ tes), disalin ke Mobile.
+  Command tetap Desktop 302 / Mobile 308; tidak ada pendaftaran baru di
+  `lib.rs`, `build.rs`, atau `capabilities/default.json`.
+- **Web**: tanpa rute baru, tanpa perubahan `/api/hris*`.
+- **Logika**: `validations/hris-bagan.ts` (`susunBagan`) + tes.
+- **Layar** (`web-desktop/src/components/hris/`, disalin seluruhnya):
+  `BaganOrganisasi.tsx` (Bagan, Fokus, Menurut unit) menggantikan `Struktur` di
+  `HrisWorkspace`; `DaftarRincian.tsx` dipakai lima layar daftar–rincian; baris
+  tab gulir; `berkas.ts` (pratinjau gambar Mobile, PDF lewat SAF, perkecil
+  foto); `PengajuanWorkspace` memakai `berkas.ts`; dialog bawaan diganti di
+  `RincianKaryawan`, `JatahCutiPanel`, `OrganisasiPanel`; tombol cetak SP
+  disembunyikan di Mobile.
+- **Mobile**: `mobile/src/app/hris/page.tsx`; `dirsToCopy` + `components/hris`
+  (empat entri `filesToCopy` HRIS dibuang); `navigation.ts` tanpa
+  `desktopSaja`, `KARYAWAN_SHORTCUT_AREAS` + `hris`; `menu/page.tsx` tanpa
+  saringan `desktopSaja`; `dashboard/page.tsx` tautan kartu (Q-132).
+
+### 25.8 Tidak dikerjakan di fase ini
+
+- Cetak SP dari HP, dan ekspor/cetak bagan (gambar atau PDF) di versi mana pun:
+  PDF butuh `jspdf` yang belum disetujui; cetak bagan lebar dari browser tidak
+  bisa dijamin rapi.
+- Cache data khusus cloud di HP untuk dibaca offline (§25.3).
+- Pengaman tambahan untuk HP (PIN aplikasi, kunci layar data rahasia, keluar
+  otomatis lebih cepat di Mobile).
+- Foto personil di kotak bagan (`personil_foto` berat dan di luar snapshot).
+- Bagan menurut jabatan resmi (posisi kosong, struktur rencana): bagan hanya
+  menggambar orang dan atasannya yang tercatat.
+- Mengubah atasan dari bagan (seret-lepas): tetap dari form karyawan.
+- Rencana dan anggaran pelatihan (fase 11); pelaporan BPJS/DJP/Wajib Lapor dan
+  berkas transfer bank (sesudah fase 11).
+
+### 25.9 Langkah
+
+| # | Langkah | Gerbang |
+| :-- | :-- | :-- |
+| 1 | **Aturan bagan**: `susunBagan` di `validations/hris-bagan.ts` (akar, siklus, atasan nonaktif, kelompok "Belum punya atasan", urutan, kedalaman 12, batas 400 kotak, rantai untuk Fokus). | `bun test src/lib/validations/hris-bagan.test.ts`: siklus dari dua perangkat, atasan nonaktif bertanda, tanpa atasan tanpa bawahan tidak jadi kotak, urutan stabil, rantai Fokus sampai akar, batas kotak |
+| 2 | **Bagan di Web/Desktop**: `BaganOrganisasi.tsx` (Bagan, Fokus, Menurut unit, cari, Lihat rincian) menggantikan `Struktur`. | typecheck + Biome; dicoba di Desktop pada tema gelap dan terang |
+| 3 | **Layar HP komponen bersama**: `DaftarRincian.tsx` di lima layar, baris tab gulir, dialog bawaan diganti, `berkas.ts` (buka dan perkecil), `PengajuanWorkspace` memakai `berkas.ts`, cetak SP disembunyikan di Mobile. | typecheck + Biome; Web dicoba di lebar 360 px (devtools) |
+| 4 | **Rust**: `tak_terhubung` memetakan `TURSO_NETWORK_ERROR`. | `cargo test hris` Desktop dan Mobile (tes baru: kedua kode menjadi pesan yang sama, kode lain diteruskan) |
+| 5 | **Mobile**: `components/hris` ke `dirsToCopy`, `app/hris/page.tsx`, `desktopSaja` dibuang, pintasan `hris`, tautan kartu di `/dashboard`. | `bun run sync:mobile`, typecheck + Biome Mobile, `audit:contract` (302/308 tetap, tidak ada command hantu dari gateway yang kini dipakai layar Mobile) |
+| 6 | Bagian `CLAUDE.md` "HRIS fase 10" (dan kalimat "Mobile tidak punya `/hris`" di fase 8/9 serta "`desktopSaja` di menu" di fase 1); catatan "Sudah dibangun" §25.13. | `audit:docs`; `bun run check` penuh oleh pemilik; uji HP (daftar di §25.10) oleh pemilik |
+
+### 25.10 Penanda yang ditinjau pemilik saat menyetujui
+
+- **Tanpa perubahan skema, command, rute, atau izin**: perangkat lama tetap
+  sinkron; yang membedakan build hanya layarnya. HP HRD butuh APK baru.
+- **Q-43 dibalik**, dan bila Q-127/Q-128 disetujui juga bagian "pengaturan
+  Web/Desktop" Q-52 dan "Final dan template Web/Desktop" Q-72 untuk `/hris`.
+  `/pengajuan` tab Penilaian di HP tetap tanpa Kembalikan/Final/Koreksi.
+- **Data rahasia di HP**: NIK, KK, rekening, NPWP, BPJS, dan pindaian dokumen
+  bisa dibuka dari HP pemegang izinnya. Tidak tersimpan di SQLite HP (khusus
+  cloud), tetapi tampil di layar, dan PDF yang dibuka tersalin ke folder
+  pilihan pengguna. HP yang hilang dalam keadaan login = sesi yang terbuka.
+- **HRIS muncul di Menu HP untuk semua pemegang `employees.view`** (Atasan dan
+  Admin juga), sama dengan Web/Desktop; isi tabnya tetap menurut izin.
+- **Tab khusus cloud butuh sinyal**; tanpa sinyal pesannya "butuh koneksi ke
+  database", kini juga untuk jaringan putus (di Desktop juga).
+- **Foto diperkecil otomatis** di ketiga versi: berkas gambar yang tersimpan
+  bisa lebih kecil resolusinya dan PNG menjadi JPEG. PDF > 1 MB tetap ditolak.
+- **Cetak SP hanya Web/Desktop.**
+- **Bagan**: karyawan nonaktif dan keluar tidak digambar; bawahan yang atasannya
+  nonaktif tampil sebagai akar bertanda "Atasan nonaktif"; karyawan tanpa atasan
+  dan tanpa bawahan hanya di kelompok "Belum punya atasan". Daftar berjenjang
+  lama hilang (Q-134).
+- **Lampiran pengajuan di Mobile berubah cara bukanya** (sudah di Mobile sejak
+  fase 2 tetapi belum pernah diuji di HP).
+- **Uji HP yang dibutuhkan** (ditunda pemilik sampai semua fase selesai):
+  pemilih berkas dan kamera dari `<input type="file">`, foto kamera diperkecil
+  di bawah 1 MB, pratinjau gambar, PDF lewat SAF, bagan Fokus dan gulir Bagan
+  di dalam `PullToRefresh`, pesan tanpa sinyal di tab khusus cloud, Jadikan
+  karyawan dari HP, Berlakukan keluar dari HP, tautan kartu `/dashboard` ke
+  `/hris`.
+
+### 25.11 Pertanyaan untuk pemilik
+
+| No | Pertanyaan | Usulan | Alasan |
+| :-- | :-- | :-- | :-- |
+| Q-125 | Fase 10 dirilis bersama fase 8 dan 9 (keduanya sudah di-commit, belum dirilis), atau fase 8+9 dirilis dulu? | (a) bersama | Tidak ada ketergantungan teknis: fase 10 tanpa skema dan tanpa perubahan Telegram. Tetapi semua perangkat memang harus diperbarui untuk fase 8/9, HP HRD butuh APK baru untuk fase 10, dan uji HP yang ditunda cukup satu putaran. Pilih (b) bila pengingat Telegram HRD ingin berjalan lebih cepat |
+| Q-126 | Tab mana yang ikut ke `/hris` Mobile? | Semua tab dan semua tab rincian, dijaga izin yang sama; hanya cetak SP yang tidak (Q-131) | "HRD harus bisa bekerja di laptop maupun HP" (§15.1). Backend semuanya sudah di biner Mobile; memotong tab hanya membuat HRD kembali ke laptop untuk hal tertentu |
+| Q-127 | Tab Organisasi (master cabang/divisi/jabatan, jenis pengajuan, aturan cuti, angka pengingat, masa simpan pelamar) di HP? Q-52 dulu menaruh pengaturan pengajuan di Web/Desktop | Ya | Isinya formulir biasa yang dikonfirmasi `konfirmasiData` dan berjalan offline lewat outbox. Alternatif: hanya baca di HP |
+| Q-128 | Di `/hris` Mobile, Kembalikan, Final, Koreksi, dan Template kinerja ikut (Q-72 menaruhnya di Web/Desktop)? | Ya untuk `/hris`; `/pengajuan` tab Penilaian tetap `modeHp` | Q-72 dibuat untuk atasan yang menilai dari HP. Final tetap butuh `hr.performance.finalize` (HRD), dan backend menolak bagi yang lain. Bila Final dianggap perlu layar lebar, `KinerjaWorkspace` meneruskan `modeHp` di Mobile |
+| Q-129 | Membuka berkas (dokumen, nota, CV, sertifikat) di HP: (a) semua lewat simpan SAF; (b) gambar dipratinjau di layar, PDF lewat SAF; (c) gambar dipratinjau, PDF tidak bisa dibuka di HP? | (b) | Kebanyakan berkas adalah foto (KTP, nota). (a) meninggalkan salinan KTP di folder HP setiap kali dilihat. (c) tanpa salinan sama sekali, tetapi kontrak dan ijazah PDF tidak terbaca dari HP |
+| Q-130 | Foto yang lebih dari 1 MB diperkecil otomatis sebelum diunggah, di ketiga versi? | Ya, hanya gambar; PDF tetap ditolak bila > 1 MB | Foto kamera HP 2–5 MB selalu ditolak batas 1 MB hari ini. Memperkecil di semua versi berarti satu jalur tanpa cabang khusus Mobile. Batas 1 MB tidak dinaikkan karena berkas disimpan base64 di cloud |
+| Q-131 | Cetak SP di HP | Disembunyikan (pola surat jalan dan tanda terima upah) | WebView Android tidak punya dialog cetak; PDF butuh dependensi yang belum disetujui |
+| Q-132 | Q-124 dibuka: nama di kartu "Perlu perhatian" Mobile bisa diklik ke `/hris?karyawan=<id>&tab=<tab>`, Kinerja ke `/hris?tab=kinerja`, lowongan ke `/hris?tab=rekrutmen`? | Ya, sama dengan beranda Web/Desktop | Alasan Q-124 (tidak ada `/hris` di Mobile) hilang di fase ini. Tanpa area `hris`, Kinerja tetap ke `/pengajuan?tab=penilaian` |
+| Q-133 | Tampilan bagan: (a) satu pohon atas-ke-bawah di semua versi, digulir mendatar di HP; (b) pohon di laptop + Fokus (satu tingkat: rantai atasan, kotak terpilih, bawahan langsung) sebagai bawaan di HP, keduanya bisa dipilih; (c) Fokus saja di semua versi? | (b) | Pohon tiga tingkat dengan enam bawahan per orang ±1.000 px; di HP 360 px itu berarti menggulir dua arah di dalam `PullToRefresh`. Fokus selalu muat, dan di laptop pohon penuh adalah yang dimaksud "bergambar" (§15). Keduanya dari satu `susunBagan` |
+| Q-134 | Tab Struktur: Bagan + Fokus + Menurut unit (cabang → divisi, terlipat), dan daftar berjenjang lama dihapus? | Ya | Menurut unit adalah janji §16.6 yang belum dibangun. Daftar lama digantikan Fokus di HP dan Bagan di laptop; menyimpannya berarti tiga cara melihat hierarki yang sama |
+| Q-135 | Karyawan tanpa atasan dan tanpa bawahan: kotak di baris puncak, atau kelompok terlipat "Belum punya atasan" per divisi? | Kelompok terlipat | Selama atasan belum diisi, hampir semua karyawan tanpa atasan; sebagai kotak puncak mereka menenggelamkan struktur yang sudah ada. Kelompok itu juga menunjukkan siapa yang belum diisi atasannya |
+| Q-136 | Siapa yang melihat bagan? | `employees.view`, sama dengan tab Struktur | Isinya nama, jabatan, divisi, cabang, dan atasan: data yang sudah terbuka dengan izin itu. Izin baru menambah peran tanpa melindungi data baru |
+
+### 25.12 Jawaban fase 10 (13 Nov 2026)
+
+Semua jawaban sesuai usulan §25.11, dan penanda §25.10 disetujui, jadi isi
+§25.2–§25.10 tidak berubah. Dengan Q-134, penghapusan daftar berjenjang lama
+disetujui (pilar 2.2).
+
+| No | Pertanyaan | Jawaban |
+| :-- | :-- | :-- |
+| Q-125 | Rilis fase 10 | (a) bersama fase 8 dan 9 |
+| Q-126 | Tab di `/hris` Mobile | Semua tab dan tab rincian, dijaga izin yang sama; kecuali cetak SP |
+| Q-127 | Tab Organisasi di HP | Ya (membalik bagian pengaturan Q-52) |
+| Q-128 | Kembalikan, Final, Koreksi, Template di `/hris` Mobile | Ya; `/pengajuan` tab Penilaian tetap `modeHp` |
+| Q-129 | Membuka berkas di HP | (b): gambar dipratinjau di layar, PDF lewat SAF |
+| Q-130 | Foto > 1 MB diperkecil otomatis | Ya, di ketiga versi, hanya gambar; PDF > 1 MB tetap ditolak |
+| Q-131 | Cetak SP di HP | Disembunyikan |
+| Q-132 | Klik nama di kartu Mobile (Q-124 dibuka) | Ya: `/hris?karyawan=<id>&tab=<tab>`, `/hris?tab=kinerja`, `/hris?tab=rekrutmen`; tanpa area `hris` Kinerja tetap ke `/pengajuan?tab=penilaian` |
+| Q-133 | Tampilan bagan | (b): Bagan di laptop + Fokus sebagai bawaan di HP, keduanya bisa dipilih |
+| Q-134 | Tab Struktur | Bagan + Fokus + Menurut unit; daftar berjenjang lama dihapus |
+| Q-135 | Karyawan tanpa atasan dan tanpa bawahan | Kelompok terlipat "Belum punya atasan" per divisi |
+| Q-136 | Yang melihat bagan | `employees.view`, tanpa izin baru |
+
+### 25.13 Sudah dibangun (13 Nov 2026)
+
+Langkah 1–6 dibangun tanpa perubahan skema (versi 42, sentinel `-2038`, 68
+tabel snapshot, 90 rute, command Desktop 302 / Mobile 308, tanpa izin baru).
+Gerbang yang dijalankan: `bun test validations/hris-bagan.test.ts` 13 lulus di
+Web/Desktop dan Mobile, `validations/hris.test.ts` 11 lulus; `cargo test hris`
+Desktop dan Mobile 12 lulus (termasuk `tak_terhubung_menyamakan_pesan_tanpa_koneksi`);
+typecheck dan Biome kedua workspace bersih; `audit:contract` dan `audit:docs`
+lulus. `bun run check` penuh belum dijalankan (pemilik). Layar belum dicoba di
+aplikasi yang berjalan: gerbang "dicoba di Desktop pada tema gelap dan terang"
+(langkah 2) dan "Web di lebar 360 px" (langkah 3) belum dilakukan, begitu pula
+uji HP §25.10.
+
+Penyimpangan dan catatan, untuk ditinjau:
+
+- **`berkas.ts` menjadi `berkas.tsx`**, karena dialog pratinjau gambar Mobile
+  butuh JSX. Jalur impornya tidak berubah; rujukan `berkas.ts` di §25.1–§25.9
+  berarti berkas ini.
+- **`siapkanBerkas`** adalah nama fungsi yang membaca dan memperkecil berkas
+  untuk keempat unggahan (dokumen, CV, sertifikat, lampiran pengajuan). Foto
+  yang diperkecil berganti nama menjadi `<nama>.jpg`. Bila mutu 0,7 pun masih
+  > 1 MB, berkasnya tetap dikirim dan backend yang menolaknya.
+- **PDF di Mobile**: nama berkas diberi `.pdf` bila tidak berekstensi; menutup
+  dialog SAF tanpa pesan, gagal menyimpan "Berkas gagal disimpan.".
+- **Konfirmasi hapus berkas/dokumen** memakai `konfirmasiData` apa adanya, jadi
+  pertanyaannya tetap "Apakah data yang dicatat sudah benar?" dengan baris
+  "Hapus berkas"/"Hapus dokumen" bertanda peringatan. Bila kalimatnya terasa
+  janggal untuk hapus, perlu dialog konfirmasi hapus tersendiri.
+- **Alasan batal penyesuaian cuti** selalu tampil sebagai isian di setiap
+  baris yang masih bisa dibatalkan (pola pembatalan kontrak); tombol Batalkan
+  baru aktif setelah alasan diisi.
+- **`DaftarRincian` saat belum ada pilihan**: kolom rincian tetap tampil di
+  bawah daftar di HP (teks "Pilih ...", panel Alasan di Keluar, tombol retensi
+  di Rekrutmen), karena bagian itu hanya ada di kolom tersebut. Memilih di
+  bawah `lg` menggulir halaman ke awal rincian.
+- **Lingkaran atasan dihitung ulang** dari karyawan aktif dan digabung dengan
+  `atasan_siklus`, supaya bagan tidak berputar walaupun organisasi belum
+  termuat. Lingkaran yang melibatkan karyawan nonaktif tidak ditandai
+  lingkaran: bawahannya tampil "Atasan nonaktif".
+- **Label "Atasan nonaktif"** ditambahkan ke `LABEL_TANDA_HRIS`
+  (`atasan_nonaktif`), bukan peta label kedua.
+- **`kelompokUnit`** (Menurut unit) ditulis dan diuji bersama `susunBagan` di
+  langkah 1. Kelompok divisi memakai teks `master_data.divisi`, kelompok
+  cabang nama master cabang.
+- **Urutan nama** tidak membedakan huruf besar/kecil (`localeCompare` `id`,
+  `sensitivity: "base"`), lalu `id_unik`.
+- **Batas 400 kotak**: tingkat bawaan dikurangi lebih dulu; bila akar saja
+  sudah > 400, atau kotak yang dibuka pengguna melewati batas, pengisian
+  berhenti per tingkat (tingkat atas utuh) dan kotak yang anaknya terpotong
+  bertuliskan "n tidak digambar".
+- **Memilih orang** dari cari, kelompok "Belum punya atasan", atau Menurut unit:
+  di Bagan rantainya dibuka dan kotaknya digulir ke tengah; bila orang itu
+  tidak ada di pohon, atau sedang di Menurut unit, tampilan pindah ke Fokus.
+  Kelompok "Belum punya atasan" tampil di bawah Bagan dan Fokus, tidak di
+  Menurut unit (yang sudah memuat semua orang).
+- **Tautan Kinerja di `/dashboard` Mobile** butuh area `hris` dan salah satu
+  dari empat izin `hr.performance.*` (sama dengan beranda Web/Desktop); tanpa
+  itu tetap ke `/pengajuan?tab=penilaian` bila area `pengajuan` dan izin
+  `assess`/`view` dipegang.
+- **`hris` di urutan pertama** `KARYAWAN_SHORTCUT_AREAS`.
+- **`tak_terhubung` mempertahankan kode** (`TURSO_NETWORK_ERROR` tetap
+  `TURSO_NETWORK_ERROR`), hanya pesannya yang disamakan.
+- **SKILL.md tidak disunting**: fase ini tanpa tabel, rute, atau command baru.
+
+## 26. Urutan pengerjaan fase 11
+
+**Belum disetujui.** Ditulis setelah menelusuri kode (13 Nov 2026). Isinya butir
+terakhir §15.1 "Urutan fase yang berlaku": rencana dan anggaran pelatihan
+(memperluas Q-26, yang di fase 7 dijawab "riwayat + sertifikat"). Pertanyaan
+Q-137 sampai Q-149 di §26.11 belum dijawab; rancangan di bawah memakai
+usulannya. Bila §11.2, §15, §22.7, atau §22.10 dan bagian ini berbeda, **bagian
+ini yang berlaku** setelah disetujui.
+
+### 26.1 Temuan dari kode
+
+- **Pelatihan hari ini** (`hr_pelatihan.rs` ↔ `validations/hr-pelatihan.ts` +
+  `services/hr-pelatihan.ts`, teks SQL kembar): `hr_pelatihan` menyimpan
+  `nama`, `penyelenggara`, `tanggal_mulai`, `tanggal_selesai`, `lokasi`,
+  `biaya` (INTEGER 0–1.000.000.000, satu total per pelatihan, Q-98),
+  `keterangan`, jejak ubah, dan pembatalan sebagai kolom. **Tidak ada kolom
+  divisi, cabang, periode, atau tautan rencana.** Status (`status_pelatihan` ↔
+  `statusPelatihan`) diturunkan dari tanggal dan `dibatalkan_pada` terhadap
+  tanggal WIB jam database (`hari_ini_cloud` ↔ `wibToday`).
+- **Periode yang sudah dipakai layar adalah tahun kalender**:
+  `DAFTAR_PELATIHAN_SQL` menyaring `strftime('%Y', l.tanggal_mulai) = ?1`, dan
+  pemilih tahun `PelatihanWorkspace` menawarkan tahun depan sampai empat tahun
+  ke belakang, jadi rencana tahun depan sudah bisa dipilih tanpa mengubah
+  pemilihnya. Daftar memuat pelatihan yang dibatalkan; riwayat karyawan
+  (`RIWAYAT_SQL`) tidak.
+- **Biaya tidak pernah dibaca selain untuk ditampilkan.** Rincian menampilkan
+  "±<biaya / jumlah peserta> per peserta" (pembagian tampilan, tidak disimpan).
+  Tidak ada jurnal, status bayar, atau ringkasan biaya per tahun di mana pun.
+- **Peserta tidak menyimpan divisinya.** `PESERTA_SQL` membaca
+  `master_data.divisi` saat ini. Tidak ada riwayat perpindahan divisi di repo
+  (`hr_kontrak` tanpa kolom organisasi, `master_data.id_divisi`/`divisi` =
+  keadaan sekarang). Realisasi per divisi yang dihitung dari divisi peserta
+  akan berpindah sendiri bila karyawannya pindah divisi.
+- **Tidak ada konsep anggaran di repo.** Pencarian "anggaran"/"budget" hanya
+  menemukan kata "pelanggaran". Dua pola terdekat:
+  - `hr_jenis_pengajuan.batas_bulanan` (fase 4): angka pada baris master,
+    jumlah dihitung di kode (`lewat_batas` ↔ `lewatBatas`), hasilnya **tanda,
+    tidak menolak**. Pola tanda yang sama dipakai stok minus inventaris dan
+    kuota lowongan (`lewat_kuota`).
+  - `BATAS_PENGATURAN` (`hris.rs` ↔ `validations/hris.ts`, 12 kunci): satu
+    angka per kunci di `setting_gex_system`, tersinkron ke semua perangkat
+    termasuk terminal scanner. Cocok untuk satu angka perusahaan, tidak untuk
+    pagu per divisi per tahun.
+- **Pembukuan**: `keu_jurnal.sumber` CHECK berisi `Manual, Kasbon, Payroll,
+  Inventaris, Cicilan, Pembatalan`; `keu_jurnal`, `keu_jurnal_baris`, dan
+  `keu_akun` tersinkron. Sumber jurnal baru berarti membangun ulang CHECK di
+  keempat lapis, dan perangkat yang belum diperbarui gagal menarik snapshot
+  begitu ada jurnal bersumber baru (preseden v28). Bagan akun bawaan
+  (`akun-bawaan.json`) **tidak punya akun Beban Pelatihan**: beban 5-1100
+  sampai 5-1900, yang terdekat Beban Lain-lain 5-1900; kode 5-1660 masih
+  kosong.
+- **Divisi tersinkron dan ada di cloud** (`hr_divisi`, id `div-…`), jadi tabel
+  khusus cloud bisa membaca nama divisi hidup lewat `LEFT JOIN` (Q-12), dan
+  kunci `umum` tidak mungkin bertabrakan dengan id divisi.
+- **Naik skema terjadi dari panggilan pertama.** Setiap command HR khusus cloud
+  memanggil `hris::siap` → `ensure_schema_current`, yang menjalankan
+  `ensure_schema` bila sentinel terbaru belum ada. Perangkat v43 pertama yang
+  membuka tab Pelatihan (atau Web yang dideploy) menaikkan cloud ke v43, dan
+  sejak itu perangkat v42 berhenti sinkron (`SCHEMA_VERSION_OUTDATED`). Build
+  v42 tetap bisa memanggil command pelatihannya sendiri (sentinel `-2038`-nya
+  ada), dan `UBAH_PELATIHAN_SQL` lamanya tidak menyentuh kolom baru.
+- **Mobile sudah ikut tanpa kerja tambahan**: sejak fase 10 `components/hris`
+  disalin utuh (`dirsToCopy`), `hr_pelatihan.rs` ada di daftar salin
+  `sync-rust-modules.ts`, dan salinan Mobile `PelatihanWorkspace.tsx` serta
+  `hr_pelatihan.rs` identik dengan sumbernya. Komponen baru di
+  `components/hris/` ikut ke Mobile dengan sendirinya. Kalimat §22.9
+  "Web/Desktop saja" sudah tidak berlaku (CLAUDE.md "HRIS fase 7" sudah menulis
+  "Mobile ikut sejak fase 10").
+- **RBAC**: `hr.training.view` dan `hr.training.manage` biasa (bukan sensitif,
+  bukan rahasia), ikut paket HRD dan Admin; sort order seed Rust 1626 dan 1627,
+  jadi izin baru (bila ada) 1628.
+- **Command dan rute**: lima command `desktop_hr_training*` (`commands.rs`,
+  baca dijaga `IZIN_PELATIHAN_BACA`, tulis `hr.training.manage`); rute
+  `POST /api/hris/training` dengan peta `IZIN` per aksi, body 8 MB, `tahun`
+  sudah divalidasi Zod 2000–2100.
+- **Fase 10 di working tree**: dalam lingkup yang ditelusuri (modul pelatihan,
+  gateway, `PelatihanWorkspace`, tab Pelatihan rincian, salinan Mobile) tidak
+  ditemukan yang salah.
+- Skema sekarang: v42, sentinel `-2038`, `REQUIRED_TABLE_COUNT` 102, 68 tabel
+  snapshot, 90 rute, command Desktop 302 / Mobile 308.
+
+### 26.2 Model data (skema v43, sentinel `-2039` `hris-pelatihan-rencana-v1`)
+
+**Tanpa perubahan skema ditimbang dan ditolak** (Q-138): pagu dan rencana di
+`setting_gex_system` berarti angka anggaran tersinkron ke setiap terminal
+scanner, rencana (nama, divisi, bulan, estimasi) dipaksa menjadi teks JSON di
+satu kunci, dan tidak ada tempat menautkan pelatihan ke rencananya.
+
+**Dua tabel baru, khusus cloud** (pola Q-87: induknya `hr_pelatihan` khusus
+cloud, layarnya sudah butuh koneksi, tidak ada pemakai offline). Hanya
+`turso.rs` + `db-schema.ts`/`db-migrations.ts`; tidak di `storage.rs`, tidak di
+`SNAPSHOT_TABLES`/`SNAPSHOT_SOURCES`, tanpa outbox dan rute kanonik (aturan
+42). Tanpa `UNIQUE` selain PK.
+
+| Tabel | Kolom |
+| :-- | :-- |
+| `hr_pelatihan_anggaran` | `id_anggaran` PK = `<tahun>:<id_divisi>` atau `<tahun>:umum` (deterministik: dua sesi yang mengisi pagu yang sama menulis baris yang sama, yang terakhir menang); `tahun` INTEGER NOT NULL CHECK 2000–2100; `id_divisi` (kosong = Umum); `nominal` INTEGER NOT NULL CHECK `nominal >= 0` (aturan 13); `catatan`; `dicatat_oleh` NOT NULL, `created_at`; `diubah_oleh`, `diubah_pada`. Indeks `tahun` |
+| `hr_pelatihan_rencana` | `id_rencana` PK (`rcn-<acak>`); `tahun` INTEGER NOT NULL CHECK 2000–2100; `nama` NOT NULL; `id_divisi` (kosong = Umum); `bulan` INTEGER CHECK (`bulan IS NULL OR bulan BETWEEN 1 AND 12`); `peserta_rencana` INTEGER NOT NULL DEFAULT 0 CHECK `peserta_rencana >= 0`; `biaya_rencana` INTEGER NOT NULL DEFAULT 0 CHECK `biaya_rencana >= 0`; `penyelenggara`; `keterangan`; `dicatat_oleh` NOT NULL, `created_at`; `diubah_oleh`, `diubah_pada`; `dibatalkan_oleh`, `dibatalkan_pada`, `alasan_batal`. Indeks `tahun` |
+
+**Satu kolom baru** `hr_pelatihan.id_rencana` TEXT (kosong = di luar rencana):
+`CREATE TABLE` untuk database baru, `ensure_column` (`turso.rs`) dan
+`hasColumn` (`db-migrations.ts`) untuk database lama; indeks
+`idx_hr_pelatihan_rencana` dibuat SESUDAH kolomnya dipastikan ada (sesudah loop
+`ensure_column` di Rust; di blok v43 `db-migrations.ts` langsung sesudah
+`hasColumn`, pola `idx_hr_pengajuan_tukar` v38; aturan 20).
+
+- Kedua jalur: `CURRENT_SCHEMA_VERSION`/`CLIENT_SCHEMA_VERSION` 43 (Desktop DAN
+  Mobile), sentinel `-2039` di INSERT dan di `ensure_schema_current` (aturan
+  21), `REQUIRED_TABLE_COUNT` 104, `isDatabaseSchemaReady` + 2 nama,
+  `schema-consistency.test.ts` + 2, daftar tabel khusus cloud
+  `audit-sync-contract.ts` + 2 (pengetatan), `PROMOTION_PLAN` + 2 dengan urutan
+  `hr_pelatihan_anggaran`, `hr_pelatihan_rencana` → `hr_pelatihan` (kini
+  `dependsOn` rencana) → `hr_pelatihan_peserta`.
+- `CLOUD_MIRRORED_TABLES`, `storage.rs`, `sync.rs` (kecuali
+  `CLIENT_SCHEMA_VERSION`), `apply_event_to_turso`, dan `CANONICAL_SYNC_ROUTES`
+  tidak disentuh: tetap 68 tabel snapshot dan 90 rute. Tidak ada yang dibuang
+  saat pindah database karena tidak ada salinan di perangkat.
+- Tanpa seed. Tidak ada pengaturan baru di `BATAS_PENGATURAN`.
+- **Perangkat lama**: tidak ada rute atau tabel snapshot yang tidak dikenalnya,
+  tetapi begitu cloud v43, perangkat v42 berhenti sinkron sampai diperbarui
+  (§26.1). Pelatihan yang diubah dari build v42 mempertahankan `id_rencana`
+  karena SQL lamanya tidak menulis kolom itu.
+
+### 26.3 Rencana pelatihan
+
+**Isian** (`validasi_rencana` ↔ `validasiRencana`, Q-144): `tahun` 2000–2100;
+`nama` 1–100 (spasi dirapikan seperti `validasi_pelatihan`); divisi opsional
+(kosong = Umum; bila diisi harus ada dan aktif saat disimpan, kecuali nilainya
+tidak berubah, pola lowongan §22.15); `bulan` opsional 1–12; `peserta_rencana`
+0–9.999; `biaya_rencana` 0–1.000.000.000 (`MAKS_BIAYA` yang sama);
+`penyelenggara` ≤ 100; `keterangan` ≤ 2.000.
+
+**Tautan ke pelatihan**:
+
+- Satu rencana bisa terlaksana lewat beberapa pelatihan (misalnya dua
+  gelombang); satu pelatihan paling banyak satu rencana
+  (`hr_pelatihan.id_rencana`).
+- Diisi dari form pelatihan (pemilih `PilihCari` berisi rencana tidak batal di
+  tahun `tanggal_mulai`). `validasi_pelatihan` ↔ `validasiPelatihan` menerima
+  `id_rencana`; `simpan` memeriksa di cloud: rencana ada, tidak dibatalkan, dan
+  `tahun` = tahun `tanggal_mulai` (`PESAN_RENCANA_TAHUN`). Mengubah tanggal
+  pelatihan yang tertaut ke tahun lain ditolak dengan pesan yang sama; lepas
+  tautannya dulu. Kosong = lepas.
+- `INSERT_PELATIHAN_SQL` dan `UBAH_PELATIHAN_SQL` mendapat kolom `id_rencana`
+  (teks kembar, diperiksa harfiah).
+
+**Status rencana tidak disimpan** (`status_rencana` ↔ `statusRencana`, tanggal
+WIB jam database, dinilai berurutan):
+
+1. `Dibatalkan`: `dibatalkan_pada` terisi.
+2. `Terlaksana`: ada pelatihan tertaut tidak batal yang `Selesai`.
+3. `Berlangsung`: ada yang `Berlangsung`.
+4. `Dijadwalkan`: ada yang `Dijadwalkan`.
+5. `Terlewat`: tanpa pelatihan tertaut yang tidak batal, dan tahun rencana
+   sudah lewat, atau `bulan` terisi dan bulan itu sudah lewat.
+6. `Belum dijadwalkan`.
+
+**Batal**: kolom, alasan wajib, sekali (pola `validasi_batal_pelatihan`);
+ditolak selama masih ada pelatihan tertaut yang tidak dibatalkan
+(`PESAN_RENCANA_TERTAUT`, pola "lepas peserta bersertifikat ditolak"). Rencana
+tidak dihapus. Selama tidak batal semua isian boleh diubah; tahun tidak bisa
+diubah selama ada pelatihan tertaut.
+
+**Tanpa alur persetujuan** (Q-144): rencana adalah catatan HRD, bukan
+pengajuan yang di-ACC.
+
+### 26.4 Anggaran dan realisasi
+
+**Pagu** (Q-140): satu angka per tahun per divisi, ditambah satu pagu "Umum"
+per tahun untuk pelatihan yang tidak dibebankan ke divisi. Total pagu
+perusahaan = jumlah semua pagu tahun itu; tidak ada pagu perusahaan terpisah
+yang bisa bertentangan dengan jumlahnya. `validasi_pagu` ↔ `validasiPagu`:
+`nominal` 0–100.000.000.000 (`MAKS_PAGU`, masih aman di `i64` dan `Number`),
+`catatan` ≤ 1.000, divisi aktif saat pagu baru dibuat. Simpan = upsert berid
+`<tahun>:<id_divisi|umum>`. **Hapus pagu** menghapus barisnya (tabel khusus
+cloud, tidak ada perangkat yang menghidupkannya kembali). Pagu 0 berbeda dari
+tanpa pagu: 0 berarti "tidak dianggarkan", tanpa baris berarti "belum diisi".
+Tanpa riwayat revisi (Q-149): yang tersimpan hanya `diubah_oleh/pada`
+terakhir.
+
+**Beban divisi pelatihan** (Q-141 (a)): divisi rencana yang ditautkan.
+Pelatihan tanpa rencana dibebankan ke Umum dan tampil di baris "Di luar
+rencana". Tidak ada kolom divisi di `hr_pelatihan`, dan biaya tidak dibagi
+menurut divisi peserta (§26.1: divisi peserta bergeser bila karyawannya
+pindah).
+
+**Realisasi** (Q-142), dari `hr_pelatihan.biaya` yang tidak dibatalkan, tahun
+= tahun `tanggal_mulai`:
+
+| Angka | Isi |
+| :-- | :-- |
+| Pagu | baris `hr_pelatihan_anggaran` |
+| Direncanakan | Σ `biaya_rencana` rencana yang tidak dibatalkan |
+| Terikat | Σ `biaya` pelatihan `Dijadwalkan` |
+| Terpakai | Σ `biaya` pelatihan `Berlangsung` dan `Selesai` |
+| Sisa | Pagu − Terikat − Terpakai (boleh minus) |
+
+- Per kelompok (setiap divisi yang punya pagu, rencana, atau pelatihan
+  tertaut, ditambah Umum) dan total tahun. Per rencana: estimasi
+  (`biaya_rencana`) dibanding jumlah biaya pelatihan tertautnya, dan jumlah
+  peserta rencana dibanding jumlah peserta sebenarnya.
+- Dihitung di kode oleh fungsi murni `ringkas_anggaran` ↔ `ringkasAnggaran`
+  (vektor uji sama), dari tiga bacaan polos bertahun: `PAGU_SQL`,
+  `RENCANA_SQL`, `REALISASI_SQL` (pelatihan tahun itu: id, `id_rencana`,
+  tanggal, `biaya`, `dibatalkan_pada`, jumlah peserta). SQL kembar diperiksa
+  harfiah. Uang hanya dijumlahkan sebagai bilangan bulat; tidak ada pembagian
+  yang disimpan.
+- **Tanda, tidak menolak** (Q-143, pola `lewat_batas`, stok minus,
+  `lewat_kuota`): `lewat_pagu` (Terikat + Terpakai > Pagu),
+  `rencana_lewat_pagu` (Direncanakan > Pagu), `tanpa_pagu` (ada realisasi
+  tetapi tidak ada baris pagu), dan per rencana `lewat_estimasi` (realisasi >
+  `biaya_rencana`). Form pelatihan menampilkan sisa pagu kelompoknya sebelum
+  disimpan dan memperingatkan bila simpanan itu melewatinya, lalu tetap
+  menyimpan.
+- Pelatihan yang dibatalkan otomatis keluar dari realisasi; status yang
+  berganti karena tanggal (Dijadwalkan → Berlangsung) memindahkan biayanya dari
+  Terikat ke Terpakai tanpa tulisan apa pun.
+
+### 26.5 Pembukuan
+
+- **Tetap jurnal manual** (Q-146, preseden Q-31 dan Q-98): tidak ada sumber
+  jurnal baru, CHECK `keu_jurnal.sumber` tidak disentuh, tidak ada status
+  "sudah dibayar", dan tidak ada akun bawaan baru. Pemilik yang ingin
+  memisahkan beban pelatihan membuat akun "Beban Pelatihan" sendiri di bagan
+  akun.
+- **Realisasi = biaya yang dicatat di pelatihan**, bukan uang yang tercatat di
+  jurnal. Keduanya bisa berbeda (penanda §26.10). Membaca realisasi dari jurnal
+  butuh tautan jurnal ↔ pelatihan yang hari ini tidak ada.
+
+### 26.6 Hak akses
+
+- **Tanpa izin baru** (Q-145): membaca rencana, pagu, dan ringkasan
+  `hr.training.view` atau `hr.training.manage`; menulis rencana,
+  membatalkannya, dan mengisi atau menghapus pagu `hr.training.manage`.
+  Alasannya: pemegang `manage` sudah mengisi `biaya` setiap pelatihan, yang
+  menentukan realisasi; pagu tidak mengeluarkan uang.
+- Akibatnya paket Admin juga bisa mengatur pagu (penanda §26.10). Bila pagu
+  dianggap keputusan pimpinan, alternatifnya izin baru `hr.training.budget`
+  (sort order 1628) di `catalog.ts`, seed `app_permission` Rust, paket HRD, dan
+  `SENSITIVE_MUTATION_PERMISSIONS` + `NOT IN` seed Admin bila sensitif.
+- Tidak ada akses baca dari `accounting.view`; Keuangan membaca lewat pemegang
+  izin pelatihan atau berkas Excel.
+- Area tetap `hris`; tab Pelatihan memeriksa izinnya sendiri, backend memeriksa
+  ulang (aturan 10, 36).
+
+### 26.7 Command, rute, dan layar
+
+**Rust** (`hr_pelatihan.rs`, disalin ke Mobile; semua `async` lewat
+`TursoClient`, pesan `tak_terhubung` tanpa koneksi; doc comment sebelum
+`#[tauri::command]`, aturan 45):
+
+| Command | Izin |
+| :-- | :-- |
+| `desktop_hr_training_plan` (satu tahun: pagu, rencana + status + tanda, ringkasan per kelompok) | `training.view` / `manage` |
+| `desktop_hr_training_plan_save` (aksi `rencana` simpan/batal, `pagu` simpan/hapus) | `training.manage` |
+
+Terdaftar di kedua `lib.rs`, kedua `build.rs`, dan kedua
+`capabilities/default.json`. Command Desktop 302 → 304, Mobile 308 → 310.
+Perubahan yang ada: `validasi_pelatihan` + `id_rencana`, `simpan` memeriksa
+rencana dan tahun, `INSERT_PELATIHAN_SQL`/`UBAH_PELATIHAN_SQL` + kolom, dan
+rincian pelatihan membawa nama dan status rencananya.
+
+**Web**: kembaran di `validations/hr-pelatihan.ts` +
+`services/hr-pelatihan.ts`; rute `/api/hris/training` mendapat aksi `rencana`
+(baca) dan `rencana_simpan` (tulis) di peta `IZIN`, tanpa rute baru dan tanpa
+`GET`; gateway `gateways/hr-pelatihan.ts` + `ambilRencanaPelatihan`,
+`simpanRencanaPelatihan`.
+
+**Layar** (`web-desktop/src/components/hris/`, otomatis ke Mobile lewat
+`dirsToCopy`):
+
+1. `PelatihanWorkspace`: pilihan "Pelatihan" / "Rencana dan anggaran" di atas
+   daftar, memakai pemilih tahun yang sama.
+2. `RencanaPelatihan.tsx` (baru): ringkasan per kelompok (Pagu, Direncanakan,
+   Terikat, Terpakai, Sisa, tanda) dalam `overflow-x-auto`; isian pagu per
+   baris (`hr.training.manage`); daftar rencana dengan status, estimasi,
+   realisasi, dan peserta; form rencana dan pembatalannya. Daftar dan rincian
+   memakai `DaftarRincian` seperti layar HRIS lain. `konfirmasiData` sebelum
+   simpan rencana dan pagu; hapus pagu lewat `konfirmasiData` dengan baris
+   bertanda peringatan (pola §25.13).
+3. Form pelatihan: pemilih rencana dan sisa pagu kelompoknya; rincian
+   pelatihan menampilkan rencananya.
+4. Ekspor Excel (Q-147): satu berkas, sheet "Ringkasan" dan "Rencana", angka
+   sebagai sel Angka lewat `AngkaExcel` (`lib/client/excel-export.ts`),
+   disimpan lewat `saveFileWithPicker` (SAF di Mobile, aturan 46).
+5. Mobile: tanpa berkas khusus; tabel tergulir di dalam kartunya dan
+   `DaftarRincian` mengurus lebar HP.
+
+### 26.8 Tidak dikerjakan di fase ini
+
+- Jurnal otomatis biaya pelatihan, sumber jurnal baru, status "sudah dibayar",
+  dan realisasi yang dibaca dari jurnal (Q-146).
+- Akun bawaan "Beban Pelatihan".
+- Biaya per peserta yang disimpan atau dibebankan ke divisi peserta (Q-141).
+- Riwayat revisi pagu, dan alur persetujuan rencana atau pagu (Q-144, Q-149).
+- Pagu per cabang, per jabatan, atau per kuartal; tahun buku yang tidak
+  dimulai Januari (Q-139).
+- Rencana per jabatan, matriks kompetensi, pelatihan wajib, dan ikatan dinas
+  (sudah di §22.10).
+- Kejadian Telegram dan bagian kartu "Perlu perhatian" untuk pagu terlewati
+  atau rencana terlewat (Q-148).
+- Ekspor PDF (butuh `jspdf`, belum disetujui).
+- Pelaporan BPJS/DJP/Wajib Lapor dan berkas transfer bank (sesudah fase 11,
+  §15.1).
+
+### 26.9 Langkah
+
+| # | Langkah | Gerbang |
+| :-- | :-- | :-- |
+| 1 | **Skema v43**: dua tabel khusus cloud dan kolom `hr_pelatihan.id_rencana` di `turso.rs` (`CREATE TABLE` + `ensure_column`, indeks sesudahnya) dan `db-schema.ts`/`db-migrations.ts` (blok v43: tabel, `hasColumn`, lalu indeks); sentinel `-2039` + `ensure_schema_current`; `CURRENT_SCHEMA_VERSION`/`CLIENT_SCHEMA_VERSION` 43 kedua workspace; `REQUIRED_TABLE_COUNT` 104; `isDatabaseSchemaReady`, `schema-consistency.test.ts`, `PROMOTION_PLAN`, daftar khusus cloud `audit-sync-contract.ts` masing-masing + 2; daftar sentinel di tes `turso.rs`; daftar versi `rbac-migration.test.ts` + 43 (langsung gagal begitu DDL v43 ada, pelajaran fase 7). `storage.rs`, `sync.rs`, `CLOUD_MIRRORED_TABLES` tidak disentuh. | `audit:schema` + `cargo test sentinel_2038_memicu_skema_rencana_pelatihan` (database bersentinel `-2038` mendapat dua tabel, kolom, dan indeks; data pelatihan lama utuh) di kedua workspace |
+| 2 | **Aturan kembar**: `validasi_rencana`, `validasi_pagu`, `id_anggaran`, `status_rencana`, `ringkas_anggaran` (kelompok, Umum, Di luar rencana, tanda), `validasi_pelatihan` + `id_rencana`, pesan `PESAN_RENCANA_TAHUN`/`PESAN_RENCANA_TERTAUT`; teks SQL kembar (`PAGU_SQL`, `RENCANA_SQL`, `REALISASI_SQL`, SQL tulis rencana dan pagu, `INSERT_`/`UBAH_PELATIHAN_SQL`). Belum dipanggil. | `bun run sync:mobile`, lalu `bun test src/lib/validations/hr-pelatihan.test.ts` dan `cargo test hr_pelatihan` di kedua workspace: vektor sama, teks SQL harfiah |
+| 3 | **Pendaftaran command**: dua command (kerangka + guard izin) di keempat tempat kedua workspace; aksi `rencana`/`rencana_simpan` di peta `IZIN` rute. Bila Q-145 memilih izin baru: `catalog.ts`, seed Rust, paket, daftar sensitif, `rbac-migration.test.ts`. | `audit:contract` (304/310, tanpa command hantu) + `web-rbac-boundary` |
+| 4 | **Transaksi cloud** (Rust): baca tahun, simpan/batal rencana, simpan/hapus pagu, tautan di `simpan` pelatihan. | tes `TursoClient::local_file` `rencana_cloud_pagu_dan_realisasi`: tautan beda tahun ditolak; mengubah tanggal pelatihan tertaut ke tahun lain ditolak; batal rencana bertaut ditolak; pagu berid sama menimpa; ringkasan Terikat/Terpakai/Sisa dan tanda; pelatihan batal keluar dari realisasi; `UBAH_PELATIHAN_SQL` v42 (teks lama) mempertahankan `id_rencana` |
+| 5 | **Web**: service, aksi rute, gateway. | `services/hr-pelatihan.test.ts` diperluas dengan alur langkah 4, data dan hasil sama |
+| 6 | **Layar** §26.7 dan ekspor Excel; `bun run sync:mobile`; bagian `CLAUDE.md` "HRIS fase 11", angka di dokumen skill (versi, tabel khusus cloud, command); catatan "Sudah dibangun" §26.13. | typecheck kedua workspace + Biome + `audit:docs`; `bun run check` penuh oleh pemilik; dicoba di Desktop tema gelap dan terang, Web di lebar 360 px |
+
+### 26.10 Penanda yang ditinjau pemilik saat menyetujui
+
+- **Naik skema ke v43**: perangkat v42 berhenti sinkron sejak cloud dinaikkan,
+  yang terjadi saat perangkat v43 pertama membuka layar HR khusus cloud atau
+  Web v43 dideploy. Semua perangkat wajib diperbarui; dengan Q-137 (a) ini
+  menumpang putaran pembaruan fase 8–10.
+- **Realisasi adalah biaya yang dicatat di pelatihan**, bukan uang yang
+  dijurnal atau dibayar. Biaya yang lupa diisi = realisasi 0.
+- **Pelatihan Dijadwalkan sudah mengurangi sisa pagu** (Terikat), sebelum
+  terlaksana.
+- **Melewati pagu tidak pernah ditolak**, hanya ditandai dan diperingatkan.
+- **Pelatihan tanpa rencana dibebankan ke Umum**, bukan ke divisi pesertanya;
+  pelatihan untuk satu divisi harus punya rencana berdivisi agar masuk
+  realisasi divisi itu.
+- **Pagu bisa diubah dan dihapus tanpa riwayat**; yang tercatat hanya siapa
+  dan kapan terakhir mengubah.
+- **Admin ikut bisa mengatur pagu** karena `hr.training.manage` ada di paket
+  Admin (bila Q-145 tanpa izin baru).
+- Tahun pelatihan = tahun `tanggal_mulai`; pelatihan yang melewati tahun baru
+  dihitung seluruhnya di tahun mulainya.
+- Divisi yang dinonaktifkan tetap tampil dengan pagu dan realisasinya; pagu
+  baru hanya untuk divisi aktif.
+- Mobile ikut tanpa langkah khusus; HP HRD butuh APK baru (sudah dibutuhkan
+  fase 10).
+
+### 26.11 Pertanyaan untuk pemilik
+
+| No | Pertanyaan | Usulan | Alasan |
+| :-- | :-- | :-- | :-- |
+| Q-137 | Fase 11 dirilis (a) bersama fase 8–10 (belum dirilis), atau (b) sesudahnya? | (a) | Fase 8–10 sudah menuntut semua perangkat diperbarui (kejadian Telegram diparkir) dan HP HRD butuh APK baru; fase 11 menaikkan skema, jadi cukup satu putaran pembaruan dan satu putaran uji HP. Pilih (b) bila fase 8–10 ingin cepat jalan: fase 11 lalu memaksa pembaruan kedua |
+| Q-138 | Rencana dan pagu: tabel khusus cloud baru (v43), atau tanpa perubahan skema (kunci `setting_gex_system`)? | Tabel khusus cloud `hr_pelatihan_anggaran` dan `hr_pelatihan_rencana`, plus kolom `hr_pelatihan.id_rencana` | `setting_gex_system` tersinkron ke terminal scanner, satu kunci per angka tidak bisa memuat rencana berstruktur, dan tidak ada tempat menautkan pelatihan. Induknya sudah khusus cloud (Q-87) |
+| Q-139 | Periode anggaran: tahun kalender, atau tahun buku yang bisa diatur (mis. April–Maret)? | Tahun kalender | Daftar pelatihan, pemilih tahun, dan laporan Pembukuan sudah per tahun kalender. Tahun buku butuh pengaturan baru dan pemetaan tanggal di semua bacaan |
+| Q-140 | Tingkat pagu: (a) per divisi per tahun + satu pagu Umum, total = jumlahnya; (b) satu pagu perusahaan per tahun; (c) keduanya, pagu perusahaan sebagai batas atas? | (a) | Diminta "per divisi". (c) membuat dua angka yang bisa saling bertentangan; (a) tetap memberi total perusahaan sebagai jumlah |
+| Q-141 | Biaya pelatihan dibebankan ke divisi mana: (a) divisi rencananya, tanpa rencana = Umum; (b) kolom divisi sendiri di pelatihan; (c) dibagi menurut divisi peserta? | (a) | Cukup satu kolom baru. (b) menambah kolom yang bisa berbeda dengan divisi rencananya. (c) bergeser sendiri bila peserta pindah divisi, karena repo tidak menyimpan riwayat divisi |
+| Q-142 | Realisasi: Terpakai = Berlangsung + Selesai, Terikat = Dijadwalkan, Sisa = Pagu − keduanya; atau hanya Selesai yang dihitung? | Terpakai + Terikat, keduanya mengurangi sisa | Pelatihan terjadwal sudah menjanjikan uangnya; tanpa Terikat, sisa pagu tampak longgar sampai hari pelatihan |
+| Q-143 | Pelatihan yang membuat pagu terlewati: ditandai dan diperingatkan, atau ditolak? | Tanda + peringatan, tetap tersimpan | Pola yang sudah ada (batas bulanan reimburse, stok minus, kuota lowongan). Menolak membuat pelatihan yang sudah terjadi tidak bisa dicatat sampai pagu diubah |
+| Q-144 | Isian rencana: nama, divisi (opsional), bulan (opsional), jumlah peserta, estimasi biaya, penyelenggara, keterangan; satu rencana banyak pelatihan, satu pelatihan satu rencana, tahun wajib sama; tanpa persetujuan? | Ya | Cukup untuk "rencana vs realisasi" per divisi dan per pelatihan. Persetujuan rencana menambah alur keputusan seperti pengajuan tanpa diminta |
+| Q-145 | Siapa mengatur pagu: (a) `hr.training.manage` tanpa izin baru; (b) izin baru `hr.training.budget` biasa (paket HRD dan Admin); (c) izin baru sensitif (paket HRD saja)? | (a) | Pemegang `manage` sudah mengisi biaya yang menentukan realisasi, dan pagu tidak mengeluarkan uang. Pilih (c) bila pagu adalah keputusan pimpinan yang tidak boleh diubah Admin |
+| Q-146 | Pembukuan: (a) tetap jurnal manual tanpa akun baru; (b) manual + akun bawaan "Beban Pelatihan" 5-1660; (c) jurnal otomatis bersumber baru? | (a) | Preseden Q-31 dan Q-98. (c) membangun ulang CHECK `keu_jurnal.sumber` di keempat lapis dan memaksa semua perangkat diperbarui (preseden v28). (b) menyentuh seed `keu_akun` di ketiga lapis untuk satu akun yang bisa dibuat sendiri |
+| Q-147 | Ekspor Excel ringkasan dan rencana per tahun? | Ya, sheet Ringkasan dan Rencana, ketiga versi | Keuangan biasanya membaca anggaran di Excel; `excel-export.ts` dan `AngkaExcel` sudah ada, Mobile lewat SAF |
+| Q-148 | Telegram atau kartu "Perlu perhatian" untuk pagu terlewati dan rencana terlewat? | Tidak di fase ini | Tanda di layar cukup untuk HRD yang membuka tab Pelatihan. Kejadian baru menambah generasi parkir dan sakelar di kartu Notifikasi |
+| Q-149 | Pagu: boleh diubah dan dihapus tanpa riwayat? Rencana: dibatalkan, tidak dihapus? | Ya, ya | Riwayat revisi pagu butuh tabel append-only tambahan dan belum ada laporan yang membacanya. Rencana dibatalkan supaya realisasi dan pelatihan tertautnya tetap terbaca |

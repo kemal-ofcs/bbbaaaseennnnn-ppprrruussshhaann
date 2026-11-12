@@ -1012,8 +1012,8 @@ vektor yang sama; SQL kembar diperiksa harfiah oleh `hris.test.ts`. Sentinel
   `harian_perlu_pkwtt`) diturunkan, angkanya dari `setting_gex_system hr_*`.
 - RBAC: `hr.*` (fase 1), `hr.finance.manage` sensitif, `CONFIDENTIAL_PERMISSIONS`
   (pribadi, keuangan, dokumen) tidak ikut paket Admin. Role bawaan `hrd` dan
-  `atasan`. Halaman `/hris` (Web/Desktop, `desktopSaja` di menu) memuat
-  Karyawan, Struktur, dan Organisasi; Mobile hanya form karyawan
+  `atasan`. Halaman `/hris` memuat Karyawan, Struktur, dan Organisasi, di
+  ketiga versi sejak fase 10; isian organisasi di form karyawan Mobile
   (`IsianOrganisasi.tsx`, di `filesToCopy`).
 
 ## HRIS fase 2: pengajuan cuti, izin, sakit (schema versi 37)
@@ -1145,8 +1145,8 @@ di `desktop/hr_pengajuan.rs` (disalin ke Mobile) ↔ `validations/hr-pengajuan.t
   diubah pemegang pemutus jenisnya. Command baru `desktop_hr_reimburse_overview`,
   `desktop_hr_reimburse_pay`, `desktop_hr_reimburse_pay_cancel`; Web aksi
   `bayar-ringkasan`, `bayar`, `batal-bayar` di `/api/hris/requests`.
-- Layar: saringan Reimburse dan tab Pembayaran (`PembayaranReimburse.tsx`, di
-  `filesToCopy`) di `/pengajuan`; pemutus, batas, dan cara bayar di Organisasi
+- Layar: saringan Reimburse dan tab Pembayaran (`PembayaranReimburse.tsx`) di
+  `/pengajuan`; pemutus, batas, dan cara bayar di Organisasi
   `/hris`; baris "Reimburse" di sel Gaji Bersih dan bagian reimbursement di slip.
 - **Semua perangkat wajib diperbarui** sebelum klaim dipakai: perangkat v38
   menolak cuti di tanggal berklaim dan bisa memutus klaim tanpa nominal.
@@ -1206,8 +1206,8 @@ Rincian dan keputusan pemilik di `prd-hris.md` §20 (Q-63 sampai Q-70). Logika
   `desktop_hr_offboarding_save`, `desktop_hr_offboarding_apply`,
   `desktop_hr_offboarding_cancel`, `desktop_hr_exit_reasons_save`; Web
   `POST /api/hris/offboarding`.
-- Layar (Web/Desktop): tab SP di rincian karyawan (`SuratPeringatanPanel.tsx`,
-  cetak A4 `cetakSuratPeringatan.ts`) dan tab Keluar di `/hris`
+- Layar: tab SP di rincian karyawan (`SuratPeringatanPanel.tsx`, cetak A4
+  `cetakSuratPeringatan.ts` hanya Web/Desktop) dan tab Keluar di `/hris`
   (`KeluarWorkspace.tsx`, termasuk alasan dan pengali). Halaman Karyawan Web
   menampilkan "Keluar <tanggal>".
 
@@ -1265,8 +1265,8 @@ cloud, baca) diperiksa harfiah oleh `hr-kinerja.test.ts`. Sentinel `-2037`,
 - Layar: `/hris` tab Kinerja (`KinerjaWorkspace.tsx`: Penilaian dan, untuk
   `config`, Template + pengaturan di `TemplateKinerja.tsx`), tab Kinerja
   rincian karyawan (`view`, `RiwayatKinerjaKaryawan`), dan Mobile `/pengajuan`
-  tab Penilaian. `PenilaianKinerja.tsx` (di `filesToCopy`) dipakai keduanya;
-  `modeHp` menyembunyikan Kembalikan, Final, dan Koreksi (Q-72). Tombol aksi
+  tab Penilaian. `PenilaianKinerja.tsx` dipakai keduanya; di `/pengajuan`
+  Mobile `modeHp` menyembunyikan Kembalikan, Final, dan Koreksi (Q-72). Tombol aksi
   mengikuti peta `boleh` dari backend.
 - **Semua perangkat wajib diperbarui sebelum penilaian dipakai**: perangkat
   v40 tidak mengenal tiga rute baru dan enam tabel snapshot.
@@ -1325,10 +1325,10 @@ dipecah lebih dulu). Sentinel `-2038`, `REQUIRED_TABLE_COUNT` 102.
   15 command `desktop_hr_vacanc*`/`applicant*`/`recruit_cleanup`/`training*`
   (Desktop 301 / Mobile 307); Web `POST /api/hris/recruitment` dan
   `/api/hris/training`.
-- Layar (Web/Desktop): tab Rekrutmen (`RekrutmenWorkspace.tsx`) dan Pelatihan
+- Layar: tab Rekrutmen (`RekrutmenWorkspace.tsx`) dan Pelatihan
   (`PelatihanWorkspace.tsx`) di `/hris`, tab Pelatihan rincian karyawan, dan
   masa simpan pelamar di form pengaturan Organisasi (konfirmasi memperingatkan
-  bila dipendekkan). Mobile tanpa layar; modul dan command tetap di biner.
+  bila dipendekkan). Mobile ikut sejak fase 10.
 - **Semua perangkat wajib diperbarui**: begitu cloud naik ke v42, perangkat v41
   berhenti sinkron (`SCHEMA_VERSION_OUTDATED`).
 
@@ -1369,7 +1369,7 @@ izin baru. Aturan kembar `desktop/telegram.rs` ↔ `validations/telegram.ts` +
   tersisa: build fase 8 mati di antara klaim dan hasil kirim, lalu build lama
   membatalkan barisnya setelah 5 menit.
 - **Kartu "Perlu perhatian"** (`components/hris/PerluPerhatian.tsx`, tab
-  Karyawan `/hris`, Web/Desktop; Mobile tidak punya `/hris`). Dibaca dari
+  Karyawan `/hris`, ketiga versi sejak fase 10). Dibaca dari
   cloud lewat `desktop_hr_attention` ↔ aksi `perhatian` di `/api/hris/query`
   (Q-102), dari `perhatian` ↔ `perhatianHr` dengan `PERHATIAN_SQL_*` yang
   disusun dari potongan SQL Telegram yang sama; pengajuan memakai
@@ -1441,16 +1441,70 @@ jendelanya boleh diganti dan kejadian baru tetap generasi parkir `gen:2`.
   `hr.performance.finalize`; `assess` tidak cukup, Q-122). `perhatian` →
   `perhatian_pada(…, tanggal)` ↔ `perhatianHrPada` supaya jendela periode
   bisa diuji.
-- **Layar**: `PerluPerhatian.tsx` (kini di `filesToCopy`) menerima
-  `onPilihKaryawan` opsional (tanpa itu nama tidak bisa diklik, Mobile,
-  Q-124), `onBukaKinerja`, dan `sembunyiBilaKosong` (beranda, Q-123: tidak
+- **Layar**: `PerluPerhatian.tsx` menerima `onPilihKaryawan` opsional (tanpa
+  itu nama tidak bisa diklik), `onBukaKinerja`, dan `sembunyiBilaKosong` (beranda, Q-123: tidak
   tampil selama memuat atau bila kosong; galat koneksi tetap tampil).
   `TabRincian`/`TAB_RINCIAN` pindah ke `validations/telegram.ts`. Beranda
   Web/Desktop (`app/page.tsx`) membuka `/hris?karyawan=<id>&tab=<tab>`,
   `/hris?tab=kinerja`, dan `/hris?tab=rekrutmen`; `HrisWorkspace` membaca
   parameter itu lewat `useSearchParams` (halaman `/hris` membungkusnya dengan
-  `Suspense`). Mobile `/dashboard` memasang kartu yang sama; tautan Penilaian
+  `Suspense`). Mobile `/dashboard` memasang kartu yang sama dengan tautan
+  yang sama sejak fase 10 (Q-132); tanpa area `hris` tautan Penilaian
   membuka `/pengajuan?tab=penilaian`.
+
+## HRIS fase 10: HRIS di Mobile dan bagan struktur (tanpa perubahan skema)
+
+Rincian dan keputusan pemilik di `prd-hris.md` §25 (Q-125 sampai Q-136).
+Versi skema tetap 42, sentinel tetap `-2038`, tanpa tabel, kolom, rute,
+command, atau izin baru (Desktop 302 / Mobile 308). Dirilis bersama fase 8
+dan 9 (Q-125); HP HRD butuh APK baru.
+
+- **`/hris` di Mobile** (`mobile/src/app/hris/page.tsx`, milik Mobile): guard
+  area `hris` (`employees.view`) → `router.replace("/dashboard")`,
+  `HrisWorkspace` di dalam `Suspense`. Semua tab dan tab rincian ikut, dijaga
+  izin yang sama dengan Web/Desktop (Q-126 sampai Q-128), termasuk Organisasi
+  dan Kembalikan/Final/Koreksi/Template kinerja; hanya cetak SP A4 yang
+  disembunyikan (`isMobileRuntime()`, Q-131). `/pengajuan` tab Penilaian
+  tetap `modeHp`. Bendera `desktopSaja` dihapus dari `navigation.ts` dan
+  saringannya dari Menu Mobile; `hris` ada di `KARYAWAN_SHORTCUT_AREAS`.
+- **`components/hris` disalin utuh** lewat `dirsToCopy` (bukan lagi empat
+  entri `filesToCopy`). Di luar direktori itu komponennya hanya bergantung pada
+  `PilihCari`, `KonfirmasiData`, `Modal`, dan `inventory/gaya`. Jangan
+  mengimpor `PageHeader`, `FeedbackBanner`, atau `AppShell` dari sana: props
+  kedua workspace berbeda.
+- **Tata letak HP** menurut lebar layar, tanpa prop `modeHp` baru:
+  `DaftarRincian.tsx` (daftar disembunyikan di bawah `lg` selama ada rincian
+  atau form, tombol "Kembali ke daftar") dipakai `HrisWorkspace`,
+  `KeluarWorkspace`, `RekrutmenWorkspace`, `PelatihanWorkspace`, dan
+  `PenilaianKinerja`; baris tab `HrisWorkspace`/`RincianKaryawan` digulir
+  mendatar di bawah `sm`. Tidak ada lagi `window.confirm/prompt/alert` di
+  `components/hris`: hapus berkas dan dokumen lewat `konfirmasiData`, alasan
+  batal penyesuaian cuti diisi di barisnya.
+- **Berkas** (`components/hris/berkas.tsx`): `bukaBerkas` satu-satunya jalur
+  membuka berkas HRIS, termasuk lampiran pengajuan. Web/Desktop tab baru;
+  Mobile gambar di dialog pratinjau (tanpa salinan di HP), PDF lewat
+  `saveFileWithPicker` (SAF) dan mengembalikan kalimat untuk ditampilkan
+  (Q-129). `siapkanBerkas` dipakai keempat unggahan: gambar > 1 MB diperkecil
+  `optimizeImageFile` ke JPEG sisi 2000 px, mutu 0,85 lalu 0,7 (Q-130); PDF
+  apa adanya dan tetap ditolak backend bila > 1 MB.
+- **Tanpa koneksi**: `hris::tak_terhubung` (dipakai semua modul HR khusus
+  cloud) kini juga memetakan `TURSO_NETWORK_ERROR` ke pesan "butuh koneksi ke
+  database"; kodenya dipertahankan, kode lain diteruskan. Tidak ada cache data
+  khusus cloud di HP (Q-30, Q-45).
+- **Bagan** (`components/hris/BaganOrganisasi.tsx`, tab Struktur, ketiga
+  versi, `employees.view`, Q-136): logika murni `validations/hris-bagan.ts`
+  (`susunBagan`, `rantaiBagan`, `kotakBagan`, `terbukaBawaan`, `bukaRantai`,
+  `kelompokUnit`) tanpa kembaran Rust karena hanya layar yang membacanya.
+  Simpul = karyawan `Aktif`; lingkaran (dari `atasan_siklus` dan dihitung
+  ulang dari karyawan aktif) dan atasan nonaktif/tidak dikenal menjadi akar
+  bertanda (`LABEL_TANDA_HRIS.atasan_siklus`/`atasan_nonaktif`); tanpa atasan
+  dan tanpa bawahan hanya di kelompok "Belum punya atasan" per divisi (200
+  nama pertama, Q-135). Tiga tampilan (Q-133, Q-134): Bagan (bawaan mulai
+  `lg`, dua tingkat terbuka, > 8 bawahan ditumpuk ke bawah, paling banyak 400
+  kotak dan 12 tingkat, gulir mendatar di dalam kartu), Fokus (bawaan di bawah
+  `lg`: rantai atasan, kotak terpilih, bawahan langsung), dan Menurut unit
+  (Cabang → Divisi, `<details>`). Garis dari border pseudo-element
+  `slate-500`, tanpa CSS baru. Daftar berjenjang lama dihapus.
 
 ## Domain contoh
 

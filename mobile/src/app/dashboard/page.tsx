@@ -32,6 +32,15 @@ export default function DashboardPage() {
   const canViewRecentScans = canAccessArea(user, "home");
   const canViewHistory = canAccessArea(user, "history");
   const canViewKaryawan = canAccessArea(user, "karyawan");
+  const bukaHris = canAccessArea(user, "hris");
+  const kinerjaHris = (
+    [
+      "hr.performance.view",
+      "hr.performance.assess",
+      "hr.performance.config",
+      "hr.performance.finalize",
+    ] as const
+  ).some((izin) => hasPermission(user, izin));
 
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [recentScans, setRecentScans] = useState<Record<string, unknown>[]>([]);
@@ -132,16 +141,34 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Kartu "Perlu perhatian" (§24.5): hanya bila ada isinya. Mobile tidak
-            punya /hris, jadi nama tidak bisa diklik (Q-124). */}
+        {/* Kartu "Perlu perhatian" (§24.5): hanya bila ada isinya. Tautannya
+            sama dengan beranda Web/Desktop (Q-132); tanpa area `hris`,
+            Kinerja tetap membuka tab Penilaian di /pengajuan. */}
         {IZIN_PERHATIAN.some((izin) => hasPermission(user, izin)) ? (
           <PerluPerhatian
             sembunyiBilaKosong
+            onPilihKaryawan={
+              bukaHris
+                ? (idKaryawan, tab) =>
+                    router.push(
+                      `/hris?karyawan=${encodeURIComponent(idKaryawan)}&tab=${tab}`,
+                    )
+                : undefined
+            }
             onBukaKinerja={
-              canAccessArea(user, "pengajuan") &&
-              (hasPermission(user, "hr.performance.assess") ||
-                hasPermission(user, "hr.performance.view"))
-                ? () => router.push("/pengajuan?tab=penilaian")
+              bukaHris && kinerjaHris
+                ? () => router.push("/hris?tab=kinerja")
+                : canAccessArea(user, "pengajuan") &&
+                    (hasPermission(user, "hr.performance.assess") ||
+                      hasPermission(user, "hr.performance.view"))
+                  ? () => router.push("/pengajuan?tab=penilaian")
+                  : undefined
+            }
+            onBukaRekrutmen={
+              bukaHris &&
+              (hasPermission(user, "hr.recruit.view") ||
+                hasPermission(user, "hr.recruit.manage"))
+                ? () => router.push("/hris?tab=rekrutmen")
                 : undefined
             }
           />

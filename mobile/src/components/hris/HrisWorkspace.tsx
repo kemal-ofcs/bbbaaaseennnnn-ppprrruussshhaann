@@ -1,0 +1,344 @@
+"use client";
+
+// Layar HRIS (Web/Desktop): daftar karyawan + rincian, bagan struktur
+// (fase 10), dan master organisasi. Setiap tab memeriksa izinnya sendiri;
+// backend memeriksa ulang (aturan 10).
+
+import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { BaganOrganisasi } from "@/components/hris/BaganOrganisasi";
+import { DaftarRincian } from "@/components/hris/DaftarRincian";
+import { KeluarWorkspace } from "@/components/hris/KeluarWorkspace";
+import { KinerjaWorkspace } from "@/components/hris/KinerjaWorkspace";
+import { OrganisasiPanel } from "@/components/hris/OrganisasiPanel";
+import { PelatihanWorkspace } from "@/components/hris/PelatihanWorkspace";
+import { PengaturanPengajuan } from "@/components/hris/PengaturanPengajuan";
+import { PerluPerhatian } from "@/components/hris/PerluPerhatian";
+import { RekrutmenWorkspace } from "@/components/hris/RekrutmenWorkspace";
+import { RincianKaryawan } from "@/components/hris/RincianKaryawan";
+import { hasPermission } from "@/lib/auth/access";
+import { useAuth } from "@/lib/context/AuthContext";
+import { getDaftarKaryawan } from "@/lib/gateways/employee";
+import {
+  ambilOrganisasi,
+  ambilRingkasanKontrak,
+  type Organisasi,
+  type RingkasanKontrak,
+} from "@/lib/gateways/hris";
+import { SYNC_COMPLETED_EVENT } from "@/lib/gateways/sync-status";
+import { LABEL_TANDA_HRIS } from "@/lib/validations/hris";
+import {
+  IZIN_PERHATIAN,
+  TAB_RINCIAN,
+  type TabRincian,
+} from "@/lib/validations/telegram";
+
+type Tab =
+  | "karyawan"
+  | "struktur"
+  | "kinerja"
+  | "keluar"
+  | "rekrutmen"
+  | "pelatihan"
+  | "organisasi";
+export type BarisKaryawan = Record<string, unknown>;
+
+const TOMBOL_TAB =
+  "min-h-10 shrink-0 rounded-xl px-4 text-sm font-bold transition-colors";
+
+export function HrisWorkspace() {
+  const { user } = useAuth();
+  const bolehOrg = hasPermission(user, "hr.org.manage");
+  const bolehKeluar =
+    hasPermission(user, "hr.offboard.view") ||
+    hasPermission(user, "hr.offboard.manage");
+  const bolehKinerja = (
+    [
+      "hr.performance.view",
+      "hr.performance.assess",
+      "hr.performance.config",
+      "hr.performance.finalize",
+    ] as const
+  ).some((izin) => hasPermission(user, izin));
+  const bolehRekrutmen =
+    hasPermission(user, "hr.recruit.view") ||
+    hasPermission(user, "hr.recruit.manage");
+  const bolehPelatihan =
+    hasPermission(user, "hr.training.view") ||
+    hasPermission(user, "hr.training.manage");
+  const bolehPerhatian = IZIN_PERHATIAN.some((izin) =>
+    hasPermission(user, izin),
+  );
+  // Tautan dari kartu di beranda (§24.5): `?karyawan=<id>&tab=<tab rincian>`
+  // membuka rincian karyawan, `?tab=kinerja|rekrutmen` membuka tab itu.
+  const parameter = useSearchParams();
+  const karyawanUrl = parameter.get("karyawan");
+  const tabUrl = parameter.get("tab") ?? "";
+  const [tab, setTab] = useState<Tab>(() => {
+    if (karyawanUrl) return "karyawan";
+    if (tabUrl === "kinerja" && bolehKinerja) return "kinerja";
+    if (tabUrl === "rekrutmen" && bolehRekrutmen) return "rekrutmen";
+    return "karyawan";
+  });
+  // "Mulai proses keluar" dari tab SP: karyawan dan SP3 yang mendasari.
+  const [mulaiKeluar, setMulaiKeluar] = useState<{
+    idKaryawan: string;
+    idSp: string | null;
+  } | null>(null);
+  const [karyawan, setKaryawan] = useState<BarisKaryawan[]>([]);
+  const [org, setOrg] = useState<Organisasi | null>(null);
+  const [kontrak, setKontrak] = useState<Map<string, RingkasanKontrak>>(
+    new Map(),
+  );
+  const [cari, setCari] = useState("");
+  const [dipilih, setDipilih] = useState<string | null>(karyawanUrl);
+  // Tab rincian yang dibuka langsung dari kartu "Perlu perhatian".
+  const [tabRincian, setTabRincian] = useState<TabRincian>(() =>
+    karyawanUrl && (TAB_RINCIAN as readonly string[]).includes(tabUrl)
+      ? (tabUrl as TabRincian)
+      : "kerja",
+  );
+  const [galat, setGalat] = useState("");
+
+  const muat = useCallback(async () => {
+    try {
+      const [daftar, organisasi, ringkas] = await Promise.all([
+        getDaftarKaryawan({}),
+        ambilOrganisasi(),
+        ambilRingkasanKontrak(),
+      ]);
+      setKaryawan(daftar);
+      setOrg(organisasi);
+      setKontrak(new Map(ringkas.karyawan.map((k) => [k.id_karyawan, k])));
+      setGalat("");
+    } catch (error) {
+      setGalat(
+        error instanceof Error ? error.message : "Data HRIS gagal dimuat.",
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    void muat();
+    const dengar = () => void muat();
+    window.addEventListener(SYNC_COMPLETED_EVENT, dengar);
+    return () => window.removeEventListener(SYNC_COMPLETED_EVENT, dengar);
+  }, [muat]);
+
+  const nama = useMemo(() => {
+    const peta = new Map<string, string>();
+    for (const c of org?.cabang ?? []) peta.set(`c:${c.id_cabang}`, c.nama);
+    for (const j of org?.jabatan ?? []) peta.set(`j:${j.id_jabatan}`, j.nama);
+    for (const k of karyawan)
+      peta.set(`k:${String(k.id_unik)}`, String(k.nama));
+    return peta;
+  }, [org, karyawan]);
+
+  const tampil = useMemo(() => {
+    const kata = cari.trim().toLowerCase();
+    return karyawan.filter(
+      (k) =>
+        !kata ||
+        [k.nama, k.kode_karyawan, k.divisi, k.jabatan_status]
+          .map((v) => String(v ?? "").toLowerCase())
+          .some((v) => v.includes(kata)),
+    );
+  }, [karyawan, cari]);
+
+  const pilihan = karyawan.find((k) => String(k.id_unik) === dipilih) ?? null;
+
+  return (
+    <div className="space-y-4">
+      <div
+        className="flex flex-nowrap gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0"
+        role="tablist"
+        aria-label="Bagian HRIS"
+      >
+        {(
+          [
+            ["karyawan", "Karyawan"],
+            ["struktur", "Struktur"],
+            ...(bolehKinerja ? [["kinerja", "Kinerja"]] : []),
+            ...(bolehKeluar ? [["keluar", "Keluar"]] : []),
+            ...(bolehRekrutmen ? [["rekrutmen", "Rekrutmen"]] : []),
+            ...(bolehPelatihan ? [["pelatihan", "Pelatihan"]] : []),
+            ...(bolehOrg ? [["organisasi", "Organisasi"]] : []),
+          ] as Array<[Tab, string]>
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            id={`hris-tab-${id}`}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            onClick={() => {
+              setMulaiKeluar(null);
+              setTab(id);
+            }}
+            className={`${TOMBOL_TAB} ${tab === id ? "bg-sky-500 text-white" : "bg-slate-900 text-slate-300"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {galat ? <p className="text-sm text-rose-200">{galat}</p> : null}
+
+      {tab === "karyawan" && bolehPerhatian ? (
+        <PerluPerhatian
+          onPilihKaryawan={(idKaryawan, tabAwal) => {
+            setDipilih(idKaryawan);
+            setTabRincian(tabAwal);
+          }}
+          onBukaRekrutmen={
+            bolehRekrutmen ? () => setTab("rekrutmen") : undefined
+          }
+          onBukaKinerja={bolehKinerja ? () => setTab("kinerja") : undefined}
+        />
+      ) : null}
+
+      {tab === "karyawan" ? (
+        <DaftarRincian
+          adaPilihan={Boolean(pilihan)}
+          onKembali={() => setDipilih(null)}
+          daftar={
+            <div className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900 p-3">
+              <input
+                id="hris-cari"
+                type="search"
+                value={cari}
+                onChange={(e) => setCari(e.target.value)}
+                placeholder="Cari nama, kode, divisi, jabatan..."
+                className="min-h-10 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-white outline-none focus:border-sky-500"
+              />
+              <ul className="max-h-[65vh] space-y-1 overflow-y-auto">
+                {tampil.map((k) => {
+                  const id = String(k.id_unik);
+                  const ringkas = kontrak.get(id);
+                  return (
+                    <li key={id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDipilih(id);
+                          setTabRincian("kerja");
+                        }}
+                        className={`w-full rounded-xl px-3 py-2 text-left ${dipilih === id ? "bg-sky-500/20" : "hover:bg-slate-800"}`}
+                      >
+                        <span className="block truncate font-semibold text-white">
+                          {String(k.nama)}
+                        </span>
+                        <span className="block truncate text-xs text-slate-400">
+                          {String(k.divisi || "-")} •{" "}
+                          {String(k.jabatan_status || "-")}
+                          {k.id_keluar
+                            ? ` • Keluar ${String(k.tanggal_selesai_aktif ?? "")}`
+                            : k.status_aktif === "Nonaktif"
+                              ? " • Nonaktif"
+                              : ""}
+                        </span>
+                        {ringkas?.tanda.length ? (
+                          <span className="block truncate text-xs text-amber-200">
+                            {ringkas.tanda
+                              .map((t) => LABEL_TANDA_HRIS[t] ?? t)
+                              .join(", ")}
+                          </span>
+                        ) : null}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          }
+        >
+          <div className="min-w-0">
+            {pilihan ? (
+              <RincianKaryawan
+                key={`${String(pilihan.id_unik)}:${tabRincian}`}
+                karyawan={pilihan}
+                tabAwal={tabRincian}
+                nama={nama}
+                onBerubah={muat}
+                onMulaiKeluar={
+                  hasPermission(user, "hr.offboard.manage")
+                    ? (idSp) => {
+                        setMulaiKeluar({
+                          idKaryawan: String(pilihan.id_unik),
+                          idSp,
+                        });
+                        setTab("keluar");
+                      }
+                    : undefined
+                }
+              />
+            ) : (
+              <p className="rounded-2xl border border-slate-800 bg-slate-900 p-6 text-sm text-slate-400">
+                Pilih karyawan untuk melihat rinciannya.
+              </p>
+            )}
+          </div>
+        </DaftarRincian>
+      ) : null}
+
+      {tab === "struktur" ? (
+        <BaganOrganisasi
+          karyawan={karyawan}
+          org={org}
+          onLihatRincian={(idKaryawan) => {
+            setDipilih(idKaryawan);
+            setTabRincian("kerja");
+            setTab("karyawan");
+          }}
+        />
+      ) : null}
+
+      {tab === "kinerja" && bolehKinerja ? <KinerjaWorkspace /> : null}
+
+      {tab === "keluar" && bolehKeluar ? (
+        <KeluarWorkspace
+          key={
+            mulaiKeluar
+              ? `${mulaiKeluar.idKaryawan}:${mulaiKeluar.idSp}`
+              : "daftar"
+          }
+          karyawan={karyawan}
+          bolehUbah={hasPermission(user, "hr.offboard.manage")}
+          mulai={mulaiKeluar}
+          onBerubah={muat}
+        />
+      ) : null}
+
+      {tab === "rekrutmen" && bolehRekrutmen ? (
+        <RekrutmenWorkspace
+          karyawan={karyawan}
+          org={org}
+          bolehUbah={hasPermission(user, "hr.recruit.manage")}
+          bolehHapus={hasPermission(user, "hr.recruit.delete")}
+          bolehJadikan={(
+            [
+              "hr.recruit.manage",
+              "employees.manage",
+              "hr.contract.manage",
+            ] as const
+          ).every((izin) => hasPermission(user, izin))}
+          onBerubah={muat}
+        />
+      ) : null}
+
+      {tab === "pelatihan" && bolehPelatihan ? (
+        <PelatihanWorkspace
+          karyawan={karyawan}
+          bolehUbah={hasPermission(user, "hr.training.manage")}
+        />
+      ) : null}
+
+      {tab === "organisasi" && bolehOrg ? (
+        <>
+          <OrganisasiPanel org={org} onBerubah={muat} />
+          <PengaturanPengajuan />
+        </>
+      ) : null}
+    </div>
+  );
+}
