@@ -638,6 +638,25 @@ berlaku.
 - Struktur organisasi bergambar (bagan). Daftar berjenjang cukup; bagan bisa
   menyusul setelah fase 1.
 
+### 15.1 Catatan pemilik sesudah fase 8 (12 Nov 2026)
+
+- **Self-service karyawan dan formulir lamaran publik**: dicatat untuk nanti,
+  sebagai website/CMS terpisah dengan pola proyek `c:/dev/sekolah`. Belum
+  dirancang.
+- **Pelaporan BPJS, DJP (e-Bupot), Wajib Lapor**: alurnya belum dipahami
+  pemilik; perlu penjelasan dulu sebelum diputuskan masuk atau tidak.
+- **Transfer gaji ke bank**: belum diputuskan.
+- **Upah cuti melahirkan UU KIA**: tetap dicatat manual untuk sekarang.
+- **Masuk fase berikutnya**: rencana dan anggaran pelatihan (Q-26); bagan
+  struktur organisasi di SEMUA versi (Web, Desktop, Mobile); kejadian Telegram
+  penilaian kinerja, rekrutmen, dan per pengajuan; kartu "Perlu perhatian" di
+  Mobile dan di beranda aplikasi; pengaturan angka pengingat per perusahaan.
+  Semuanya ditunda di §22.10/§23.7 dan kini diminta ada.
+- **Urutan yang disetujui**: fase 9 = kejadian Telegram baru, kartu di Mobile
+  dan beranda, dan pengaturan angka pengingat (§24); fase 10 = rencana dan
+  anggaran pelatihan dan bagan struktur organisasi. Pelaporan BPJS/DJP/Wajib
+  Lapor dan berkas transfer gaji ke bank dibahas sesudah fase 10.
+
 ## 16. Urutan pengerjaan fase 1
 
 Ditulis setelah menelusuri kode (10 Nov 2026). Temuan yang mengubah §5 dijawab
@@ -3602,3 +3621,687 @@ Penyimpangan dan catatan, untuk ditinjau:
 - **Belum dikerjakan**: tabrakan PK dua sesi yang mencatat tahap bersamaan
   tidak diuji (transport `local_file` serial); mekanismenya ada dan galat
   `UNIQUE` diterjemahkan. Pengingat sertifikat kedaluwarsa tetap fase 8.
+
+## 23. Urutan pengerjaan fase 8
+
+**Disetujui pemilik (12 Nov 2026).** Ditulis setelah menelusuri kode
+(12 Nov 2026); jawaban Q-101 sampai Q-112 di §23.11, semuanya sesuai usulan.
+Bila §11.3 dan bagian ini berbeda, **bagian ini yang berlaku** (terutama:
+semua kejadian HR dicatat sekali sehari mulai 07.00 WIB, ulang tahun kerja
+menjadi ringkasan harian, id pengingat dokumen
+memuat tanggal kedaluwarsanya, dan baris antrean HR "diparkir" supaya perangkat
+lama tidak bisa membatalkannya).
+
+### 23.1 Temuan dari kode
+
+- **Pengirim selalu membaca CLOUD, tidak pernah SQLite perangkat.**
+  `telegram::drain` (`desktop/telegram.rs`) menerima `&TursoClient`;
+  `desktop_drain_telegram` (`commands.rs`) hanya memeriksa sesi lalu
+  `state.get_turso_client()`. Kembarannya `drainTelegram`
+  (`services/telegram.ts`) dipanggil `POST /api/telegram/drain`
+  (`requireWebSession`). Jadi kekhawatiran "data khusus cloud tetapi pengirim
+  membaca lokal" **tidak terjadi**: `hr_dokumen` dan `hr_sp` (khusus cloud)
+  maupun `hr_kontrak`, `hr_pengajuan`, `hr_pengajuan_keputusan`, `master_data`
+  (tersinkron, salinannya ada di cloud) terbaca oleh pengirim yang sama di
+  Desktop, Mobile, dan Web. Pada mode database lokal `TursoClient` menunjuk hub.
+  Akibat yang perlu diketahui: mutasi yang masih mengantre di outbox belum
+  terlihat pengirim sampai terdorong.
+- **Siapa yang menjalankan**: `AutoTelegramRunner` (`AppShell` Web/Desktop dan
+  `MobileAppShell`), 20 detik setelah login lalu tiap 60 detik, untuk SETIAP
+  sesi. Tidak ada server atau penjadwal; bila tidak ada yang login, tidak ada
+  yang dikirim sampai login berikutnya.
+- **Satu siklus** (`drain`): `ensure_schema_current` → `baca_pengaturan`
+  (berhenti bila `aktif` ≠ 1 atau token kosong) → hapus baris bukan `Menunggu`
+  berumur > 30 hari → `catat_kejadian` (di dalamnya `catat_armada`,
+  `catat_buka_buku`, `catat_harian`) → ambil `TELEGRAM_BATCH` (20) baris
+  `Menunggu` yang klaimnya kosong atau kedaluwarsa → klaim atomik
+  (`klaim_oleh`, `klaim_sampai = +5 menit`) → kirim → `Terkirim`, atau
+  `status_setelah_gagal` ↔ `statusSetelahGagal` (3 kali lalu `Gagal`).
+- **Pola menambah kejadian** (dipakai fase 3 driver tanpa perubahan skema):
+  entri di `KEJADIAN`/`TELEGRAM_KEJADIAN`, `bidang_kejadian`/`BIDANG_KEJADIAN`,
+  `LABEL_KEJADIAN`; satu SQL sumber ber-`NOT EXISTS` atas
+  `notifikasi_telegram.id_notifikasi`; fungsi pesan kembar; cabang di
+  `catat_kejadian`. Bidang baru = entri `BIDANG`/`TELEGRAM_BIDANG` +
+  `label_bidang`/`LABEL_BIDANG`. Pengaturannya hanya baris baru
+  `grup:<bidang>` dan `kirim:<kejadian>` di `app_telegram_setting`
+  (key/value); `notifikasi_telegram.kejadian` sengaja tanpa CHECK.
+  `NotifikasiTelegramCard.tsx` merender `TELEGRAM_BIDANG` dan
+  `TELEGRAM_KEJADIAN` dengan `.map`, jadi bidang dan sakelar baru tampil tanpa
+  perubahan layar.
+- **`aktif_sejak` dan batas 7 hari** ada di setiap SQL sumber berbasis
+  peristiwa (`created_at >= ? AND created_at >= datetime('now', '-7 days')`).
+  Ringkasan harian (`stok_menipis`) tidak memakainya: `catat_harian` membaca
+  `SQL_JAM_WIB`, menunggu `JAM_RINGKASAN_STOK` (7), lalu memeriksa
+  `belum_tercatat` atas `stok:<tanggal WIB>`. Semua kejadian §11.3 berbasis
+  TANGGAL (H-30, H-7, hari H, harian), bukan peristiwa, jadi polanya
+  `catat_harian`, bukan `catat_kejadian`.
+- **Tes kembar**: `validations/telegram.test.ts` memeriksa teks SQL perjalanan
+  harfiah terhadap `telegram.rs` (Desktop dan salinan Mobile) dan vektor pesan
+  yang sama; `services/telegram.test.ts` "kejadian armada" ↔
+  `catat_armada_dari_data_cloud` (Rust, `TursoClient::local_file`).
+  `telegram.rs` ada di daftar salin `sync-rust-modules.ts`.
+- **Siapa yang mengatur**: `require_telegram_admin` (`settings.manage` DAN
+  `is_superadmin`) untuk empat command konfigurasi; Web
+  `requireWebPermission(request, "settings.manage", true)`. Tab Pengaturan
+  "Notifikasi" hanya tampil untuk `isSuperadmin` (`settings/page.tsx`).
+  `baca_draft` menuntut objek `grup` dan `kirim` berkunci PERSIS daftar build
+  itu (`objek_persis`), lalu menulis per kunci; build lama yang menyimpan
+  konfigurasi tidak menyentuh kunci baru yang tidak dikenalnya.
+- **Perangkat lama membatalkan kejadian yang tidak dikenalnya**, dan tidak ada
+  gerbang yang menghentikannya: di `drain`, `bidang_kejadian(kejadian)` =
+  `None` membuat baris `Menunggu` diubah menjadi `Dibatalkan`. Baris yang
+  sudah dibatalkan tetap memegang id-nya, jadi `NOT EXISTS` mencegah kejadian
+  itu dicatat ulang: pesannya hilang diam-diam. `drain` hanya memanggil
+  `ensure_schema_current` (memeriksa sentinel, dan sentinel lama tetap ada di
+  cloud); pemeriksaan `CLIENT_SCHEMA_VERSION` (`is_client_schema_outdated`,
+  `sync.rs`) hanya ada di jalur sinkronisasi. Jadi **menaikkan versi skema pun
+  tidak menghentikan pengirim perangkat lama**. Yang bisa dimanfaatkan: SELECT
+  dan pembatalan di build lama sama-sama bersyarat
+  `klaim_sampai IS NULL OR klaim_sampai < datetime('now')`, sehingga baris
+  yang klaimnya masih berlaku tidak disentuhnya (§23.2).
+- **Sumber data setiap kejadian §11.3**:
+
+  | Kejadian | Tabel | Letak | Terbaca pengirim Desktop/Mobile | Web membaca dari |
+  | :-- | :-- | :-- | :-- | :-- |
+  | PKWT berakhir, percobaan berakhir | `hr_kontrak` (`jenis`, `tanggal_selesai`, `percobaan_selesai`; pembatalan = baris `batal-<id>`) + `master_data` | tersinkron | ya, salinan cloud | cloud |
+  | Dokumen kedaluwarsa (termasuk sertifikat pelatihan fase 7, Q-97) | `hr_dokumen.tanggal_kedaluwarsa` + `hr_dokumen_jenis.nama` | khusus cloud | ya | cloud |
+  | SP berakhir | `hr_sp` (`berlaku_sampai` beku per SP, `dicabut_pada`) | khusus cloud | ya | cloud |
+  | Pengajuan menunggu, urgent belum diketahui | `hr_pengajuan` (`sidik`, `created_at` = jam cloud) + `hr_pengajuan_keputusan` | tersinkron | ya, salinan cloud | cloud |
+  | Ulang tahun kerja | `master_data.tanggal_daftar` (= Tanggal Masuk, Q-41) | tersinkron | ya, salinan cloud | cloud |
+
+- **Yang sudah ada dan dipakai ulang**: status kerja dan tanda kontrak
+  (`status_kerja`, `tanda_kontrak`, `kontrak_aktif` ↔ kembaran TS di
+  `validations/hris.ts`), predikat kontrak tidak dibatalkan di
+  `JENIS_DARI_KONTRAK_SQL`, `status_sp` ↔ `statusSp` (`Berlaku` sampai DENGAN
+  `berlaku_sampai`), `status_pengajuan` + tanda `perlu_diketahui`
+  (`tanda_keputusan`), predikat keputusan final di `PENGAJUAN_BERLAKU_SQL`,
+  tanggal hapus pelamar (`tanggal_hapus_sql!` ↔ `TANGGAL_HAPUS_SQL`), dan
+  `idx_hr_dokumen_kedaluwarsa`. `hr_dokumen.tanggal_kedaluwarsa` hari ini
+  belum dibaca kueri mana pun.
+- **Bentuk `tanggal_daftar` tidak terbukti divalidasi di semua jalur lama**
+  (kolom teks sejak sebelum HRIS), jadi SQL ulang tahun kerja wajib menyaring
+  `date(tanggal_daftar) IS NOT NULL`, bukan menganggapnya `YYYY-MM-DD`.
+- **Belum ada kartu "Perlu perhatian" di HRIS.** `HrisWorkspace.tsx` (tab
+  Karyawan, Struktur, Kinerja, Keluar, Rekrutmen, Pelatihan, Organisasi) hanya
+  menampilkan tanda kontrak per karyawan di daftar (`LABEL_TANDA_HRIS`). Pola
+  serupa yang ada: tab "Perlu ditinjau" `/perjalanan` dan `/pengajuan`, bagian
+  "Perlu ditinjau" Cicilan, dan peringatan foto 7 hari driver. Izin baca hari
+  ini: kontrak `employees.view` (`desktop_hr_contracts`), dokumen
+  `hr.document.view`, SP `hr.warning.view`, pengajuan `hr.request.view` atau
+  `reimburse.decide` (yang terakhir hanya klaim Reimburse, `hanya_reimburse`),
+  rekrutmen `hr.recruit.view`/`manage`. Rute baca Web: `POST /api/hris/query`
+  (enum `aksi`, izin per aksi).
+- Skema sekarang: v42, sentinel `-2038`, `REQUIRED_TABLE_COUNT` 102, 68 tabel
+  snapshot, 90 rute, command Desktop 301 / Mobile 307, 13 kejadian, 4 bidang.
+
+### 23.2 Model data: tanpa perubahan skema
+
+**Versi skema tetap 42, sentinel tetap `-2038`, `REQUIRED_TABLE_COUNT` tetap
+102, 68 tabel snapshot, 90 rute.** Tidak ada tabel, kolom, indeks, rute outbox,
+atau izin baru. `storage.rs`, `sync.rs`, DDL `turso.rs`, `db-schema.ts`,
+`db-migrations.ts`, `PROMOTION_PLAN`, dan skrip audit tidak disentuh.
+Alasannya: pola fase 3 driver berlaku persis.
+
+- **Bidang `hrd`** dan **tujuh kejadian `hr_*`** hanya baris baru di
+  `app_telegram_setting` (`grup:hrd`, `kirim:hr_*`), ditulis saat Superadmin
+  menyimpan kartu Notifikasi. Sakelar baru lahir mati (baris belum ada =
+  `kirim` salah).
+- **Tidak ada pengaturan baru di `setting_gex_system`**: H-30, H-7, 2 hari,
+  dan jam 07.00 konstanta kembar di kode (Q-106).
+- **Parkir klaim** (Q-101), satu-satunya perubahan pada cara antrean dipakai,
+  tanpa mengubah tabelnya: baris kejadian HR dimasukkan dengan
+  `klaim_oleh = 'gen:2'` dan `klaim_sampai = '9999-12-31 23:59:59'`
+  (`INSERT_ANTREAN_PARKIR_SQL`, kembar). Build lama tidak pernah memilih atau
+  membatalkan baris yang klaimnya masih berlaku. Build fase 8 menambah
+  `OR klaim_oleh = 'gen:2'` pada SELECT, klaim, dan pembatalan di `drain` ↔
+  `drainTelegram`; kegagalan kirim yang masih boleh dicoba ulang
+  mengembalikan baris ke keadaan parkir, bukan ke klaim kosong. Tiga belas
+  kejadian lama tidak diparkir dan perilakunya tidak berubah. Kejadian baru
+  sesudah fase ini memakai `gen:3` dan seterusnya, yang tidak dikenali build
+  fase 8.
+  - Celah yang tersisa: build fase 8 mati di antara klaim dan hasil kirim.
+    Klaim 5 menitnya kedaluwarsa dan baris itu terlihat build lama, yang
+    membatalkannya. Butuh dua hal sekaligus (aplikasi mati tepat saat
+    mengirim, dan masih ada perangkat lama yang login); kartu "Perlu
+    perhatian" tetap menampilkan hal yang sama.
+
+### 23.3 Kejadian
+
+Semua ke bidang `hrd`. Semua dicatat di `catat_harian` ↔ `catatHarian` setelah
+07.00 WIB jam database (`JAM_RINGKASAN_STOK` yang ada), supaya pengingat tidak
+terkirim tengah malam; tiap siklus sesudahnya hanya memeriksa `NOT EXISTS`.
+"Hari ini" selalu `date('now', '+7 hours')` di SQL (aturan 19). Karyawan =
+`master_data.status_aktif = 'Aktif'`; yang sudah keluar atau nonaktif tidak
+diingatkan. Jabatan = `COALESCE(hr_jabatan.nama, master_data.jabatan_status)`.
+
+| Kejadian (`kirim:`) | Kapan dicatat | Id deterministik | SQL sumber (cloud) |
+| :-- | :-- | :-- | :-- |
+| `hr_kontrak_akhir` | sisa hari 8–30 (`:30`) dan 0–7 (`:7`) sebelum `tanggal_selesai` | `hr-kontrak:<id_kontrak>:30`, `hr-kontrak:<id_kontrak>:7` | `hr_kontrak` berjenis `PKWT`, tidak punya `batal-<id>`, dan tidak ada kontrak tidak dibatalkan lain milik karyawan itu yang `tanggal_mulai`-nya lebih baru (sudah diperpanjang = tidak diingatkan) |
+| `hr_percobaan_akhir` | sisa hari 0–7 sebelum `percobaan_selesai` | `hr-coba:<id_kontrak>` | `hr_kontrak` tidak dibatalkan, kontrak terakhir karyawannya, `percobaan_selesai` terisi |
+| `hr_dokumen_kedaluwarsa` | sisa hari 0–30 sebelum `tanggal_kedaluwarsa` | `hr-dok:<id_dokumen>:<tanggal_kedaluwarsa>` (Q-104) | `hr_dokumen` + `hr_dokumen_jenis`; sertifikat pelatihan ikut karena jenisnya `dok-sertifikat` |
+| `hr_sp_berakhir` | `berlaku_sampai` = hari ini sampai 6 hari lalu, dan ≥ tanggal WIB `aktif_sejak` | `hr-sp:<id_sp>` | `hr_sp` dengan `dicabut_pada IS NULL` |
+| `hr_pengajuan_menunggu` | harian, bila ada | `hr-tunggu:<tanggal WIB>` | `hr_pengajuan` tanpa `Batal` dan tanpa keputusan final bersidik sekarang, `created_at <= datetime('now', '-2 days')` (jam cloud), dihitung per `kelompok` |
+| `hr_urgent_belum_diketahui` | harian, bila ada | `hr-urgent:<tanggal WIB>` | pengajuan yang keputusan berlakunya `Setujui Urgent`, tanpa `Batal`, tanpa `Diketahui` (tanda `perlu_diketahui`) |
+| `hr_ulang_tahun_kerja` | harian, bila ada | `hr-ultah:<tanggal WIB>` (Q-103) | `master_data` Aktif dengan bulan-hari `tanggal_daftar` = hari ini dan tahun lebih kecil; 29 Feb jatuh di 28 Feb pada tahun bukan kabisat (sama dengan `tambah_bulan`) |
+
+- **Jendela, bukan satu hari**: karena pengirim hanya berjalan saat ada sesi,
+  pengingat dicatat pada login pertama di dalam jendelanya. H-30 berhenti
+  berlaku begitu sisa ≤ 7, jadi kontrak yang baru terlihat 5 hari sebelum
+  berakhir hanya menghasilkan satu pesan (`:7`), bukan dua.
+- **`aktif_sejak`**: pengingat yang melihat ke depan (kontrak, percobaan,
+  dokumen) tidak disaring `aktif_sejak`; kejadian hari H (SP) disaring.
+  Batas 7 hari menjadi lebar jendela hari H. Akibatnya saat `hrd` pertama kali
+  dinyalakan, semua yang sedang di dalam jendela terkirim hari itu (penanda).
+- Setiap SQL per butir ber-`LIMIT 50` per siklus seperti yang ada; sisanya
+  tercatat di siklus berikutnya, dan antrean mengirim 20 pesan per menit.
+- Teks SQL kembar Rust ↔ TS diperiksa harfiah (perluasan tes "SQL perjalanan
+  disalin harfiah" di `telegram.test.ts`).
+
+**Isi pesan** (fungsi kembar `pesan_hr_*` ↔ `pesanHr*`, vektor uji sama; teks
+polos seperti pesan lain):
+
+| Kejadian | Isi |
+| :-- | :-- |
+| `hr_kontrak_akhir` | "Kontrak PKWT berakhir <sisa> hari lagi (<tanggal>)", nama, jabatan. Sisa 0 = "hari ini" |
+| `hr_percobaan_akhir` | "Masa percobaan berakhir <sisa> hari lagi (<tanggal>)", nama, jabatan |
+| `hr_dokumen_kedaluwarsa` | "Dokumen <nama jenis> kedaluwarsa <sisa> hari lagi (<tanggal>)", nama, jabatan (Q-105) |
+| `hr_sp_berakhir` | "Masa berlaku <SP1/SP2/SP3> berakhir <tanggal>", nama, jabatan (Q-105) |
+| `hr_pengajuan_menunggu` | "<n> pengajuan menunggu lebih dari 2 hari", lalu hitungan per kelompok (Cuti 3, Izin 1, Reimburse 2, …) dan "Paling lama sejak <tanggal>" |
+| `hr_urgent_belum_diketahui` | "<n> pengajuan urgent belum diketahui HRD", "Paling lama sejak <tanggal>" |
+| `hr_ulang_tahun_kerja` | "Ulang tahun kerja hari ini", lalu sampai 30 baris "nama (jabatan), <n> tahun" dan "dan <k> lainnya" (pola `MAKS_BARIS_STOK`) |
+
+**Yang TIDAK pernah dikirim** (Q-32, ditegakkan dengan tidak membaca kolomnya
+di SQL sumber, pola `gaji_status` yang tidak membaca `payroll_items`): NIK dan
+isi `hr_profil` apa pun; gaji, nominal klaim, nominal pesangon; `alasan`
+pengajuan (termasuk alasan sakit) dan lampirannya; `pelanggaran`, `harapan`,
+dan `alasan_tingkat` SP; nomor dan berkas dokumen; nomor kontrak; data
+pelamar. Dua ringkasan pengajuan tidak memuat nama sama sekali, supaya
+"<nama>: Sakit" tidak terbaca di grup.
+
+**Kandidat yang ditunda fase 7** (§22.10):
+
+| Kandidat | Putusan | Alasan |
+| :-- | :-- | :-- |
+| Sertifikat kedaluwarsa | **Masuk**, tanpa kode khusus | Sertifikat = `hr_dokumen` (Q-97), ikut `hr_dokumen_kedaluwarsa` |
+| Lowongan dibuka/ditutup, pelamar baru, tahap pelamar | **Tidak masuk** | Rekrutmen HRD-input saja (Q-17): memberi tahu grup HRD tentang hal yang baru diketik HRD sendiri. Data pelamar sengaja khusus cloud dan diretensi (Q-33, Q-86); menyalin namanya ke riwayat grup Telegram mengalahkan retensi itu |
+| Data pelamar akan dihapus retensi | **Hanya kartu "Perlu perhatian"** (hitungan per lowongan, tanpa nama), tidak ke Telegram (Q-111) | Daftar lowongan sudah menonjolkannya 30 hari sebelumnya; cukup satu tempat lagi yang selalu terlihat |
+
+Catatan tunda fase 4 (§19.7) dan fase 5 (§20.9) terjawab oleh
+`hr_pengajuan_menunggu` (klaim ikut dihitung sebagai kelompok Reimburse,
+Q-107) dan `hr_sp_berakhir`. Catatan tunda fase 6 (§21.10, penilaian kinerja)
+tidak masuk (§23.7).
+
+### 23.4 Kartu "Perlu perhatian"
+
+Selalu ada, tidak bergantung pada Telegram. Tempatnya di atas daftar pada tab
+Karyawan `/hris` (tab bawaan = beranda HRIS), komponen baru
+`components/hris/PerluPerhatian.tsx`. Web/Desktop saja (Mobile tidak punya
+`/hris`, Q-43). Tiap bagian hanya dikirim backend bila sesi memegang izinnya;
+bagian tanpa isi tidak dirender, dan kartu menulis "Tidak ada yang perlu
+perhatian" bila semua bagian yang boleh dilihat kosong.
+
+| Bagian | Isi | Izin (sama dengan izin baca datanya hari ini) |
+| :-- | :-- | :-- |
+| Kontrak | PKWT berakhir ≤ 30 hari dan masa percobaan berakhir ≤ 7 hari: nama, jabatan, tanggal, sisa hari | `employees.view` |
+| Dokumen | kedaluwarsa ≤ 30 hari ATAU sudah lewat: nama, jenis dokumen, tanggal | `hr.document.view` |
+| Surat peringatan | SP yang berakhir ≤ 7 hari: nama, tingkat, tanggal | `hr.warning.view` |
+| Pengajuan | hitungan menunggu > 2 hari per kelompok dan urgent belum diketahui, tautan ke `/pengajuan` | `hr.request.view`; pemegang `reimburse.decide` saja hanya melihat hitungan Reimburse |
+| Ulang tahun kerja | hari ini dan 7 hari ke depan: nama, tanggal, tahun ke- | `employees.view` |
+| Rekrutmen | lowongan yang data pelamarnya dihapus ≤ 30 hari: judul lowongan, jumlah pelamar, tanggal hapus | `hr.recruit.view` atau `hr.recruit.manage` |
+
+- **Sumber data: cloud, satu bacaan** (Q-102). Command baru
+  `desktop_hr_attention` (`async`, `TursoClient`, pola command khusus cloud
+  fase 5–7) ↔ aksi baru `perhatian` di `POST /api/hris/query`. Dokumen, SP,
+  dan rekrutmen memang hanya ada di cloud, dan dengan satu sumber kartu dan
+  Telegram memakai predikat SQL yang SAMA (konstanta kembar di
+  `validations/telegram.ts` dipakai dua-duanya), jadi keduanya tidak bisa
+  berbeda pendapat. Tanpa koneksi kartu menulis "Butuh koneksi ke database"
+  dan sisa halaman tetap jalan dari SQLite lokal.
+- Kartu lebih lebar dari Telegram (dokumen yang sudah lewat, ulang tahun 7
+  hari ke depan, rekrutmen) karena kartu bukan pesan sekali kirim.
+- Klik nama membuka rincian karyawan pada tab yang sesuai (Kontrak, Dokumen,
+  SP), memakai pemilih karyawan yang sudah ada di `HrisWorkspace`.
+- Dimuat saat tab dibuka dan pada tombol Muat Ulang; tidak ada polling.
+
+### 23.5 Hak akses
+
+- **Tidak ada izin baru.** `catalog.ts`, seed role Rust,
+  `CONFIDENTIAL_PERMISSIONS`, `SENSITIVE_MUTATION_PERMISSIONS`, dan
+  `rbac-migration.test.ts` tidak berubah.
+- Konfigurasi bidang `hrd` dan sakelar `hr_*`: tetap hanya Superadmin
+  (`require_telegram_admin`), di kartu Notifikasi yang ada.
+- Pengirim: tetap cukup sesi (`desktop_drain_telegram`), hasilnya hanya
+  hitungan.
+- `desktop_hr_attention`: `require_any_permission` atas `employees.view`,
+  `hr.document.view`, `hr.warning.view`, `hr.request.view`,
+  `reimburse.decide`, `hr.recruit.view`, `hr.recruit.manage`; setiap bagian
+  disaring lagi per izin di backend (aturan 10, 44), bukan di layar. Web sama
+  lewat `requireAnyWebPermission`.
+- **Grup Telegram adalah pembaca tanpa RBAC** (Q-23, Q-42, Q-69, Q-84): siapa
+  pun anggota grup `hrd` membaca nama + jabatan + jenis dokumen + tingkat SP.
+  Itu sebabnya isi pesan dibatasi §23.3 dan sakelar per kejadian lahir mati.
+
+### 23.6 Command, rute, dan layar
+
+**Rust** (`desktop/telegram.rs`, sudah di daftar salin Mobile): `BIDANG` 4 → 5,
+`KEJADIAN` 13 → 20, `bidang_kejadian`, `label_bidang`; tujuh SQL sumber, tujuh
+fungsi `pesan_hr_*`, cabang HR di `catat_harian`; `INSERT_ANTREAN_PARKIR_SQL`
+dan tiga predikat `drain`. Bacaan kartu `perhatian` di modul yang sama (SQL-nya
+milik modul itu), dipanggil satu command baru:
+
+| Command | Izin |
+| :-- | :-- |
+| `desktop_hr_attention` (kartu "Perlu perhatian", bagian menurut izin) | salah satu izin §23.5 |
+
+Command Desktop 301 → 302, Mobile 307 → 308 (terdaftar di kedua `lib.rs`,
+`build.rs`, `capabilities/default.json`; doc comment sebelum
+`#[tauri::command]`, aturan 45). Empat command konfigurasi dan
+`desktop_drain_telegram` tidak berubah tanda tangannya.
+
+**Web**: `validations/telegram.ts` (kembar di atas), `services/telegram.ts`
+(`catatHarian`, `drainTelegram`, bacaan `perhatian`), aksi `perhatian` di
+`POST /api/hris/query` (Zod `.strict()`, tanpa `GET`), gateway
+`gateways/hris.ts` (cabang `isDesktopRuntime()`). Rute `/api/telegram/drain`
+dan `/api/settings/telegram*` tidak berubah.
+
+**Layar**:
+
+1. Pengaturan → Notifikasi (`NotifikasiTelegramCard.tsx`): grup HRD dan tujuh
+   sakelar muncul dari daftar; ditambah satu kalimat peringatan di kelompok
+   HRD tentang siapa yang membaca grup itu.
+2. `/hris` tab Karyawan: `PerluPerhatian.tsx`.
+3. Mobile: tidak ada layar; `AutoTelegramRunner` di `MobileAppShell` ikut
+   mengirim kejadian HR seperti kejadian lain.
+
+### 23.7 Tidak dikerjakan di fase ini
+
+- Pengaturan angka pengingat per perusahaan (H-30, H-7, 2 hari, jam 07.00).
+- Pengingat `pkwt_lewat`, `percobaan_lewat`, `harian_perlu_pkwtt`: sudah tampil
+  sebagai tanda di daftar karyawan; tidak dijadikan kejadian.
+- Kejadian rekrutmen dan pelatihan selain sertifikat kedaluwarsa (§23.3).
+- Kejadian penilaian kinerja (menunggu Final, periode berakhir) dan bagian
+  Kinerja di kartu.
+- Kejadian per pengajuan (pengajuan baru, diputus) dan per klaim: hanya
+  ringkasan harian.
+- Ulang tahun (tanggal lahir): `hr_profil` data pribadi, tidak pernah dikirim.
+- Kartu "Perlu perhatian" di Mobile dan di beranda aplikasi (`/`).
+- Pesan pribadi ke karyawan atau atasan, perintah dari Telegram, tombol di
+  pesan: bot tetap satu arah.
+- Mengirim ulang pesan `Gagal` atau `Dibatalkan` dari layar.
+- Gerbang versi di `drain` untuk build mendatang (parkir klaim sudah
+  menutupnya per generasi).
+
+### 23.8 Langkah
+
+| # | Langkah | Gerbang |
+| :-- | :-- | :-- |
+| 1 | **Aturan kembar** `telegram.rs` ↔ `validations/telegram.ts`: bidang `hrd`, tujuh kejadian, `bidang_kejadian`, label, id deterministik, tujuh SQL sumber, tujuh fungsi pesan, konstanta jendela (30, 7, 2 hari), `INSERT_ANTREAN_PARKIR_SQL`. Belum ada yang memanggilnya. | `bun run sync:mobile` dulu (tes teks SQL membaca salinan Mobile), lalu `bun test src/lib/validations/telegram.test.ts` (vektor pesan, SQL harfiah Rust ↔ TS) + `cargo test telegram` |
+| 2 | **Pengirim Rust**: cabang HR di `catat_harian`, parkir klaim di `drain` (SELECT, klaim, batal, parkir ulang saat gagal). | tes `TursoClient::local_file` `catat_hrd_dari_data_cloud`: setiap kejadian dari data yang sama; dijalankan dua kali tidak menggandakan; kontrak yang sudah diperpanjang atau dibatalkan, karyawan nonaktif, SP dicabut tidak dicatat; sebelum 07.00 tidak ada yang dicatat. Tes `baris_parkir_tidak_disentuh_predikat_lama`: SELECT dan UPDATE batal build lama (teks v33 disalin ke tes) tidak mengenai baris parkir; gagal kirim kembali parkir; kejadian lama tetap tidak diparkir |
+| 3 | **Pengirim Web**: `catatHarian` dan `drainTelegram` kembar langkah 2. | `bun test src/lib/services/telegram.test.ts` ("kejadian hrd", data dan pesan sama dengan langkah 2, dan tes parkir yang sama) |
+| 4 | **Kartu, backend**: bacaan `perhatian` (Rust + TS, bagian menurut izin), command `desktop_hr_attention` di keempat tempat, aksi `perhatian` di `/api/hris/query`, gateway. | `audit:contract` (302/308) + `cargo test telegram` (bagian tanpa izin tidak ikut) + tes layanan Web yang sama + `web-rbac-boundary` |
+| 5 | **Layar**: `PerluPerhatian.tsx` di `HrisWorkspace`, kalimat peringatan di `NotifikasiTelegramCard`; `bun run sync:mobile`; bagian `CLAUDE.md` "HRIS fase 8" (dan angka 13 → 20 kejadian, 4 → 5 bidang di bagian Telegram v33); angka di dokumen skill (command 302/308); catatan "Sudah dibangun" §23.12. | typecheck + Biome + `audit:docs`; `bun run check` penuh oleh pemilik |
+
+`audit:schema` tidak punya gerbang di fase ini karena tidak ada DDL yang
+berubah; ia tetap ikut `bun run check` penuh di akhir.
+
+### 23.9 Penanda yang ditinjau pemilik saat menyetujui
+
+- **Tanpa perubahan skema**: versi tetap 42, sentinel tetap `-2038`. Perangkat
+  fase 7 tetap bisa sinkron; yang membedakan build hanya isi pengirimnya.
+- **Parkir klaim** memakai kolom `klaim_oleh`/`klaim_sampai` untuk tujuan
+  kedua (menyembunyikan baris dari build lama). Ini satu-satunya bagian yang
+  mengubah `drain`, kode yang sudah berjalan sejak v33. Celah sisanya di §23.2.
+- **Prosedur tetap dianjurkan**: nyalakan sakelar `hr_*` setelah perangkat
+  diperbarui. Parkir klaim menjaga bila ada yang terlewat, bukan pengganti.
+- **Pengingat hanya terkirim bila ada yang login** hari itu (sesi mana pun,
+  termasuk terminal scanner dan HP driver), dan baru setelah 07.00 WIB.
+- **Hari pertama dinyalakan**: semua kontrak, percobaan, dan dokumen yang
+  sedang di dalam jendelanya terkirim sekaligus (dibatasi 20 pesan per menit).
+- Pengingat dokumen hanya untuk dokumen yang belum lewat; dokumen yang sudah
+  kedaluwarsa sebelum Telegram dinyalakan hanya tampil di kartu.
+- Dokumen yang tanggal kedaluwarsanya diperbarui diingatkan lagi untuk tanggal
+  barunya (id memuat tanggal), berbeda dari id `hr-dok:<id>` di §11.3.
+- Ulang tahun kerja satu pesan per hari, bukan satu per orang (§11.3).
+- Pesan memuat **jenis dokumen** dan **tingkat SP** selain nama + jabatan.
+- Dua ringkasan pengajuan tidak memuat nama; klaim Reimburse ikut dihitung di
+  grup HRD walaupun pemutusnya pemegang `reimburse.decide`.
+- "Menunggu > 2 hari" dihitung dari jam cloud menerima pengajuan (2 × 24 jam
+  kalender, termasuk hari libur), bukan hari kerja.
+- Pengingat PKWT tidak dikirim bila karyawan itu sudah punya kontrak yang
+  lebih baru, apa pun jenisnya.
+- Kartu "Perlu perhatian" butuh koneksi ke database, di Desktop sekalipun, dan
+  pemegang `employees.view` (termasuk Atasan dan Admin) melihat bagian Kontrak
+  dan Ulang tahun kerja.
+- Data pelamar tidak pernah masuk Telegram.
+
+### 23.10 Pertanyaan untuk pemilik
+
+| No | Pertanyaan | Usulan | Alasan |
+| :-- | :-- | :-- | :-- |
+| Q-101 | Cara aman menyalakan kejadian baru selagi masih ada perangkat lama: (a) parkir klaim (§23.2) ditambah prosedur; (b) prosedur saja seperti fase 3 driver; (c) menaikkan versi skema ke 43 tanpa isi? | (a) | (c) tidak menolong: `drain` build lama tidak memeriksa versi, hanya sentinel lama yang tetap ada. (b) bergantung pada disiplin, dan pesan yang dibatalkan hilang diam-diam. (a) tiga predikat di `drain` + satu INSERT, tanpa skema |
+| Q-102 | Kartu "Perlu perhatian" di Desktop: (a) semua bagian dibaca dari cloud lewat satu command; (b) kontrak, pengajuan, ulang tahun dari SQLite lokal dan sisanya dari cloud? | (a) | Tiga dari enam bagian memang khusus cloud; satu sumber berarti SQL yang sama dengan Telegram. (b) tetap tampil sebagian saat offline, tetapi dua jalur baca dan dua set kueri kembar |
+| Q-103 | Ulang tahun kerja: satu pesan per orang (`hr-ultah:<id>:<tahun>`, §11.3) atau ringkasan harian (`hr-ultah:<tanggal>`)? | Ringkasan harian | Karyawan hasil impor sering bertanggal masuk sama (1 Januari, tanggal berdiri); per orang berarti puluhan pesan sekaligus |
+| Q-104 | Dokumen yang diperpanjang (tanggal kedaluwarsa diubah): diingatkan lagi? | Ya, id `hr-dok:<id_dokumen>:<tanggal_kedaluwarsa>` | Dengan id §11.3 (`hr-dok:<id>`) SIM yang diperpanjang tidak pernah diingatkan lagi seumur baris itu |
+| Q-105 | Selain nama + jabatan (Q-32), bolehkah pesan memuat jenis dokumen ("SIM B1") dan tingkat SP ("SP2")? | Ya untuk keduanya; nomor dokumen dan isi SP tetap tidak pernah | Tanpa jenis dokumen pesannya tidak bisa ditindaklanjuti. Tingkat SP bukan isi SP, tetapi bila dianggap terlalu peka, pesan SP cukup "Masa berlaku SP berakhir" |
+| Q-106 | Angka pengingat (H-30/H-7 kontrak, H-7 percobaan, H-30 dokumen, 2 hari menunggu, 07.00 WIB): tetap di kode atau bisa diatur per perusahaan? | Tetap di kode | §11.3 sudah menetapkannya; enam pengaturan baru menambah layar dan validator kembar tanpa permintaan |
+| Q-107 | Klaim Reimburse yang menunggu > 2 hari ikut ringkasan grup HRD? | Ya, sebagai baris hitungan "Reimburse", tanpa nominal | Mesin pengajuannya sama; grup Keuangan tidak punya kejadian klaim. Bila pemutus klaim bukan HRD, alternatifnya ringkasan kedua ke grup Keuangan (satu kejadian lagi) |
+| Q-108 | Ringkasan pengajuan menunggu dan urgent: hitungan saja, atau dengan nama karyawan? | Hitungan saja per kelompok | Nama + kelompok "Sakit" di grup sudah mendekati "alasan sakit" yang dilarang Q-32; rinciannya ada di `/pengajuan` |
+| Q-109 | SP berakhir: dikirim pada hari terakhir berlaku (`berlaku_sampai`) saja, atau juga pengingat sebelumnya? | Hari terakhir saja (§11.3), kartu menampilkan 7 hari sebelumnya | SP berakhir tidak butuh tindakan seperti kontrak; cukup tahu |
+| Q-110 | Pengingat PKWT untuk karyawan yang sudah punya kontrak lebih baru (sudah diperpanjang atau diangkat PKWTT): tetap dikirim? | Tidak | Mengingatkan hal yang sudah ditangani hanya menambah bising |
+| Q-111 | Data pelamar yang akan dihapus retensi: Telegram, kartu, atau keduanya? | Kartu saja (judul lowongan, jumlah, tanggal; tanpa nama) | Daftar lowongan sudah menonjolkannya; nama pelamar tidak boleh keluar ke Telegram (Q-86) |
+| Q-112 | Bagian Kontrak dan Ulang tahun kerja di kartu terbuka untuk semua pemegang `employees.view` (termasuk Atasan dan Admin)? | Ya | Tanggal kontrak sudah terbaca dengan izin itu hari ini (`desktop_hr_contracts`); kartu tidak membuka data baru |
+
+### 23.11 Jawaban fase 8 (12 Nov 2026)
+
+Semua jawaban sesuai usulan §23.10, dan penanda §23.9 disetujui, jadi isi
+§23.2–§23.9 tidak berubah.
+
+| No | Pertanyaan | Jawaban |
+| :-- | :-- | :-- |
+| Q-101 | Menyalakan kejadian baru selagi ada perangkat lama | (a): parkir klaim (`gen:2`) ditambah prosedur |
+| Q-102 | Sumber kartu "Perlu perhatian" di Desktop | (a): semua bagian dari cloud lewat satu command |
+| Q-103 | Ulang tahun kerja | Ringkasan harian (`hr-ultah:<tanggal>`) |
+| Q-104 | Dokumen yang diperpanjang | Diingatkan lagi; id `hr-dok:<id_dokumen>:<tanggal_kedaluwarsa>` |
+| Q-105 | Jenis dokumen dan tingkat SP di pesan | Ya untuk keduanya; nomor dokumen dan isi SP tidak pernah |
+| Q-106 | Angka pengingat | Tetap di kode |
+| Q-107 | Klaim Reimburse di ringkasan grup HRD | Ya, baris hitungan "Reimburse" tanpa nominal |
+| Q-108 | Nama di ringkasan pengajuan | Tidak; hitungan per kelompok saja |
+| Q-109 | Waktu pesan SP berakhir | Hari terakhir berlaku saja; kartu menampilkan 7 hari sebelumnya |
+| Q-110 | Pengingat PKWT bila sudah ada kontrak lebih baru | Tidak dikirim |
+| Q-111 | Data pelamar yang akan dihapus retensi | Kartu saja (judul lowongan, jumlah, tanggal; tanpa nama) |
+| Q-112 | Bagian Kontrak dan Ulang tahun kerja untuk pemegang `employees.view` | Ya |
+
+### 23.12 Sudah dibangun (12 Nov 2026)
+
+Langkah 1–5 dibangun tanpa perubahan skema (versi 42, sentinel `-2038`, 68
+tabel snapshot, 90 rute, tanpa izin baru). Gerbang yang dijalankan:
+`audit:contract` (90 rute, 68 tabel snapshot, command Desktop 302 / Mobile
+308) dan `audit:docs` lulus; `cargo test telegram` Desktop dan Mobile 18 lulus
+(termasuk `isi_pesan_hrd`, `sql_sumber_hrd_sah_di_skema_cloud`,
+`catat_hrd_dari_data_cloud`, `baris_parkir_tidak_disentuh_predikat_lama`,
+`izin_kartu_perhatian`, `perhatian_menurut_izin`) dan `cargo test
+hr_rekrutmen` Desktop 7 lulus; `bun test` untuk `services/telegram.test.ts`,
+`validations/telegram.test.ts`, dan `validations/hr-rekrutmen.test.ts` 37
+lulus di kedua workspace (vektor, teks SQL dan daftar izin kembar Rust ↔ TS,
+data uji disalin dari Rust), `web-rbac-boundary.test.ts` 9 lulus; typecheck
+kedua workspace dan Biome berkas yang diubah bersih. `bun run check` penuh
+belum dijalankan (pemilik). Layar belum dicoba di aplikasi yang berjalan, dan
+belum ada pesan yang dikirim ke Telegram sungguhan.
+
+Penyimpangan dan catatan, untuk ditinjau:
+
+- **Teks pesan diberi emoji di depan** seperti 13 pesan yang sudah ada (📄
+  kontrak, ⏳ percobaan, 🪪 dokumen, 📋 SP, 📥 menunggu, ⚡ urgent, 🎉 ulang
+  tahun); nama dan jabatan satu baris "Karyawan: <nama> · <jabatan>", baris
+  jabatan hilang bila kosong.
+- **Ringkasan pengajuan juga hanya karyawan Aktif** (aturan umum §23.3), jadi
+  pengajuan milik karyawan yang sudah keluar tidak ikut dihitung walaupun masih
+  Menunggu di `/pengajuan`. Hitungan per kelompok urut abjad.
+- **"Kontrak terakhir"** = urutan `JENIS_DARI_KONTRAK_SQL` (tanggal mulai, lalu
+  id kontrak); kontrak yang punya `batal-<id>` dianggap tidak ada. Kontrak lama
+  yang bukan kontrak terakhir karyawannya tidak diingatkan, berlaku juga untuk
+  masa percobaan.
+- **Daftar ulang tahun kerja tanpa `LIMIT`**; pesannya memotong di 30 baris
+  (`MAKS_BARIS_STOK`). Ringkasan tanpa isi tidak dicatat, jadi setiap siklus
+  sesudah 07.00 mengulang tiga kueri ringkasan sampai ada isinya atau tanggal
+  berganti.
+- **Kejadian yang diparkir ditentukan dari bidangnya (`hrd`)**, bukan dari
+  `klaim_oleh` yang terbaca: baris yang klaimnya sempat diganti pengirim yang
+  mati tetap kembali diparkir saat gagal berikutnya. Generasi sesudah fase ini
+  perlu aturan `diparkir` sendiri.
+- **Tiga ekspor khusus tes di `services/telegram.ts`** (`Pengaturan`,
+  `bacaPengaturan`, `catatHarianPada`) supaya batas 07.00 diuji tanpa bergantung
+  jam saat tes berjalan; berkasnya `server-only`. Jalur `drain` Rust (kirim dan
+  batal sungguhan) hanya diuji lewat SQL dan fungsi yang dipakainya, karena
+  `kirim_pesan` memanggil HTTP Telegram langsung; tes Web menjalankan
+  `drainTelegram` utuh dengan `fetch` tiruan.
+- **SQL kartu Rekrutmen di modul rekrutmen** (`PERHATIAN_REKRUTMEN_SQL` di
+  `hr_rekrutmen.rs` ↔ `hr-rekrutmen.ts`), bukan `telegram.rs`, karena makro
+  tanggal hapus dan tutup efektif hanya ada di sana; bacaannya tetap di
+  `telegram::perhatian`.
+- **Jendela kartu yang ditafsirkan**: kontrak PKWT sisa 0–30 dan percobaan 0–7
+  (yang sudah lewat tetap tanda `pkwt_lewat`/`percobaan_lewat` di daftar);
+  dokumen ≤ 30 hari termasuk yang sudah lewat; SP Berlaku yang berakhir dalam 7
+  hari; ulang tahun kerja hari ini sampai 7 hari ke depan; rekrutmen tanggal
+  hapus ≤ hari ini + 30 dan hanya lowongan yang masih punya pelamar yang belum
+  dijadikan karyawan. Setiap daftar `LIMIT 200`, tanpa "dan k lainnya".
+- **Layar**: kartu hanya dirender bila sesi memegang salah satu
+  `IZIN_PERHATIAN`; tombol Muat ulang menjalankan `syncNow()` dulu (outbox
+  yang belum terdorong belum terlihat cloud). Klik nama memilih karyawan dan
+  membuka `RincianKaryawan` pada tab yang sesuai (prop baru `tabAwal`, ekspor
+  tipe `TabRincian`); klik lowongan membuka tab Rekrutmen; bagian Pengajuan
+  bertaut ke `/pengajuan`. Kalimat peringatan di kolom grup HRD kartu
+  Notifikasi.
+- **Command juga terdaftar di Mobile** (308) karena `telegram.rs` dan
+  `commands.rs` ikut daftar salin; tidak ada layar Mobile untuknya.
+
+## 24. Urutan pengerjaan fase 9
+
+**Rancangan, belum disetujui pemilik.** Ditulis setelah menelusuri kode
+(12 Nov 2026). Q-113 sampai Q-124 (§24.11) menunggu jawaban; eksekusi belum
+boleh dimulai. Isinya butir yang ditunda §22.10 dan §23.7 dan diminta pemilik
+di §15.1: kejadian Telegram penilaian kinerja, rekrutmen, dan per pengajuan;
+kartu "Perlu perhatian" di Mobile dan di beranda; angka pengingat yang bisa
+diatur per perusahaan. Rencana dan anggaran pelatihan serta bagan struktur
+organisasi adalah fase 10.
+
+### 24.1 Temuan dari kode
+
+- **Fase 8 belum dirilis.** Seluruh kode fase 8 masih di working tree (commit
+  terakhir "selesai fase 7"), jadi belum ada perangkat yang menjalankan
+  `gen:2`. Ini menentukan Q-113: bila fase 8 dan 9 dirilis bersama, kejadian
+  baru cukup masuk generasi parkir `gen:2` yang sama, dan id serta jendela
+  fase 8 masih boleh diubah tanpa jejak di cloud.
+- **Bila fase 8 dirilis lebih dulu**, dua masalah muncul: (1) kejadian fase 9
+  butuh `gen:3` dan predikat `drain` baru (`klaim_oleh IN ('gen:2', 'gen:3')`);
+  (2) build fase 8 tetap memakai angka 30/7/2/07.00 dari kode, sementara build
+  fase 9 memakai pengaturan, sehingga dua build yang berjalan bersamaan mencatat
+  pengingat yang sama dengan jendela berbeda. Dengan id `hr-kontrak:<id>:30`
+  dan pengaturan H-14, build lama dan baru masing-masing mengirim satu pesan.
+- **Pola pengaturan angka sudah ada.** `BATAS_PENGATURAN` (`hris.rs` ↔
+  `validations/hris.ts`) memuat enam angka HR berbatas min–maks, disimpan di
+  `setting_gex_system` (tersinkron) lewat `simpan_pengaturan` →
+  `tulis_pengaturan` (outbox `setting/update`, satu transaksi), dijaga
+  `hr.org.manage`, layarnya di `OrganisasiPanel.tsx`. SQL yang membaca angka
+  itu memakai subkueri berbatas dengan bawaan (`retensi_bulan_sql!` ↔
+  `RETENSI_BULAN_SQL`): nilai rusak = bawaan, dihitung database, teks kembar.
+  Pengirim Telegram membaca cloud, jadi angka yang baru disimpan di perangkat
+  berlaku setelah terdorong.
+- **Angka fase 8 tertulis di tiga tempat**: literal di SQL sumber dan SQL kartu
+  (`TELEGRAM_SQL_HR_*`, `PERHATIAN_SQL_*`), id kontrak `:30`/`:7`
+  (`id_hr_kontrak`), dan jam `JAM_RINGKASAN_STOK` di `catat_harian_pada`, yang
+  juga dipakai ringkasan stok Inventaris.
+- **Status penilaian kinerja tidak ada di SQL.** `status_kinerja` ↔
+  `statusKinerja` dihitung di kode dari sidik dan keputusan
+  (`urut_keputusan`). Kejadian kinerja karena itu membaca baris penilaian dan
+  keputusan dari cloud lalu memakai fungsi status yang sama, bukan SQL predikat
+  baru. Jenis periode yang berlaku ada di `setting_gex_system`
+  `hr_kinerja_periode`; rentangnya `periode_rentang` ↔ `periodeRentang`.
+- **Data kejadian baru dan jam cloud-nya**: `hr_pengajuan.created_at` (jam
+  cloud), `hr_pengajuan_keputusan.diterima_cloud`, `hr_kinerja_keputusan`
+  (`diterima_cloud` + `waktu_perangkat` berpresisi milidetik),
+  `hr_pelamar.created_at` dan `hr_lowongan` (khusus cloud, jadi jam cloud).
+- **Beranda**: Web/Desktop `/` = `src/app/page.tsx` (ringkasan dan kartu
+  modul, `AppShell`). Mobile `/` hanya mengalihkan ke `/dashboard`
+  (`mobile/src/app/dashboard/page.tsx`, milik Mobile sendiri, tidak disalin).
+- **Mobile sudah punya bacaannya**: `desktop_hr_attention` terdaftar di biner
+  Mobile (308) dan `ambilPerhatian` ada di `gateways/hris.ts` salinan Mobile.
+  Yang belum: komponennya. `PerluPerhatian.tsx` tidak di `filesToCopy`, dan
+  mengimpor tipe `TabRincian` dari `RincianKaryawan.tsx` yang tidak ada di
+  Mobile. Mobile punya `/pengajuan` (termasuk tab Penilaian) tetapi tidak punya
+  `/hris`.
+- **Kartu Notifikasi** merender `TELEGRAM_KEJADIAN` dengan `.map`, jadi sakelar
+  baru tampil sendiri; `telegramDraftSchema` dan `baca_draft` wajib ditambah
+  kuncinya (pola langkah 1 fase 8).
+- Skema sekarang: v42, sentinel `-2038`, 68 tabel snapshot, 90 rute, command
+  Desktop 302 / Mobile 308, 20 kejadian, 5 bidang.
+
+### 24.2 Model data: tanpa perubahan skema
+
+Versi tetap 42, sentinel tetap `-2038`, tanpa tabel, kolom, indeks, rute, atau
+izin baru. Pengaturan baru = baris `setting_gex_system` lewat
+`BATAS_PENGATURAN`; kejadian baru = baris `app_telegram_setting` dan antrean
+seperti fase 8. Dengan Q-113 (a), semua kejadian baru juga diparkir `gen:2`
+(`diparkir` = bidang `hrd`, sudah begitu).
+
+### 24.3 Angka pengingat per perusahaan (Q-114, Q-115, Q-116)
+
+Enam entri baru di `BATAS_PENGATURAN`, diatur di tab Organisasi `/hris`
+(`hr.org.manage`), berlaku untuk Telegram DAN kartu:
+
+| Kunci | Arti | Bawaan | Batas |
+| :-- | :-- | :-- | :-- |
+| `hr_ingat_kontrak_jauh` | PKWT: pengingat pertama, hari sebelum berakhir | 30 | 8–90 |
+| `hr_ingat_kontrak_dekat` | PKWT: pengingat kedua | 7 | 1–30, wajib < jauh |
+| `hr_ingat_percobaan` | Masa percobaan | 7 | 1–30 |
+| `hr_ingat_dokumen` | Dokumen kedaluwarsa | 30 | 1–90 |
+| `hr_ingat_menunggu` | Pengajuan menunggu lebih dari (hari) | 2 | 1–14 |
+| `hr_ingat_jam` | Jam WIB mulai mencatat kejadian HR harian | 7 | 0–23 |
+
+- SQL membaca angkanya lewat fragmen kembar berpola `retensi_bulan_sql!`
+  (`ingat_*_sql!` ↔ `INGAT_*_SQL`): subkueri `setting_gex_system` berbatas,
+  bawaan bila kosong atau rusak. Literal 30/7/2 di SQL sumber dan SQL kartu
+  fase 8 diganti fragmen itu; konstanta `HR_HARI_*` menjadi bawaan.
+- `validasi_pengaturan` ↔ `validasiPengaturan` menambah satu aturan silang:
+  dekat < jauh. Bila yang tersimpan rusak (dekat ≥ jauh dari data lama), SQL
+  tetap jalan: jendela "jauh" kosong, "dekat" tetap.
+- **Id kontrak menjadi `hr-kontrak:<id>:jauh` / `:dekat`** (Q-116): mengubah
+  angka di tengah jendela tidak melahirkan pesan kedua untuk tahap yang sama.
+  `id_hr_kontrak(id, sisa, dekat)`.
+- **Jam**: `catat_harian_pada` membaca `hr_ingat_jam` untuk kejadian HR; stok
+  Inventaris tetap `JAM_RINGKASAN_STOK` (7). Jendela kartu yang lain (SP 7 hari,
+  ulang tahun 7 hari ke depan, rekrutmen 30 hari) tetap di kode.
+- Pesan "menunggu lebih dari N hari" memakai angka yang sama; fungsi pesan
+  menerima N sebagai argumen.
+
+### 24.4 Kejadian baru (Q-117 sampai Q-121)
+
+Semua ke bidang `hrd`, sakelar lahir mati, diparkir. Kejadian berbasis tanggal
+dicatat di `catat_hrd` sesudah jam `hr_ingat_jam`; kejadian per peristiwa di
+`catat_kejadian`, disaring `aktif_sejak` dan batas 7 hari jam cloud seperti
+kejadian v33.
+
+| Kejadian (`kirim:`) | Kapan | Id | Isi (tanpa yang dilarang Q-32) |
+| :-- | :-- | :-- | :-- |
+| `hr_kinerja_menunggu` | ringkasan harian, bila ada | `hr-kinerja-tunggu:<tanggal>` | "<n> penilaian kinerja menunggu Final", paling lama sejak. Tanpa nama (hasil kinerja rahasia) |
+| `hr_kinerja_periode` | sekali per periode, hari pertama sesudah `periode_selesai` sampai 7 hari | `hr-kinerja-periode:<periode_mulai>` | "Periode <label> berakhir: <a> belum dinilai, <b> masih draf, <c> diajukan". Tanpa nama |
+| `hr_pelamar_baru` | ringkasan harian atas pelamar yang dicatat kemarin (WIB) | `hr-pelamar:<tanggal>` | "<n> pelamar baru kemarin", lalu per judul lowongan. Tanpa nama pelamar (Q-86) |
+| `hr_lowongan_tutup` | `tanggal_tutup` H-3 sampai hari H, belum ditekan Tutup | `hr-lowongan:<id>:<tanggal_tutup>` | judul, tanggal tutup, jumlah pelamar, kuota |
+| `hr_pengajuan_baru` | per pengajuan, `created_at` cloud, masih Menunggu saat dibaca | `hr-ajuan:<id_pengajuan>` | menurut Q-120 |
+| `hr_pengajuan_diputus` | per keputusan final yang berlaku, `diterima_cloud` | `hr-putus:<id_keputusan>` | menurut Q-120; Setujui/Tolak dan pemutus; tanpa alasan |
+
+- `hr_kinerja_menunggu` dan `hr_kinerja_periode` membaca penilaian dan
+  keputusan dari cloud lalu memakai `status_kinerja` ↔ `statusKinerja`.
+  "Wajib dinilai" (Q-118) = karyawan Aktif yang rentang aktifnya (§21.4)
+  beririsan dengan periode itu; "belum dinilai" = tanpa penilaian akar yang
+  tidak dibatalkan untuk periode itu.
+- `hr_pengajuan_diputus` hanya keputusan yang sidiknya cocok dengan isi
+  sekarang dan yang pertama berlaku (`PENGAJUAN_BERLAKU_SQL`); keputusan ganda
+  dan yang gugur tidak dikirim.
+- Klaim Reimburse ikut `hr_pengajuan_baru`/`_diputus` tanpa nominal (Q-121).
+- Menambah kejadian = pola fase 8: `KEJADIAN`, `bidang_kejadian`, label, id,
+  SQL sumber, fungsi pesan kembar, dan kunci baru di `telegramDraftSchema` dan
+  `baca_draft`. Jumlah kejadian 20 → 26.
+
+### 24.5 Kartu "Perlu perhatian": Kinerja, beranda, Mobile (Q-122 sampai Q-124)
+
+- **Bagian Kinerja baru**: hitungan penilaian yang menunggu Final dan, untuk
+  periode yang baru berakhir, belum dinilai / masih draf. Hanya angka, bertaut
+  ke tab Kinerja (Web/Desktop) atau tab Penilaian `/pengajuan` (Mobile). Izin:
+  `hr.performance.finalize` atau `hr.performance.view` (Q-122). Masuk
+  `IZIN_PERHATIAN` dan `IzinPerhatian`.
+- **Beranda Web/Desktop** (`src/app/page.tsx`): komponen yang sama di atas
+  daftar modul, hanya bila sesi memegang salah satu `IZIN_PERHATIAN` dan hanya
+  bila ada isinya (Q-123); di `/hris` kartunya tetap selalu tampil. Klik nama
+  dari beranda membuka `/hris?karyawan=<id>&tab=<tab>`; `HrisWorkspace` membaca
+  parameter itu (`useSearchParams` dalam `Suspense`, cocok dengan
+  `output: "export"`).
+- **Mobile** (`/dashboard`): komponen disalin lewat `filesToCopy`. Tipe
+  `TabRincian` dipindah ke `validations/telegram.ts` supaya komponen tidak
+  mengimpor `RincianKaryawan`. Di Mobile nama tidak bisa diklik (tidak ada
+  `/hris`); tautan Pengajuan dan Penilaian ke `/pengajuan` tetap (Q-124).
+  Tanpa koneksi: "Butuh koneksi ke database", sisa layar tetap jalan.
+- Kartu memakai angka §24.3 untuk jendela kontrak, percobaan, dokumen, dan
+  menunggu.
+
+### 24.6 Hak akses
+
+- Tidak ada izin baru. `IZIN_PERHATIAN` 7 → 9 (`hr.performance.view`,
+  `hr.performance.finalize`), tetap disaring per bagian di backend.
+- Angka pengingat: `hr.org.manage` (Q-115), lewat `desktop_hr_settings_save` dan
+  aksi pengaturan `/api/hris` yang sudah ada.
+- Konfigurasi Telegram tetap Superadmin. Grup HRD tetap pembaca tanpa RBAC;
+  karena itu kinerja hanya angka dan per pengajuan mengikuti Q-120.
+
+### 24.7 Command, rute, dan layar
+
+- **Tanpa command baru** (tetap Desktop 302 / Mobile 308): pengaturan lewat
+  `desktop_hr_settings_save`, kartu lewat `desktop_hr_attention`. Tanpa rute
+  baru: `/api/hris` (pengaturan) dan `/api/hris/query` aksi `perhatian`.
+- **Rust**: `hris.rs` (`BATAS_PENGATURAN`, aturan silang, fragmen `ingat_*`),
+  `telegram.rs` (enam kejadian, SQL sumber dan kartu memakai fragmen, bagian
+  Kinerja), `hr_kinerja.rs` (fungsi yang dipakai ulang dibuka `pub(crate)` bila
+  perlu).
+- **Web**: kembaran di `validations/hris.ts`, `validations/telegram.ts`,
+  `services/telegram.ts`; `telegramDraftSchema`.
+- **Layar**: isian enam angka di `OrganisasiPanel.tsx` (konfirmasi
+  `konfirmasiData` seperti pengaturan lain); `PerluPerhatian.tsx` (bagian
+  Kinerja, mode tanpa klik, mode "sembunyi bila kosong") di `/hris`, beranda
+  Web/Desktop, dan `mobile/src/app/dashboard/page.tsx`; `HrisWorkspace` membaca
+  parameter URL; `filesToCopy` ditambah `PerluPerhatian.tsx`.
+
+### 24.8 Tidak dikerjakan di fase ini
+
+- Rencana dan anggaran pelatihan, bagan struktur organisasi (fase 10).
+- Pelaporan BPJS/DJP/Wajib Lapor dan berkas transfer bank (sesudah fase 10).
+- Pesan per penilaian kinerja (nama + nilai): hasil kinerja rahasia.
+- Kejadian per pelamar dan per tahap seleksi (nama pelamar, Q-86).
+- Grup Telegram per atasan atau per divisi; bot tetap satu arah ke grup bidang.
+- Angka jendela kartu yang lain (SP, ulang tahun, rekrutmen) dan jam ringkasan
+  stok sebagai pengaturan.
+
+### 24.9 Langkah
+
+| # | Langkah | Gerbang |
+| :-- | :-- | :-- |
+| 1 | **Angka pengingat**: enam entri `BATAS_PENGATURAN` + aturan silang (Rust ↔ TS), fragmen SQL `ingat_*`, SQL sumber dan kartu fase 8 memakai fragmen, id kontrak `:jauh`/`:dekat`, jam HR dari pengaturan, pesan menunggu menerima N. | `bun run sync:mobile`, lalu `bun test` `validations/telegram.test.ts` + `validations/hris.test.ts` + `services/telegram.test.ts`, `cargo test telegram` + `cargo test hris` (kedua workspace): angka bawaan, angka diubah, angka rusak = bawaan, dekat ≥ jauh ditolak, id tidak berubah saat angka diubah |
+| 2 | **Aturan kembar enam kejadian**: bidang, label, id, SQL sumber, fungsi pesan, kunci draft. Belum dipanggil. | tes teks SQL dan vektor pesan Rust ↔ TS, SQL dijalankan di skema cloud |
+| 3 | **Pengirim Rust dan Web**: kinerja dan rekrutmen di `catat_hrd`, per pengajuan di `catat_kejadian`, semuanya diparkir. | `catat_hrd_dari_data_cloud` diperluas + kembarannya "kejadian hrd": data dan pesan sama, dua kali tidak menggandakan, `aktif_sejak` dan 7 hari, keputusan gugur dan ganda tidak dikirim, isi rahasia tidak ada |
+| 4 | **Kartu backend**: bagian Kinerja, `IZIN_PERHATIAN` 9. | `perhatian_menurut_izin` + "perhatian" diperluas, `web-rbac-boundary`, `audit:contract` (302/308 tetap) |
+| 5 | **Layar**: isian angka di Organisasi, kartu di beranda dan Mobile, parameter URL `/hris`, `filesToCopy`; `CLAUDE.md` "HRIS fase 9", angka di dokumen skill; §24.13 "Sudah dibangun". | typecheck kedua workspace + Biome + `audit:docs`; `bun run check` penuh oleh pemilik |
+
+### 24.10 Penanda yang ditinjau pemilik saat menyetujui
+
+- **Fase 8 dan 9 dirilis bersama** (Q-113 (a)): fase 8 jangan dikirim ke klien
+  sebelum fase 9 selesai. Id kontrak fase 8 (`:30`/`:7`) diganti `:jauh`/
+  `:dekat` sebelum ada yang terkirim.
+- Mengubah angka pengingat berlaku setelah pengaturannya terdorong ke cloud;
+  perangkat offline yang menyimpannya baru berlaku saat online.
+- Memperkecil angka (mis. dokumen 30 → 14) tidak membatalkan pengingat yang
+  sudah tercatat; memperbesar angka bisa membuat pengingat langsung tercatat
+  untuk yang kini masuk jendela.
+- Per pengajuan menambah pesan di grup HRD: satu per pengajuan baru dan satu
+  per keputusan. Ringkasan menunggu dan urgent tetap ada.
+- Grup HRD membaca nama karyawan per pengajuan menurut Q-120; kinerja dan
+  rekrutmen hanya angka dan judul lowongan.
+- Kartu di beranda hanya muncul bila ada isinya; di `/hris` selalu.
+- Di Mobile nama di kartu tidak bisa diklik.
+- Hari pertama sakelar baru dinyalakan, ringkasan dan pengingat yang sedang di
+  jendelanya terkirim hari itu (sama dengan fase 8).
+
+### 24.11 Pertanyaan untuk pemilik
+
+| No | Pertanyaan | Usulan | Alasan |
+| :-- | :-- | :-- | :-- |
+| Q-113 | Fase 8 dirilis sendiri dulu, atau ditahan dan dirilis bersama fase 9? | (a) ditahan, rilis bersama | Fase 8 belum di-commit; rilis bersama menghindari `gen:3`, pesan ganda antara build yang memakai angka tetap dan build yang memakai pengaturan, dan id kontrak yang tidak bisa diganti lagi |
+| Q-114 | Angka mana yang bisa diatur? | Enam angka §24.3 (kontrak jauh/dekat, percobaan, dokumen, menunggu, jam HR) | Itu angka §11.3 yang ditunda di §23.7. Jendela kartu yang lain murni tampilan |
+| Q-115 | Siapa yang mengatur angka pengingat? | `hr.org.manage`, di tab Organisasi bersama pengaturan HR lain | Angkanya aturan HR, bukan konfigurasi bot; Superadmin tetap mengatur Telegram |
+| Q-116 | Id pengingat kontrak memakai tahap (`:jauh`/`:dekat`) atau angkanya (`:30`)? | Tahap | Dengan angka, mengubah H-30 menjadi H-14 di tengah jendela mengirim pengingat kedua untuk tahap yang sama |
+| Q-117 | Kejadian kinerja: ringkasan "menunggu Final" harian dan ringkasan "periode berakhir", tanpa nama? | Ya keduanya, tanpa nama | Hasil kinerja rahasia (`CONFIDENTIAL_PERMISSIONS`); grup tidak punya RBAC |
+| Q-118 | "Wajib dinilai" untuk ringkasan periode: semua karyawan Aktif yang rentang aktifnya beririsan dengan periode, atau hanya yang jabatannya punya template? | Semua yang beririsan | Template bawaan berlaku untuk jabatan tanpa pemetaan; yang belum punya template justru perlu terlihat |
+| Q-119 | Kejadian rekrutmen: ringkasan pelamar baru harian (per lowongan, tanpa nama) dan lowongan yang tutup H-3? | Ya keduanya | Nama pelamar tetap tidak keluar (Q-86); judul lowongan bukan data pribadi |
+| Q-120 | Isi pesan per pengajuan: (a) nama + kelompok + tanggal untuk semua; (b) seperti (a) tetapi Sakit tanpa nama ("1 pengajuan Sakit baru"); (c) tanpa nama sama sekali? | (b) | Q-108 menghapus nama karena "<nama>: Sakit" mendekati alasan sakit (Q-32). Kelompok lain tidak sepeka itu, dan pesan tanpa nama tidak bisa ditindaklanjuti |
+| Q-121 | Per pengajuan: kirim saat diajukan DAN saat diputus? Klaim Reimburse ikut (tanpa nominal)? | Ya, ya; semuanya ke grup HRD | Satu mesin pengajuan; nominal tetap tidak pernah dikirim (Q-32) |
+| Q-122 | Bagian Kinerja di kartu: siapa yang melihat, dan isinya? | `hr.performance.finalize` atau `hr.performance.view`; hanya angka | Pemegangnya sudah bisa membuka daftar penilaian; angka cukup untuk tahu ada yang menunggu |
+| Q-123 | Kartu di beranda: selalu tampil, atau hanya bila ada isinya? | Hanya bila ada isinya | Beranda dipakai semua peran; "Tidak ada yang perlu perhatian" setiap hari hanya bising |
+| Q-124 | Kartu di Mobile: nama tidak bisa diklik (tidak ada `/hris`), atau membuka `/karyawan`? | Tidak bisa diklik; tautan Pengajuan/Penilaian tetap | `/karyawan` Mobile tidak punya tab Kontrak/Dokumen/SP; membukanya tidak menunjukkan alasan nama itu muncul |

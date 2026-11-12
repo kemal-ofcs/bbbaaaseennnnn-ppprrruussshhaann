@@ -831,8 +831,8 @@ kembar dengan vektor uji yang sama).
 
 ## Notifikasi grup Telegram (schema versi 33)
 
-Bot SATU ARAH ke grup internal per bidang (`inventaris`, `keuangan`,
-`pimpinan`, `armada`); tidak ada perintah dari Telegram yang bisa mengubah data. Dua tabel
+Bot SATU ARAH ke lima grup internal per bidang (`inventaris`, `keuangan`,
+`pimpinan`, `armada`, `hrd`); tidak ada perintah dari Telegram yang bisa mengubah data. Dua tabel
 KHUSUS CLOUD (sentinel `-2029`): `app_telegram_setting` (key/value: `bot_token`,
 `aktif`, `aktif_sejak` UTC, `grup:<bidang>`, `kirim:<kejadian>`; token tidak
 pernah dikembalikan ke UI dan tidak pernah disimpan di SQLite perangkat) dan
@@ -854,13 +854,15 @@ totalnya disembunyikan bila pegawainya < 3 (`MIN_PEGAWAI_NOMINAL_GAJI`);
 `payroll_items` tidak pernah dibaca. Kejadian sebelum `aktif_sejak` atau lebih
 dari 7 hari tidak dikirim. Menambah kejadian = satu SQL sumber + fungsi pesan
 kembar + entri `BIDANG_KEJADIAN`/`bidang_kejadian`. Enam kejadian perjalanan
-ke grup Armada ada di subbagian "Notifikasi armada" di bawah.
+ke grup Armada ada di subbagian "Notifikasi armada" di bawah, dan tujuh
+pengingat HR ke grup HRD di "HRIS fase 8"; seluruhnya 20 kejadian.
 
 **Perangkat lama membatalkan kejadian yang tidak dikenalnya.** Semua build
 menguras antrean yang sama, dan `bidang_kejadian` = `None` membuat baris itu
 `Dibatalkan`. Sentinel tidak bisa mencegahnya karena sentinel lama tetap ada
 di cloud, jadi kejadian baru baru boleh dinyalakan setelah semua perangkat
-diperbarui.
+diperbarui. Sejak fase 8 kejadian baru juga bisa diparkir (lihat "HRIS fase 8"),
+yang menyembunyikannya dari build lama tanpa perubahan skema.
 
 `AutoTelegramRunner` berjalan untuk setiap sesi login (`desktop_drain_telegram`
 cukup sesi, hasilnya hanya hitungan). Konfigurasi hanya Superadmin
@@ -1328,6 +1330,59 @@ dipecah lebih dulu). Sentinel `-2038`, `REQUIRED_TABLE_COUNT` 102.
   bila dipendekkan). Mobile tanpa layar; modul dan command tetap di biner.
 - **Semua perangkat wajib diperbarui**: begitu cloud naik ke v42, perangkat v41
   berhenti sinkron (`SCHEMA_VERSION_OUTDATED`).
+
+## HRIS fase 8: pengingat dan Telegram HRD (tanpa perubahan skema)
+
+Rincian dan keputusan pemilik di `prd-hris.md` §23 (Q-101 sampai Q-112).
+Versi skema tetap 42, sentinel tetap `-2038`, tanpa tabel, kolom, rute, atau
+izin baru. Aturan kembar `desktop/telegram.rs` ↔ `validations/telegram.ts` +
+`services/telegram.ts`, vektor sama; SQL diperiksa harfiah oleh
+`validations/telegram.test.ts`. Command Desktop 302 / Mobile 308.
+
+- **Bidang `hrd`, tujuh kejadian** `hr_kontrak_akhir`, `hr_percobaan_akhir`,
+  `hr_dokumen_kedaluwarsa`, `hr_sp_berakhir`, `hr_pengajuan_menunggu`,
+  `hr_urgent_belum_diketahui`, `hr_ulang_tahun_kerja`. Semua dicatat
+  `catat_harian` ↔ `catatHarian` mulai 07.00 WIB jam database
+  (`catat_harian_pada` ↔ `catatHarianPada` menerima jamnya supaya bisa diuji).
+  Jendela tetap di kode: `HR_HARI_JAUH` 30, `HR_HARI_DEKAT` 7,
+  `HR_HARI_MENUNGGU` 2 (Q-106). Karyawan hanya yang Aktif; jabatan = master
+  jabatan, lalu `jabatan_status`.
+- **Id**: `hr-kontrak:<id>:30|:7` (sisa 8–30 dan 0–7), `hr-coba:<id>`,
+  `hr-dok:<id>:<tanggal_kedaluwarsa>` (diperpanjang = diingatkan lagi, Q-104),
+  `hr-sp:<id>` (hari terakhir berlaku sampai 6 hari sesudahnya, disaring
+  `aktif_sejak`), dan tiga ringkasan harian `hr-tunggu:`, `hr-urgent:`,
+  `hr-ultah:<tanggal WIB>` (Q-103). Pengingat kontrak dan percobaan hanya untuk
+  kontrak terakhir karyawan yang tidak dibatalkan (Q-110).
+- **Yang tidak pernah dikirim** (Q-32): SQL sumber tidak membaca NIK,
+  `hr_profil`, nominal, alasan, isi SP, nomor dokumen dan kontrak, maupun data
+  pelamar; dua ringkasan pengajuan tanpa nama (Q-108). Pesan memuat nama,
+  jabatan, jenis dokumen, dan tingkat SP (Q-105). Klaim Reimburse ikut dihitung
+  (Q-107).
+- **Parkir klaim** (Q-101): baris HR masuk lewat `INSERT_ANTREAN_PARKIR_SQL`
+  dengan `klaim_oleh = 'gen:2'` dan `klaim_sampai = '9999-12-31 23:59:59'`.
+  Build v33–fase 7 hanya mengambil dan membatalkan baris tanpa klaim berlaku,
+  jadi tidak menyentuhnya. `DRAIN_*_SQL` ↔ `TELEGRAM_DRAIN_*_SQL` menambah
+  `OR klaim_oleh = 'gen:2'`; gagal kirim yang masih boleh dicoba kembali
+  diparkir (`klaim_setelah_gagal` ↔ `klaimSetelahGagal`). `diparkir` = semua
+  kejadian bidang `hrd`; kejadian generasi berikutnya memakai `gen:3`. Celah
+  tersisa: build fase 8 mati di antara klaim dan hasil kirim, lalu build lama
+  membatalkan barisnya setelah 5 menit.
+- **Kartu "Perlu perhatian"** (`components/hris/PerluPerhatian.tsx`, tab
+  Karyawan `/hris`, Web/Desktop; Mobile tidak punya `/hris`). Dibaca dari
+  cloud lewat `desktop_hr_attention` ↔ aksi `perhatian` di `/api/hris/query`
+  (Q-102), dari `perhatian` ↔ `perhatianHr` dengan `PERHATIAN_SQL_*` yang
+  disusun dari potongan SQL Telegram yang sama; pengajuan memakai
+  `SQL_HR_MENUNGGU`/`SQL_HR_URGENT` apa adanya, dan rekrutmen
+  `PERHATIAN_REKRUTMEN_SQL` di `hr_rekrutmen.rs` ↔ `hr-rekrutmen.ts` (tanpa
+  nama pelamar, Q-111). Gerbangnya `IZIN_PERHATIAN` (salah satu), lalu
+  `izin_perhatian` ↔ `izinPerhatian` per bagian di backend: kontrak dan ulang
+  tahun kerja `employees.view` (Q-112), dokumen `hr.document.view`, SP
+  `hr.warning.view`, pengajuan `hr.request.view` atau `reimburse.decide` (yang
+  terakhir hanya hitungan Reimburse), rekrutmen `hr.recruit.view`/`manage`.
+  Bagian tanpa izin tidak dibaca dan kuncinya tidak ada. Klik nama membuka
+  rincian karyawan pada tab Kontrak, Dokumen, SP, atau Kerja (`tabAwal`).
+- Grup Telegram adalah pembaca tanpa RBAC: kartu Notifikasi memperingatkannya
+  di kolom grup HRD, dan sakelar `hr_*` lahir mati.
 
 ## Domain contoh
 

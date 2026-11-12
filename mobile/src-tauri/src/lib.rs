@@ -118,6 +118,7 @@ pub fn run() {
             mobile::commands::desktop_hr_reimburse_overview,
             mobile::commands::desktop_hr_reimburse_pay,
             mobile::commands::desktop_hr_reimburse_pay_cancel,
+            mobile::commands::desktop_hr_attention,
             mobile::commands::desktop_hr_warnings,
             mobile::commands::desktop_hr_warning_save,
             mobile::commands::desktop_hr_warning_revoke,
