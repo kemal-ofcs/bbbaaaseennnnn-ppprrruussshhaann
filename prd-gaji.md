@@ -35,9 +35,12 @@ Dokumen ini memetakan seluruh berkas kode sumber yang menyusun fitur dan sistem 
 | Berkas | Deskripsi & Fungsi |
 | :--- | :--- |
 | [`gateways/payroll.ts`](file:///c:/fr/Absensi%20Perusahaan/web-desktop/src/lib/gateways/payroll.ts) | **Hybrid Isomorphic Gateway** — Modul tunggal perantara UI. Otomatis bercabang ke Rust IPC (`invokeDesktop`) pada mode Desktop/Mobile dan Route Handler HTTP (`requestWebApi`) pada mode Web Browser. |
-| [`services/payroll-calculator.ts`](file:///c:/fr/Absensi%20Perusahaan/web-desktop/src/lib/services/payroll-calculator.ts) | Mesin kalkulasi penggajian sisi TypeScript: perhitungan upah pokok, lembur tier bertingkat, tunjangan, potongan, BPJS perusahaan/karyawan, dan PPh 21 TER. |
+| [`services/payroll-calculator.ts`](file:///c:/fr/Absensi%20Perusahaan/web-desktop/src/lib/services/payroll-calculator.ts) | Mesin kalkulasi penggajian sisi TypeScript: upah pokok, lembur tier bertingkat, tunjangan, potongan. Sejak fase 13 (v45) BPJS dan PPh 21 dihitung per masa pajak lewat `validations/pajak.ts`. |
+| [`validations/pajak.ts`](file:///c:/dev/absensi-perusahaan/web-desktop/src/lib/validations/pajak.ts) | Aturan PPh 21 dan BPJS per masa (fase 13, `prd-hris.md` §29), kembar `payroll/pajak.rs` dengan vektor `pajak.vektor.json`: status tetap/tidak tetap, TER bulanan dan harian, masa terakhir Pasal 17 (boleh negatif), BPJS masa, `RUN_TAHUN_SQL`, `KOLOM_PAJAK_SQL`, `ringkasPembanding`, label slip. Konstanta PTKP/biaya jabatan/TER harian di `pajak-bawaan.json`. |
+| [`validations/tarif-bawaan.ts`](file:///c:/dev/absensi-perusahaan/web-desktop/src/lib/validations/tarif-bawaan.ts) | Seed TER A/B/C (PP 58/2023), Pasal 17, dan BPJS dari `tarif-bawaan.json`, berkas yang sama dengan `payroll_seed.rs`; koreksi v45 bersyarat. |
 | [`services/payroll-calculator.test.ts`](file:///c:/fr/Absensi%20Perusahaan/web-desktop/src/lib/services/payroll-calculator.test.ts) | Unit test otomatis untuk memvalidasi akurasi perhitungan angka dan aturan pajak/BPJS. |
-| [`services/payroll-recap.ts`](file:///c:/fr/Absensi%20Perusahaan/web-desktop/src/lib/services/payroll-recap.ts) | Layanan rekapitulasi absensi: menghitung total kehadiran, keterlambatan, pulang awal, serta jam lembur berbasis log absensi harian. |
+| [`services/payroll-recap.ts`](file:///c:/fr/Absensi%20Perusahaan/web-desktop/src/lib/services/payroll-recap.ts) | Layanan rekapitulasi absensi: menghitung total kehadiran, keterlambatan, pulang awal, serta jam lembur berbasis log absensi harian. Membaca run pembanding setahun (`RUN_TAHUN_SQL`) untuk masa pajak. |
+| [`services/payroll-pajak.test.ts`](file:///c:/dev/absensi-perusahaan/web-desktop/src/lib/services/payroll-pajak.test.ts) | Skenario masa pajak jalur Web (dua run sebulan, Desember, karyawan keluar, run lama, `REJECTED`), data dan harapan sama dengan `tests_pajak` Rust. |
 | [`rbac/catalog.ts`](file:///c:/fr/Absensi%20Perusahaan/web-desktop/src/lib/rbac/catalog.ts) | Registri izin hak akses (*RBAC permissions*): `payroll.view`, `payroll.config.manage`, `payroll.run.create`, `payroll.run.review`, `payroll.run.approve`, `payroll.run.disburse`, `payroll.export`. |
 
 ---
@@ -64,10 +67,11 @@ Dokumen ini memetakan seluruh berkas kode sumber yang menyusun fitur dan sistem 
 
 | Berkas | Deskripsi & Fungsi |
 | :--- | :--- |
-| [`engine.rs`](file:///c:/fr/Absensi%20Perusahaan/web-desktop/src-tauri/src/desktop/payroll/engine.rs) | Mesin kalkulasi angka presisi di Rust dengan pustaka `rust_decimal` (mencegah *floating-point error*). |
+| [`engine.rs`](file:///c:/fr/Absensi%20Perusahaan/web-desktop/src-tauri/src/desktop/payroll/engine.rs) | Mesin kalkulasi angka presisi di Rust dengan pustaka `rust_decimal` (mencegah *floating-point error*). `calculate_employee_pay` menerima `KonteksPajak` (fase 13). |
+| [`pajak.rs`](file:///c:/dev/absensi-perusahaan/web-desktop/src-tauri/src/desktop/payroll/pajak.rs) | Kembaran `validations/pajak.ts`: PPh 21 dan BPJS per masa pajak, disalin ke `mobile/.../payroll_admin/`. |
 | [`commands.rs`](file:///c:/fr/Absensi%20Perusahaan/web-desktop/src-tauri/src/desktop/payroll/commands.rs) | Kumpulan perintah Tauri IPC (`#[tauri::command]`): `desktop_get_payroll_recap`, `desktop_create_payroll_run`, `desktop_list_payroll_runs`, `desktop_get_payroll_run_detail`, `desktop_transition_payroll_status`, dll. |
 | [`models.rs`](file:///c:/fr/Absensi%20Perusahaan/web-desktop/src-tauri/src/desktop/payroll/models.rs) | Definisi tipe struktur data (*structs*) entitas penggajian di Rust. |
-| [`payroll_seed.rs`](file:///c:/fr/Absensi%20Perusahaan/web-desktop/src-tauri/src/desktop/payroll_seed.rs) | Seeder inisialisasi awal aturan BPJS dan tabel PPh 21 TER standar regulasi Indonesia ke database lokal. |
+| [`payroll_seed.rs`](file:///c:/fr/Absensi%20Perusahaan/web-desktop/src-tauri/src/desktop/payroll_seed.rs) | Seeder tarif bawaan dari `validations/tarif-bawaan.json` (TER A 44, B 40, C 41 lapis; Pasal 17; BPJS dengan batas JP 11.086.300) untuk SQLite lokal dan cloud, plus `DEFAULT_RATE_IDS`/`LEGACY_RATE_IDS`. |
 
 ---
 
@@ -152,6 +156,7 @@ Perusahaan dengan kontrak "hadir = Rp 150.000 bersih, tanpa lembur" tidak bisa m
 - **NG-1:** Scanner tidak berubah. Jam masuk/pulang, `jam_kerja`, `lembur` tetap tercatat untuk audit disiplin.
 - **NG-2:** Fitur lembur `HOURLY` tidak dihapus/dinonaktifkan.
 - **NG-3:** Tidak ada BPJS/PPh21 untuk `FLAT_DAILY` di MVP. **Batasan yang disadari:** PPh21 pegawai tidak tetap harian bernilai 0 selama upah ≤ Rp 450.000/hari; tarif di atas itu secara aturan terkena PPh21 dan berada di luar cakupan MVP.
+  **Diperbarui fase 13 (v45, `prd-hris.md` §29):** `FLAT_DAILY` tetap tanpa BPJS (Q-182), tetapi kini DIPOTONG PPh 21 menurut status pajaknya: pegawai tidak tetap memakai TER harian (0% s.d. 450.000/hari, 0,5% s.d. 2.500.000/hari, di atasnya Pasal 17 atas 50%), atau TER bulanan bila run tepat sebulan; kontrak `Pegawai`/`Kontrak` bergaji harian diperlakukan pegawai tetap (Q-178).
 - **NG-4:** Tidak ada permission baru — memakai `payroll.config.manage` dan izin run yang sudah ada.
 - **NG-5:** Tidak ada tabel, domain outbox, atau rute kanonik baru.
 

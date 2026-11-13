@@ -1617,6 +1617,71 @@ Sentinel `-2040`, `REQUIRED_TABLE_COUNT` 107, command Desktop 307 / Mobile
 - **Semua perangkat wajib diperbarui**: begitu cloud naik ke v44, perangkat
   v43 berhenti sinkron (`SCHEMA_VERSION_OUTDATED`).
 
+## HRIS fase 13: PPh 21 dan BPJS per masa pajak (schema versi 45)
+
+Rincian dan keputusan pemilik di `prd-hris.md` §29 (Q-177 sampai Q-192).
+Aturan murni `desktop/payroll/pajak.rs` (disalin ke Mobile `payroll_admin/`)
+↔ `validations/pajak.ts`, vektor sama (`validations/pajak.vektor.json`, V1–V12
+dan tepi; V2/V3 masa terakhir = hitungan sendiri, belum dicocokkan lampiran
+PMK 168); SQL dan konstanta diperiksa harfiah oleh `pajak.test.ts`. Sentinel
+`-2041`, `REQUIRED_TABLE_COUNT` tetap 107, 68 tabel snapshot, 90 rute, command
+Desktop 307 / Mobile 313, tanpa izin baru. Bukan nasihat pajak: §29.2 wajib
+dicek konsultan sebelum dipakai klien.
+
+- **Tarif bawaan satu berkas** `validations/tarif-bawaan.json` (TER A 44, B 40,
+  C 41 lapis PP 58/2023; Pasal 17; BPJS, JP 11.086.300 berlaku 2026-03-01),
+  dibaca `payroll_seed.rs` (`include_str!`) dan `validations/tarif-bawaan.ts`.
+  Web akhirnya menanam TER (sebelumnya PPh 21 Web selalu 0). Seed berjalan
+  SESUDAH id lama (`LEGACY_RATE_IDS`) dibuang, di `turso.rs` dan
+  `db-migrations.ts`: baris lama Web `bpjs-jht-emp`/`bpjs-jp-*` memegang
+  `component_code` UNIQUE yang sama, dan urutan terbalik membuat JHT/JP hilang.
+  Blok v45 (sekali, dijaga versi 45) mengoreksi `tax_ter_b_7..37`,
+  `tax_ter_c_16..39`, dan batas JP hanya pada baris yang masih bernilai seed
+  lama (`KOREKSI_PAJAK_SQL`, `KOREKSI_JP_SQL`, Q-186 (a)). Konstanta seed tetap
+  bernama `TAX_RULES_SEED_SQL`/`BPJS_RULES_SEED_SQL` (diperiksa `audit:contract`).
+- **Kolom `payroll_components.dasar_bpjs`** (0/1, tersinkron, empat lapis):
+  tunjangan tetap yang menjadi dasar BPJS (Q-181 (a)); potongan selalu 0.
+  Handler cloud menimpanya hanya bila payload membawa kuncinya.
+- **Masa = bulan `period_start`** (Q-177). Pembanding = item karyawan yang sama
+  di run setahun sampai masa ini, kecuali `REJECTED`, `DRAFT` ikut (Q-190):
+  satu SQL `RUN_TAHUN_SQL`, himpunan masa diambil darinya; diringkas
+  `ringkas_pembanding` ↔ `ringkasPembanding`. Item lama tanpa kunci `pajak`
+  dihitung ulang (bruto + premi dari `breakdown_snapshot.bpjs`, dasar BPJS =
+  bruto). Status, tanggal keluar, dan PTKP awal tahun (Q-180) dibaca
+  `KOLOM_PAJAK_SQL` di SELECT rekap. Desktop/Mobile membaca SQLite lokal, jadi
+  gateway `createPayrollRun` menjalankan `syncNow()` dulu (gagal = tetap jalan).
+- **Status pajak** (Q-178): kontrak `Pegawai`/`Kontrak` = tetap, `Harian` =
+  tidak tetap, selain itu `FLAT_DAILY` = tidak tetap. Tetap: TER bulanan atas
+  bruto masa dikurangi yang sudah dipotong (paling kecil 0); masa terakhir
+  (Desember, atau bulan `tanggal_selesai_aktif` bila `id_keluar` terisi) =
+  Pasal 17 setahun − PPh setahun, **boleh negatif** (Q-189). Tidak tetap: TER
+  harian per run, atau TER bulanan tanpa rekonsiliasi bila run tepat sebulan
+  (Q-179). Bruto pajak = bruto + premi JKK/JKM/Kesehatan perusahaan
+  (`KODE_PREMI`, termasuk kode lama Web).
+- **BPJS per masa**: dasar = gaji pokok + tunjangan `dasar_bpjs`, tanpa lembur;
+  iuran sebulan atas dasar masa yang dibatasi, dikurangi yang sudah dipotong per
+  kode. `FLAT_DAILY` tetap tanpa BPJS (Q-182), tetapi kini dipotong PPh 21.
+- **Uang**: tarif diubah ke basis per sepuluh ribu (`persen_ke_basis` ↔
+  `persenKeBasis`), Rust `rust_decimal`, TS BigInt; tarif berdesimal lebih dari
+  dua ditolak saat disimpan (`PESAN_TARIF_TIDAK_SAH`, empat command simpan dan
+  rute `config/tax|bpjs`). Konstanta PTKP, biaya jabatan, TER harian di
+  `validations/pajak-bawaan.json` (Q-187).
+- **Satu rumus**: `calculate_employee_pay(PayInput { pajak: KonteksPajak })` ↔
+  `calculateEmployeePay`, dipakai rekap DAN pembekuan; `calculate_bpjs` dan
+  `calculate_pph21_ter` dibuang. Snapshot run mendapat kunci `pajak` (bentuk
+  `HasilPph`) dan `bpjs_masa`; `tax` dan `bpjs` tetap untuk slip lama. Run lama
+  tidak pernah dihitung ulang (§29.4); tanda (tidak menolak):
+  `lebih_potong_masa`, `lintas_bulan`, `tanpa_hari`, `tarif_tidak_ada`,
+  `rumus_lama`, `status_pajak_berubah`, `komponen_per_run`.
+- **Hilir**: `susun_jurnal_payroll` ↔ `susunJurnalPayroll` menaruh total PPh
+  negatif di DEBIT `akun-utang-pph21`. Slip Web/Mobile dan rincian run
+  memakai `labelPph`/`bacaPajakSnapshot`/`catatanPajakRun` (`pajak.ts`); form
+  komponen punya centang "Tunjangan tetap (dasar BPJS)"; halaman aturan pajak
+  dan BPJS memakai `components/payroll/KonstantaPajak.tsx` (di `filesToCopy`).
+- **Semua perangkat wajib diperbarui**: begitu cloud naik ke v45, perangkat v44
+  berhenti sinkron (`SCHEMA_VERSION_OUTDATED`). Desember 2026 menanggung koreksi
+  setahun dari tarif dan rumus lama.
+
 ## Domain contoh
 
 `master_item` dan `log_aktivitas` adalah tabel peraga yang memperagakan pola

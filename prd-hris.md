@@ -5851,3 +5851,487 @@ pengaturan data pemotong `payroll.config.manage` (Superadmin saja). Area tetap
 - **Q-170**: urutan yang berlaku: fase 12 berkas transfer, fase 13 perbaikan
   rumus PPh 21 dan BPJS, fase 14 pelaporan.
 - Q-162 sampai Q-169, Q-171, dan Q-172 belum dijawab.
+
+## 29. Urutan pengerjaan fase 13: perbaikan rumus PPh 21 dan BPJS
+
+**Disetujui pemilik (13 Nov 2026)**: Q-177 sampai Q-192 sesuai usulan §29.11,
+lihat §29.13. Ditulis 13 Nov 2026 setelah menelusuri kode dan regulasi. Isinya Q-161 (b): rumus
+diperbaiki sebelum pelaporan fase 14 (§28). Bukan nasihat pajak: angka dan
+aturan di §29.2 wajib dicocokkan dengan konsultan pajak sebelum dipakai klien.
+
+### 29.1 Temuan dari kode
+
+Diverifikasi ulang ke kode, bukan disalin dari §28.2. Semua item §28.2 benar,
+tetapi tidak lengkap: butir 5 sampai 10 di bawah belum tercatat di sana.
+
+1. **TER dihitung per proses gaji** (sesuai §28.2).
+   `PayrollCalculator::calculate_employee_pay` (`payroll/engine.rs`) memanggil
+   `calculate_pph21_ter(gross, ...)` dengan bruto SATU run; kembarannya
+   `calculateEmployeePay` → `calculatePph21Ter` (`services/payroll-calculator.ts`).
+   Tidak ada konsep masa pajak: `payroll_runs` hanya punya `period_start` /
+   `period_end`, tanpa batas panjang, tanpa larangan tumpang tindih, dan dua
+   run berperiode sama sama-sama berlaku. Run tidak bisa dihapus; `REJECTED`
+   bisa kembali ke `DRAFT` (`PayrollStatus::can_transition_to`), dan item
+   dibekukan sekali saat run dibuat.
+2. **BPJS per run** (sesuai §28.2), dan dasarnya lebih lebar dari yang ditulis
+   di sana: `calculate_bpjs(gross, ...)` memakai `gross = basic + overtime +
+   allowance`, yaitu lembur DAN semua komponen ALLOWANCE (tetap maupun tidak).
+   Batas upah diterapkan per run; tidak ada batas bawah. `bpjs_rules.component_code`
+   `UNIQUE` di semua lapis, jadi satu komponen hanya punya satu baris:
+   saringan `effective_date` di `load_bpjs_rules` tidak pernah memilih apa-apa,
+   dan mengubah batas berarti menimpa. Seed JP `wage_cap` 10.042.300 (angka
+   2024); yang berlaku sejak Maret 2026 11.086.300.
+3. **`FLAT_DAILY` tanpa PPh dan BPJS** (sesuai §28.2): cabang awal
+   `calculate_employee_pay`, keputusan NG-3 `prd-gaji.md`.
+4. **Tanpa rekonsiliasi masa terakhir** (sesuai §28.2). Baris `PASAL_17` di
+   `tax_rules` hanya dibaca layar config pajak.
+5. **Tabel TER B dan TER C di seed salah.** `TAX_RULES_SEED_SQL`
+   (`payroll_seed.rs`) TER A cocok 44 lapis. TER B benar sampai lapis 6, lalu
+   memakai batas TER A (`tax_ter_b_7` 10.750.001–12.500.000 2%; seharusnya
+   10.750.001–11.250.000 2%, lalu 2,5% dan 3%), 37 lapis, tertinggi 32%
+   (seharusnya 40 lapis, 34% di atas 1.405.000.000). TER C benar sampai lapis 15,
+   lalu salah (`tax_ter_c_16` 22.700.001–24.700.000 9%; seharusnya s.d.
+   26.600.000), 39 lapis, tertinggi 32% (seharusnya 41, 34% di atas
+   1.419.000.000). Contoh: K/1 bruto 12.000.000 dipotong 2% = 240.000,
+   seharusnya 3% = 360.000; K/3 bruto 25.000.000 dipotong 10% = 2.500.000,
+   seharusnya 9% = 2.250.000.
+6. **Database yang hanya dimigrasi Web tidak punya TER sama sekali.** Seed di
+   `db-migrations.ts` (blok `payroll-engine-foundation`) hanya menanam
+   `PASAL_17` ber-id lama `tax-p17-*` dan BPJS ber-id dan kode lama (`JKK`,
+   `JKM`, `KES_EMP`, `KES_CO`, JKK 0,24%, berlaku 2024-01-01). TER dan
+   pembersihan `LEGACY_RATE_IDS` hanya ditanam `turso.rs` `ensure_schema`,
+   yang berjalan bila Desktop/Mobile pernah tersambung. Pemasangan Web saja
+   (image Docker, paket Windows, Vercel) membuat `calculatePph21Ter` tidak
+   menemukan lapis apa pun: **PPh 21 selalu 0**, kecuali admin mengetik 125
+   lapis sendiri. Urutan pembersihan dan seed di `turso.rs` saat baris lama
+   berkode sama (`UNIQUE`) masih ada perlu diperiksa saat eksekusi.
+7. **Bruto TER tidak memasukkan premi yang dibayar perusahaan.** `gross` tanpa
+   JKK, JKM, dan BPJS Kesehatan bagian perusahaan; contoh resmi DJP (Tuan A,
+   §29.2) memasukkannya.
+8. **PTKP per run**: `salary_configs.ptkp_status` yang berlaku ≤
+   `period_end`, sementara PMK 168 memakai keadaan awal tahun pajak (ragu,
+   §29.2). Peta kategori benar (TK/0, TK/1, K/0 → A; TK/2, TK/3, K/1, K/2 → B;
+   K/3 → C); nilai tak dikenal jatuh ke A.
+9. **Komponen FIXED dihitung per run**, bukan per bulan (`calculate_components`
+   dipanggil sekali per run). Tunjangan 500.000 "sebulan" dibayar dua kali
+   untuk gaji dua mingguan. Bukan rumus pajak, tetapi menentukan bruto masa.
+   Kasbon sudah per bulan (`TERPOTONG_BULAN_SQL`).
+10. **PPh negatif belum dikenal di hilir.** `payroll_items.pph21_amount` tanpa
+    CHECK (boleh negatif) dan `net_salary` CHECK ≥ 0. `susun_jurnal_payroll`
+    (`loan.rs`) ↔ `susunJurnalPayroll` membuang baris kredit negatif, sehingga
+    pengembalian PPh akan masuk `akun-potongan-gaji`. `SlipGajiPrintView`
+    menampilkan PPh hanya bila `> 0`.
+
+Kait yang dipakai rancangan:
+
+- **Bulan sebuah run** sudah punya preseden: `TERPOTONG_BULAN_SQL` =
+  `substr(r.period_start, 1, 7)` dan `r.status <> 'REJECTED'`.
+- Urutan bersih: `net = gross − deduction − bpjs_employee − pph21` (≥ 0),
+  lalu kasbon dipotong dari sisa (`potong_kasbon`), lalu reimbursement mode
+  `gaji` ditambahkan. Rust menghitung ulang di `desktop_create_payroll_run`
+  dengan fungsi yang sama; Web memakai hasil `computePayrollRecap` apa adanya.
+- **Snapshot tarif** tidak punya tabel: `breakdown_snapshot.tax`
+  (`category`, `rate_percentage`) dan `.bpjs[]` (`code`, `rate`, `wage_cap`,
+  `nominal`).
+- **Status pegawai tetap / tidak tetap tidak ada.** Yang terdekat:
+  `master_data.jenis_personil` (`Pegawai`/`Kontrak`/`Harian`/`Magang`, dari
+  kontrak terakhir lewat `JENIS_DARI_KONTRAK_SQL`, tersinkron) dan
+  `salary_type`. Gaji keluar: `master_data.id_keluar` +
+  `tanggal_selesai_aktif` (tersinkron, `KARYAWAN_REKAP_SQL`).
+- Run dibuat dari SQLite lokal: run perangkat lain yang belum tersinkron tidak
+  terlihat.
+- Uang di TS memakai `number` (`roundMoney` = `Math.round`), Rust
+  `rust_decimal` + `exact_decimal`. Vektor kembar yang menjaga keduanya sama.
+- Mobile: `commands.rs`, `engine.rs`, `models.rs` disalin ke `payroll_admin/`
+  dan `payroll_seed.rs` ikut daftar salin `sync-rust-modules.ts`; halaman
+  payroll Mobile (`RunDetailClient`, `SlipDetailClient`) berkas terpisah.
+
+### 29.2 Aturan menurut regulasi
+
+Sumber utama: paparan resmi DJP "PMK 168 Tahun 2023 tentang PPh Pasal 21 TER"
+(pajak.go.id, berisi tabel TER dan contoh hitung), PP 58/2023, Surat BPJS
+Ketenagakerjaan B/1226/022026, Perpres 59/2024 Pasal 32. Pasal PMK yang disebut
+"ragu" belum dicocokkan dengan teks PMK sendiri.
+
+**Pegawai tetap** (termasuk PKWT yang dibayar teratur):
+
+- Setiap masa selain masa terakhir: PPh = **TER bulanan × bruto sebulan**.
+  Paparan DJP: "Gabung seluruh penghasilan Pegawai Tetap dalam 1 bulan". Batas
+  atas lapis inklusif (5.400.000 masih 0%, 5.400.001 sudah 0,25%).
+- Bruto termasuk premi JKK, JKM, dan BPJS Kesehatan yang dibayar pemberi
+  kerja; iuran JHT dan JP bagian perusahaan tidak.
+- **Masa pajak terakhir** (Desember, atau bulan berhenti bekerja): PPh setahun
+  = Pasal 17 × PKP; PKP = bruto setahun − biaya jabatan − iuran pensiun/JHT/JP
+  yang dibayar pegawai − zakat lewat pemberi kerja − PTKP, dibulatkan ke bawah
+  ribuan penuh (UU PPh Pasal 17 ayat 4). PPh masa terakhir = PPh setahun − PPh
+  masa sebelumnya. Kelebihan dikembalikan ke pegawai bersama bukti potong,
+  paling lambat akhir bulan berikutnya (PMK 168 Pasal 21 ayat 1, ragu).
+- Biaya jabatan 5%, paling banyak 500.000 per bulan bekerja (6.000.000
+  setahun); contoh resign delapan bulan memakai 8 × 500.000.
+- Pegawai yang berhenti tetapi tetap subjek pajak dalam negeri: **tidak
+  disetahunkan**, PTKP penuh. Disetahunkan hanya bila meninggalkan Indonesia
+  (di luar cakupan).
+- PTKP: 54.000.000, + 4.500.000 kawin, + 4.500.000 per tanggungan (maks 3).
+  Status yang dipakai: keadaan awal tahun pajak (ragu, belum dicocokkan pasal).
+- Pasal 17: s.d. 60 jt 5%, s.d. 250 jt 15%, s.d. 500 jt 25%, s.d. 5 M 30%,
+  di atasnya 35% (sesuai seed).
+
+**Pegawai tidak tetap** (dibayar hanya bila bekerja: per hari, jam, unit,
+atau borongan):
+
+- Tidak dibayar bulanan: **TER harian** atas bruto sehari atau rata-rata bruto
+  sehari: ≤ 450.000 0%; > 450.000 s.d. 2.500.000 0,5%; > 2.500.000 Pasal 17 ×
+  50% × bruto.
+- Dibayar bulanan: TER bulanan × bruto bulanan, Januari sampai Desember,
+  **tanpa** rekonsiliasi Pasal 17.
+
+**BPJS** (dasar = upah, yaitu gaji pokok + tunjangan tetap, tanpa lembur; ragu
+untuk pekerja per jam dan harian lepas):
+
+| Program | Pekerja | Perusahaan | Batas upah |
+| :-- | :-- | :-- | :-- |
+| JHT | 2% | 3,7% | tanpa batas |
+| JP | 1% | 2% | 11.086.300 sejak Maret 2026 (10.547.400 Mar 2025–Feb 2026; 10.042.300 2024) |
+| JKK | – | 0,24–1,74% menurut risiko | tanpa batas |
+| JKM | – | 0,30% | tanpa batas |
+| Kesehatan | 1% | 4% | atas 12.000.000; bawah UMP/UMK kecuali usaha mikro/kecil |
+
+**Bahan vektor uji** (angka contoh resmi; "dihitung" = dihitung dari data
+contoh karena kolom masa terakhir di paparan berupa gambar, wajib dicocokkan
+dengan lampiran PMK):
+
+| # | Kasus | Hasil |
+| :-- | :-- | :-- |
+| V1 | Tuan R, K/0, gaji 10.000.000, iuran pensiun 100.000 | Jan–Nov 2% = 200.000; setahun 2.715.000; Desember 515.000 |
+| V2 | Tuan A, K/0, bruto setahun 450.960.000 (termasuk JKK+JKM 80.000/bulan), iuran pegawai 1.200.000, zakat 2.400.000 | Jan–Nov 50.120.000 (cocok paparan); dihitung: PKP 382.860.000, setahun 64.715.000, Desember 14.595.000 |
+| V3 | Tuan D, TK/0, 17.500.000 × 8, berhenti 1 Sep, iuran 100.000 | Jan–Jul 8% = 9.800.000; dihitung: biaya jabatan 4.000.000, PKP 81.200.000, setahun 6.180.000, Agustus −3.620.000 (dikembalikan) |
+| V4 | Tuan H, K/2, 6.800.000 | TER B 0,5% = 34.000 |
+| V5 | Tuan G, TK/0, 65.605.059 | TER A 21% = 13.777.062 |
+| V6 | K/1 12.000.000; K/3 25.000.000 | TER B 3% = 360.000; TER C 9% = 2.250.000 (temuan 5) |
+| V7 | Tuan L, tidak tetap, 4.500.000 untuk 10 hari | rata-rata 450.000, 0% = 0 |
+| V8 | Tuan M, tidak tetap, 3.000.000 sehari | 5% × 50% × 3.000.000 = 75.000 |
+| V9 | Tuan N, tidak tetap dibayar bulanan, TK/0, 7.000.000 | TER A 1,25% = 87.500, termasuk Desember |
+| V10 | Dua mingguan, TK/0, 2 run × 3.000.000 sebulan | sekarang 0 + 0; benar masa 6.000.000 × 0,75% = 45.000 (run 1: 0, run 2: 45.000) |
+| V11 | JP dua mingguan, 2 run × 8.000.000 | sekarang 80.000 + 80.000; benar 1% × 11.086.300 = 110.863 |
+| V12 | Batas lapis TER A | 5.400.000 → 0; 5.400.001 → 13.500 |
+
+### 29.3 Rancangan rumus
+
+Satu modul murni kembar `payroll/pajak.rs` (ikut daftar salin
+`payroll_admin`) ↔ `validations/pajak.ts`, vektor V1–V12 di
+`validations/pajak.vektor.json` (dibaca Rust lewat `include_str!`, pola
+`transfer.vektor.json`). Semua uang `i64`/INTEGER rupiah; Rust `rust_decimal`
+`MidpointAwayFromZero`; TS bilangan bulat (persen tarif diubah ke per sepuluh
+ribu lewat `persen_ke_basis` ↔ `persenKeBasis`, tarif dengan lebih dari dua
+desimal ditolak saat disimpan), tanpa `Math.round` atas pecahan.
+
+**Masa dan run pembanding.** `masa = substr(period_start, 1, 7)` (Q-177).
+"Sudah dipotong di masa ini" = item karyawan yang sama di run lain bermasa
+sama, `status <> 'REJECTED'` (preseden kasbon, Q-190). SQL kembar
+`RUN_MASA_SQL` dan `RUN_TAHUN_SQL` mengembalikan per item: bruto pajak, PPh,
+dasar BPJS, dan nominal per kode BPJS dari `breakdown_snapshot`. Gateway
+Desktop/Mobile menjalankan `syncNow()` sebelum membuat run (preseden Q-72).
+
+**Status pajak** `status_pph` ↔ `statusPph` (Q-178 (a)): `jenis_personil`
+`Pegawai`/`Kontrak` → tetap, `Harian` → tidak tetap; selain itu menurut
+`salary_type` (`HOURLY` tetap, `FLAT_DAILY` tidak tetap).
+
+**Urutan per karyawan per run**: BPJS masa → premi perusahaan → bruto pajak →
+PPh → `net` seperti sekarang (PPh negatif menambah `net`) → kasbon →
+reimbursement (tidak berubah).
+
+1. **BPJS per masa.** `dasar_run = basic + Σ ALLOWANCE bertanda dasar BPJS`
+   (Q-181), tanpa lembur. `D_masa = Σ dasar run pembanding + dasar_run`. Per
+   kode: `iuran_masa = round(tarif × min(D_masa, wage_cap))`; potongan run =
+   `iuran_masa − Σ nominal kode itu di run pembanding`, paling kecil 0. Run lama
+   ikut lewat `nominal`-nya. `FLAT_DAILY` tetap tanpa BPJS (Q-182).
+2. **Bruto pajak** = `gross_salary` + JKK, JKM, BPJS Kesehatan bagian
+   perusahaan run ini (`KODE_PREMI`, termasuk kode lama Web `JKK`, `JKM`,
+   `KES_CO`). Untuk item lama tanpa kunci `pajak` dihitung ulang dengan cara
+   yang sama dari `gross_salary` dan `breakdown_snapshot.bpjs`.
+3. **Tetap, masa biasa**: `B_masa = Σ bruto pajak pembanding + bruto run`;
+   `P_masa = round(TER(kategori, B_masa) × B_masa)`; potongan = `P_masa − Σ PPh
+   pembanding`, paling kecil 0 (lebih potong tengah tahun ditandai
+   `lebih_potong_masa` dan diselesaikan masa terakhir). TER bulanan naik
+   monoton, jadi potongan run kedua tidak pernah negatif kecuali run lama
+   dihitung dengan tarif yang salah.
+4. **Tetap, masa terakhir** (masa Desember, atau masa = bulan
+   `tanggal_selesai_aktif` bila `id_keluar` terisi saat run dibuat):
+   `B_tahun` = bruto pajak semua item berstatus tetap tahun itu sampai run ini;
+   `BJ = min(round(5% × B_tahun), 500.000 × jumlah masa berbruto)`;
+   `IP` = Σ `JHT_EMP` + `JP_EMP` tahun itu; `PKP = max(0, ⌊(B_tahun − BJ − IP −
+   PTKP) / 1000⌋ × 1000)`; `P_tahun` = Pasal 17 dari `tax_rules` `PASAL_17`;
+   potongan = `P_tahun − Σ PPh tahun itu sebelum run ini`, **boleh negatif**
+   (Q-189). Setiap run Desember menghitung ulang, jadi run terakhir bulan itu
+   yang menuntaskan. PTKP dari status awal tahun (Q-180).
+5. **Tidak tetap, run bukan sebulan penuh**: `hari = days_present` (0 dengan
+   bruto > 0 dihitung 1 dan ditandai `tanpa_hari`). `bruto ≤ 450.000 × hari` →
+   0; `≤ 2.500.000 × hari` → `round(0,5% × bruto)`; di atasnya Pasal 17 atas
+   50% × bruto run (Q-191). Tanpa masa dan tanpa rekonsiliasi.
+6. **Tidak tetap, run sebulan penuh** (`period_start` tanggal 1 dan
+   `period_end` akhir bulan yang sama, Q-179): rumus 3, tanpa masa terakhir.
+
+**Konstanta** PTKP, biaya jabatan, dan TER harian di
+`validations/pajak-bawaan.json` (Q-187, pola `akun-bawaan.json`). TER bulanan
+dan Pasal 17 tetap di `tax_rules`.
+
+**Snapshot.** `breakdown_snapshot` mendapat kunci `pajak` (`versi`, `masa`,
+`status`, `metode` `TER_BULANAN` / `TER_HARIAN` / `PASAL_17_HARIAN` /
+`PASAL_17_TERAKHIR`, `kategori`, `tarif`, `bruto_pajak`, `premi`,
+`bruto_masa`, `sudah_dipotong`, `hari`, dan untuk masa terakhir `bruto_tahun`,
+`biaya_jabatan`, `iuran_pensiun`, `ptkp`, `pkp`, `pph_setahun`) dan
+`bpjs_masa` (`dasar_run`, `dasar_masa`). `tax` dan `bpjs` tetap untuk slip
+lama. Tanpa kolom baru di `payroll_items`.
+
+**Tanda, tidak menolak**: `lebih_potong_masa`, `lintas_bulan` (Q-183),
+`tanpa_hari`, `rumus_lama` (run pembanding tanpa kunci `pajak`),
+`status_pajak_berubah` (item tahun itu berstatus berbeda; masa terakhir hanya
+menjumlah item tetap), `komponen_per_run` (Q-184).
+
+### 29.4 Run lama
+
+- **Tidak ada run yang dihitung ulang**, berstatus apa pun. Rumus baru hanya
+  untuk run yang dibuat sesudah pembaruan; run terbuka yang dibuat sebelumnya
+  tetap berangka lama dan ditandai `rumus_lama` (Q-185).
+- Angka run lama masuk perhitungan sebagai "sudah dipotong": run baru pertama
+  di masa yang sudah punya run lama menambal kekurangannya, dan masa terakhir
+  2026 mengoreksi seluruh tahun, termasuk kekurangan atau kelebihan akibat
+  TER B/C yang salah. **Potongan Desember 2026 bisa besar**, atau berupa
+  pengembalian.
+- **Slip** (`SlipGajiPrintView`, Mobile `SlipDetailClient`): PPh tampil bila
+  `!== 0` dengan label metode ("TER A 1,25%", "Masa terakhir (Pasal 17)",
+  "Pengembalian PPh 21" bila negatif); item tanpa kunci `pajak` tetap
+  ditampilkan seperti sekarang.
+- **Jurnal `pay-<run>`**: `susun_jurnal_payroll` ↔ `susunJurnalPayroll`
+  menaruh total PPh negatif di DEBIT `akun-utang-pph21`; vektor baru di kedua
+  tes.
+- **Kasbon**: aturan tidak berubah, tetap dipotong dari `net` sesudah PPh.
+  Pengembalian PPh memperbesar ruang potong kasbon bulan itu.
+- **Reimburse mode `gaji`**: tidak berubah; tetap di luar bruto dan di luar
+  pajak. `periksa_reimburse_run` tidak tersentuh.
+- **Berkas transfer fase 12**: tetap `net_salary`; pengembalian PPh otomatis
+  ikut.
+- **Karyawan keluar (fase 5)**: masa terakhir hanya terjadi bila Berlakukan
+  sudah tersinkron sebelum run bulan itu dibuat. Bila Berlakukan menyusul,
+  rekonsiliasi tertinggal; run susulan untuk bulan itu akan menghitungnya,
+  tetapi run susulan juga mengulang komponen FIXED karyawan lain (temuan 9).
+  Batalkan keluar sesudah run terakhir tidak membatalkan rekonsiliasinya.
+
+### 29.5 Model data dan sinkronisasi
+
+**Usulan: skema v45, sentinel `-2041` `payroll-pajak-masa-v1`.** Rumusnya
+sendiri tidak butuh kolom (status dari `jenis_personil`, konstanta di JSON,
+jejak di `breakdown_snapshot`), tetapi tiga hal butuh migrasi data yang hanya
+berjalan bila versi naik (Web: `isDatabaseSchemaReady` membandingkan
+`MAX(version)`; Rust: sentinel di `ensure_schema_current`):
+
+1. **Koreksi TER B dan C** di `turso.rs` dan `db-migrations.ts`: `UPDATE` baris
+   `tax_ter_b_7..37` dan `tax_ter_c_16..39` HANYA bila nilainya masih sama
+   dengan seed lama, lalu `INSERT OR IGNORE` `tax_ter_b_38..40` dan
+   `tax_ter_c_40..41` (Q-186). `tax_rules` tersinkron (`conflict_column` `id`,
+   `delete_missing: false`), jadi perangkat menerimanya lewat snapshot; seed
+   lokal ikut dibetulkan untuk pemasangan baru.
+2. **Seed tarif satu sumber**: TER, Pasal 17, dan BPJS bawaan dipindah ke
+   `validations/tarif-bawaan.json`, dibaca `payroll_seed.rs` lewat
+   `include_str!` dan `db-migrations.ts` lewat import; Web akhirnya menanam TER
+   (temuan 6). Baris lama Web (`tax-p17-*`, `bpjs-jkk`, …) dibersihkan Web juga
+   dengan daftar `LEGACY_RATE_IDS` yang sama.
+3. **Batas JP 11.086.300**, berlaku 2026-03-01, hanya untuk baris yang masih
+   bernilai seed 10.042.300 (Q-186).
+4. **Bila Q-181 (a)**: kolom `payroll_components.dasar_bpjs INTEGER NOT NULL
+   DEFAULT 0 CHECK (dasar_bpjs IN (0,1))`, tabel tersinkron, keempat lapis:
+   `storage.rs` kedua workspace (CREATE + `ensure_column`), `turso.rs` (DDL,
+   `ensure_column`, handler komponen menimpa hanya bila payload membawa
+   kuncinya), `sync.rs` (`SNAPSHOT_TABLES.columns` dan payload
+   `ensure_unsynced_payroll_data_enqueued`), `db-schema.ts`/`db-migrations.ts`
+   (`hasColumn`), `models.rs`, gateway, Zod `.strict()` rute
+   `config/components`.
+
+Daftar yang ikut: `CURRENT_SCHEMA_VERSION`/`CLIENT_SCHEMA_VERSION` 45 (Desktop
+dan Mobile), sentinel `-2041` (INSERT dan `ensure_schema_current`),
+`isDatabaseSchemaReady`, `schema-consistency.test.ts`, daftar versi
+`rbac-migration.test.ts`. Tanpa tabel baru: `REQUIRED_TABLE_COUNT` tetap 107,
+68 tabel snapshot, 90 rute, `PROMOTION_PLAN` tetap. Perangkat v44 berhenti
+sinkron begitu cloud v45 (Q-188).
+
+### 29.6 Hak akses
+
+Tanpa izin baru. Membuat run `payroll.run.create`, tarif dan komponen
+`payroll.config.manage`, seperti sekarang.
+
+### 29.7 Command, rute, dan layar
+
+- Tanpa command atau rute baru (Desktop 307 / Mobile 313). Berubah:
+  `desktop_get_payroll_recap`, `desktop_create_payroll_run` (Rust, salinan
+  `payroll_admin` ikut), `computePayrollRecap` dan `POST /api/payroll/runs`
+  (Web), simpan komponen bila Q-181 (a).
+- Rekap dan rincian run: kolom PPh dan BPJS menampilkan metode dan tanda;
+  ringkasan run menyebut berapa item bertanda `rumus_lama`.
+- Form komponen: centang "Tunjangan tetap (dasar BPJS)" bila Q-181 (a).
+- Halaman aturan pajak: kartu baca-saja PTKP, biaya jabatan, dan TER harian
+  dari JSON; halaman BPJS: catatan bahwa batas JP berubah setiap Maret.
+- Halaman payroll Mobile disunting manual (bukan salinan).
+
+### 29.8 Tidak dikerjakan di fase ini
+
+- Zakat/sumbangan keagamaan lewat pemberi kerja, PPh 21 DTP, gross-up
+  (tunjangan pajak), pegawai dengan dua pemberi kerja, WNA yang meninggalkan
+  Indonesia (disetahunkan), PPh 26, bukan pegawai, pesangon final.
+- Pemisahan penghasilan teratur dan tidak teratur (THR/bonus): semua komponen
+  diperlakukan sama.
+- Batas bawah UMP/UMK BPJS Kesehatan (data upah minimum tidak ada) dan anggota
+  keluarga tambahan.
+- Generasi tarif `bpjs_rules` (tetap `UNIQUE component_code`, ditimpa).
+- Komponen FIXED sebagai jatah per bulan (Q-184), BPJS untuk `FLAT_DAILY`
+  (Q-182).
+- Pengembalian PPh lewat jalur selain run gaji.
+
+### 29.9 Langkah
+
+| # | Langkah | Gerbang |
+| :-- | :-- | :-- |
+| 1 | **Skema v45**: `tarif-bawaan.json`, koreksi TER B/C dan JP bersyarat, seed TER di Web, pembersihan id lama Web, kolom `dasar_bpjs` bila Q-181 (a) | `audit:schema` + `cargo test sentinel_2040_mengoreksi_tarif` (baris seed lama dikoreksi, baris yang disunting admin tidak) kedua workspace + tes migrasi Web (database baru punya 125 lapis TER) |
+| 2 | **Aturan kembar** `pajak.rs` ↔ `pajak.ts`: status, TER bulanan/harian, masa terakhir, BPJS masa, bruto pajak, tanda | `bun test validations/pajak.test.ts` + `cargo test pajak` kedua workspace, vektor V1–V12 dari JSON yang sama |
+| 3 | **SQL kembar** `RUN_MASA_SQL`/`RUN_TAHUN_SQL` + integrasi rekap dan pembekuan Rust | tes SQLite: dua run sebulan, masa Desember, karyawan keluar, run lama tanpa `pajak`, run `REJECTED` diabaikan |
+| 4 | **Web** `computePayrollRecap` + rute run | `services/*.test.ts`: data langkah 3, hasil sama |
+| 5 | **Hilir**: jurnal PPh negatif, slip Web dan Mobile, layar §29.7 | vektor jurnal kembar; typecheck + Biome |
+| 6 | `sync:mobile`, CLAUDE.md, `prd-gaji.md`, angka di skill, "Sudah dibangun" | `audit:contract` + `audit:docs`; `bun run check` oleh pemilik |
+
+### 29.10 Penanda yang ditinjau pemilik
+
+- **Gaji bersih berubah** untuk karyawan dengan lebih dari satu run sebulan,
+  PTKP kategori B/C, karyawan yang dipotong BPJS di atas batas JP, dan semua
+  karyawan tetap di Desember. Premi JKK/JKM/Kesehatan perusahaan kini menaikkan
+  PPh sedikit.
+- **Desember 2026 menanggung koreksi setahun** dari tarif dan rumus lama.
+- `FLAT_DAILY` mulai dipotong PPh bila rata-rata di atas 450.000 sehari.
+- Dua perangkat offline yang membuat run di masa yang sama tidak saling
+  melihat; kekurangannya terkoreksi di masa terakhir, tidak dicegah.
+- Pengembalian PPh dibayar lewat gaji bersih; pemilik wajib memastikan setoran
+  dan pelaporannya sesuai (fase 14).
+- Naik ke v45: semua perangkat wajib diperbarui.
+- Aturan §29.2 wajib dicek konsultan pajak sebelum dipakai klien.
+
+### 29.11 Pertanyaan untuk pemilik
+
+| No | Pertanyaan | Usulan | Alasan |
+| :-- | :-- | :-- | :-- |
+| Q-177 | Masa pajak sebuah run: (a) bulan `period_start`; (b) bulan `period_end`; (c) bulan saat ditandai `PAID`? | (a) | Sama dengan kasbon; (c) belum diketahui saat run dihitung |
+| Q-178 | Pegawai tetap atau tidak tetap: (a) dari `jenis_personil` (kontrak), lalu jenis gaji; (b) kolom baru di `salary_configs`? | (a) | Tanpa kolom; kontrak sudah menyatakan hubungan kerja |
+| Q-179 | Pegawai tidak tetap "dibayar bulanan" bila run tepat satu bulan kalender? | Ya | Selain itu TER harian |
+| Q-180 | PTKP: (a) status yang berlaku 1 Januari (atau konfigurasi pertama tahun itu); (b) konfigurasi per run seperti sekarang? | (a) | PMK memakai keadaan awal tahun (perlu dicek konsultan) |
+| Q-181 | Dasar BPJS: (a) gaji pokok + tunjangan yang ditandai "tetap" (kolom baru, bawaan tidak ditandai); (b) gaji pokok saja; (c) bruto tanpa lembur? | (a) | Regulasi: gaji pokok + tunjangan tetap; aplikasi tidak bisa menebak mana yang tetap |
+| Q-182 | `FLAT_DAILY` tetap tanpa BPJS? | Ya, fase ini | Keputusan NG-3; harian lepas punya aturan kepesertaan sendiri |
+| Q-183 | Run yang melintasi dua bulan: (a) boleh, masa = bulan `period_start`, ditandai; (b) ditolak? | (a) | Gaji mingguan wajar melintasi akhir bulan |
+| Q-184 | Komponen FIXED untuk gaji lebih dari satu run sebulan: (a) tetap per run, ditandai; (b) jatah per bulan seperti kasbon? | (a), (b) fase sendiri | Mengubah komponen menyentuh semua slip; pajak tetap benar atas bruto yang dibayar |
+| Q-185 | Run terbuka saat pembaruan: (a) biarkan berangka lama, ditandai; (b) wajib ditolak dan dibuat ulang? | (a) | Pemilik bisa menolak sendiri; masa terakhir mengoreksi |
+| Q-186 | Koreksi otomatis TER B/C dan batas JP: (a) hanya baris yang masih sama dengan seed; (b) timpa semua; (c) admin manual? | (a) | Tarif yang sengaja diubah admin tidak ditimpa |
+| Q-187 | PTKP, biaya jabatan, TER harian: (a) konstanta JSON di kode; (b) tabel yang bisa diubah di layar? | (a) | Jarang berubah; (b) butuh membangun ulang CHECK `tax_rules` di empat lapis |
+| Q-188 | Rilis v45 bersama v43–v44 (fase 8–12)? | Ya | Satu putaran pembaruan perangkat |
+| Q-189 | Lebih bayar di masa terakhir: (a) dikembalikan lewat gaji bersih run itu; (b) PPh 0, kelebihan diurus manual? | (a) | Kewajiban pemotong menurut PMK 168 |
+| Q-190 | Run yang dihitung "sudah dipotong": (a) semua kecuali `REJECTED`, termasuk `DRAFT`; (b) hanya `APPROVED`/`PAID`? | (a) | Sama dengan kasbon; (b) membuat dua run terbuka sebulan sama-sama memotong penuh |
+| Q-191 | Pegawai tidak tetap di atas 2.500.000 sehari: Pasal 17 atas 50% bruto run? | Ya, ditandai | Jarang; cara pasti untuk beberapa hari perlu dicek konsultan |
+| Q-192 | Pegawai yang status pajaknya berubah di tengah tahun (Harian → PKWT): masa terakhir hanya menjumlah masa berstatus tetap? | Ya, ditandai | Penghasilan saat tidak tetap sudah final per pembayaran |
+
+### 29.12 Dampak ke rancangan fase 14 (§28)
+
+Dicatat di sini; §28 tidak disunting.
+
+- §28.2 sebagian besar selesai oleh fase ini. Tanda `run_lebih_dari_satu` dan
+  `harian_tanpa_pph` di §28.4 hilang; gantinya `rumus_lama` untuk item tanpa
+  kunci `pajak`.
+- Rekap PPh 21 bulanan membaca `breakdown_snapshot.pajak`: masa (Q-177, sama
+  dengan Q-162), bruto = `bruto_pajak` (termasuk premi), metode dan kategori,
+  dan pemisahan pegawai tetap (BPMP) dari tidak tetap (bukti potong harian)
+  lewat `pajak.status`.
+- A1 tahunan (Q-165) menjadi mungkin dari kunci masa terakhir (`bruto_tahun`,
+  `biaya_jabatan`, `iuran_pensiun`, `ptkp`, `pkp`, `pph_setahun`); usulan
+  Q-165 perlu ditulis ulang.
+- Rekap BPJS memakai `bpjs_masa.dasar_masa` dengan batas per masa, lebih dekat
+  ke tagihan portal; Q-171 tetap relevan untuk upah terdaftar.
+- Data pemotong (Q-163) bila tabel baru: versi sesudah v45, yaitu v46 /
+  sentinel `-2042`.
+
+### 29.13 Jawaban (13 Nov 2026)
+
+- **Q-177 sampai Q-192**: semuanya sesuai usulan §29.11, dan penanda §29.10
+  disetujui. Karena Q-181 (a), langkah 1 memuat kolom
+  `payroll_components.dasar_bpjs`.
+- Eksekusi per langkah §29.9 di sesi terpisah. Sebelum langkah 2, angka masa
+  terakhir V2 dan V3 (§29.2) yang masih "dihitung" dicocokkan dengan lampiran
+  PMK 168 bila tersedia; bila tidak, vektor itu ditandai sebagai hitungan
+  sendiri di berkas vektornya.
+
+### 29.14 Sudah dibangun (13 Nov 2026)
+
+Langkah 1–6 dibangun: skema v45 (sentinel `-2041` `payroll-pajak-masa-v1`,
+`REQUIRED_TABLE_COUNT` 107, 68 tabel snapshot, 90 rute), command Desktop 307 /
+Mobile 313, tanpa izin baru. Gerbang yang dijalankan:
+
+- `audit:schema` lulus; `audit:contract` lulus (307/313); `audit:docs` lulus.
+- `cargo test --lib` Desktop dan Mobile, masing-masing 75 lulus (pajak,
+  payroll, loan, sentinel, storage, hr_pengajuan, engine), termasuk
+  `sentinel_2040_mengoreksi_tarif` (seed lama dikoreksi ke 125 lapis TER,
+  lapis dan batas JP yang disunting admin tidak ditimpa, baris lama Web
+  `bpjs-jht-emp` diganti seed baru, kolom `dasar_bpjs` lahir, handler komponen
+  mempertahankan penanda bila kuncinya absen), `payroll_seed::tests`,
+  `payroll::pajak::tests` (vektor V1–V12, tepi, pembanding),
+  `payroll::commands::tests_pajak` (dua run sebulan, Desember dengan run
+  lama, karyawan keluar, `REJECTED`/tahun lalu/masa sesudahnya diabaikan,
+  PTKP awal tahun), dan `jurnal_payroll` (pengembalian PPh).
+- `bun test` per berkas dengan `--no-env-file`, 67 berkas di setiap workspace
+  (`services/`, `validations/`, `server/operational/`, `rbac/`, `server/`),
+  0 gagal; termasuk `pajak.test.ts` (vektor sama dan teks harfiah terhadap
+  kedua `pajak.rs`), `tarif-bawaan.test.ts`, `payroll-pajak.test.ts` (data
+  langkah 3 di skema Web, ditambah `computePayrollRecap` ujung ke ujung),
+  `schema-consistency` (database baru 125 lapis TER; database v44 dikoreksi
+  bersyarat), `loan.test.ts`.
+- Typecheck kedua workspace dan Biome berkas yang diubah bersih; `cargo check`
+  tanpa peringatan baru.
+
+`bun run check` penuh belum dijalankan (pemilik). Layar belum dicoba di
+aplikasi yang berjalan (tema gelap dan terang, lebar 360 px).
+
+Penyimpangan dan catatan, untuk ditinjau:
+
+- **Angka TER B/C ditulis dari tabel PP 58/2023**, lalu dicocokkan dengan
+  semua titik di §29.1 dan vektor V4/V6; belum disalin dari dokumen resmi.
+  V2 Desember dan V3 Agustus ditandai `hitungan sendiri` di berkas vektor
+  (lampiran PMK 168 tidak tersedia); zakat V2 digabung ke iuran pensiun
+  karena zakat di luar cakupan (§29.8), PKP-nya sama.
+- **Urutan seed diperbaiki** (§29.1 butir 6 terbukti): seed TER/BPJS kini
+  berjalan sesudah `purge_legacy_rate_rows` di `turso.rs` dan sesudah
+  pembersihan id lama di `db-migrations.ts`. Menyangkut uang: pembersihan id
+  lama Web juga membuang suntingan admin pada baris itu (mis. JKK 0,24% Web
+  menjadi `JKK_CO` 0,54%); Rust sudah begini sejak dulu.
+- **Koreksi JP dicocokkan lewat `component_code`**, bukan id. Karena
+  `bpjs_rules` satu baris per kode, run Januari–Februari 2026 yang dibuat
+  sesudah pembaruan juga memakai batas 11.086.300 (sejalan §29.8).
+- **Satu SQL pembanding**: `RUN_TAHUN_SQL` saja; himpunan masa diambil dari
+  hasilnya (`RUN_MASA_SQL` tidak dibuat). Dasar BPJS item lama = `gross_salary`
+  (rumus lama memang memotong atas bruto; `FLAT_DAILY` lama 0); status item
+  lama dari jenis gaji.
+- **Tanda tambahan** di luar §29.3: `tarif_tidak_ada` (tidak ada lapis
+  TER/Pasal 17 yang cocok, PPh 0; di masa terakhir tidak mengembalikan apa
+  pun) dan, untuk BPJS, `tarif_tidak_sah` di `bpjs_masa.tanda`.
+- **Pasal 17 harian (Q-191)**: dasar 50% dibulatkan ke rupiah lebih dulu.
+- **Konstanta seed** tetap bernama `TAX_RULES_SEED_SQL`/`BPJS_RULES_SEED_SQL`
+  (kini SQL berparameter) karena `audit:contract` memeriksa nama itu; skrip
+  audit tidak diubah.
+- **Uji engine lama berubah sengaja**: BPJS per jam kini atas gaji pokok saja
+  kecuali tunjangan bertanda (Q-181 (a)).
+- **Validasi tarif** (§29.3) dipasang di empat command simpan tarif dan rute
+  `config/tax|bpjs`; rute `config/components` mendapat Zod `.strict()`
+  (sebelumnya tanpa validasi), `created_at` boleh terbawa dan diabaikan.
+- **`PayrollRecapRow`** mendapat `jenis_personil`, `keluar_pada`,
+  `ptkp_awal_tahun`, `pajak` (Rust dan TS). Snapshot `tax.rate_percentage`
+  kini `null` untuk metode Pasal 17.
+- **MSRV 1.77.2**: `is_none_or` di `pajak.rs` diganti `map_or`.
+- **Layar**: slip menampilkan PPh bila `!== 0` dengan label metode
+  ("PPh 21 TER A 2%", "masa terakhir (Pasal 17)", "Pengembalian PPh 21");
+  Mobile menulis pengembalian sebagai `+` berwarna hijau. Rincian run kedua
+  versi menampilkan label dan tanda di bawah angka PPh, plus catatan jumlah
+  slip `rumus_lama`. Kartu konstanta dan catatan JP di
+  `components/payroll/KonstantaPajak.tsx` (di `filesToCopy`). Rekap pratinjau
+  sebelum membuat run belum menampilkan metode (nilai `pajak` sudah ada di
+  baris rekap).

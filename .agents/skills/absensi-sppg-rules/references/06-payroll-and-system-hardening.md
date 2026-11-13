@@ -42,12 +42,15 @@ Dokumen ini memuat spesifikasi arsitektur komprehensif untuk modul Payroll, kalk
 3. **Dukungan Insentif:**
    - Disediakan flag `is_dtp` (Ditanggung Pemerintah) per komponen/karyawan untuk industri atau skema khusus.
 
+4. **Per masa pajak (fase 13, v45):** masa = bulan `period_start`; run lain di masa/tahun yang sama (kecuali `REJECTED`) dihitung sebagai "sudah dipotong" (`RUN_TAHUN_SQL`, `ringkas_pembanding`). Masa terakhir = Desember atau bulan keluar, PPh boleh negatif. Pegawai tidak tetap: TER harian (0% s.d. 450.000/hari, 0,5% s.d. 2.500.000/hari, di atasnya Pasal 17 atas 50%). Bruto pajak termasuk premi JKK/JKM/Kesehatan perusahaan. Aturan di `payroll/pajak.rs` ↔ `validations/pajak.ts`, konstanta di `pajak-bawaan.json`, tarif di `tarif-bawaan.json`.
+
 ### 2.2 BPJS Ketenagakerjaan & BPJS Kesehatan
 1. **BPJS Ketenagakerjaan:**
    - **Jaminan Hari Tua (JHT):** 5,7% (Karyawan 2%, Perusahaan 3,7%).
    - **Jaminan Pensiun (JP):** 3% (Karyawan 1%, Perusahaan 2%) dengan batas plafon upah maksimal terkonfigurasi.
    - **Jaminan Kecelakaan Kerja (JKK):** 0,24% – 1,74% (sesuai tingkat risiko lingkungan kerja, ditanggung perusahaan).
    - **Jaminan Kematian (JKM):** 0,30% (ditanggung perusahaan).
+   - **Dasar iuran (fase 13):** gaji pokok + tunjangan bertanda `dasar_bpjs` (tunjangan tetap), tanpa lembur; dihitung per masa atas dasar sebulan yang dibatasi. Batas JP 11.086.300 sejak Maret 2026 (berubah setiap Maret). `FLAT_DAILY` tanpa BPJS.
 2. **BPJS Kesehatan:**
    - Total 5% (Karyawan 1%, Perusahaan 4%) dengan batas plafon upah maksimal terkonfigurasi.
 

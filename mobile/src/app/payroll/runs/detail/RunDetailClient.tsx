@@ -26,6 +26,12 @@ import {
   type PayrollRunDetail,
   transitionPayrollStatus,
 } from "@/lib/gateways/payroll";
+import {
+  bacaPajakSnapshot,
+  catatanPajakRun,
+  LABEL_TANDA_PAJAK,
+  labelPph,
+} from "@/lib/validations/pajak";
 import { IZIN_UNDUH, STATUS_RUN_TRANSFER } from "@/lib/validations/transfer";
 
 /*
@@ -134,6 +140,9 @@ export default function RunDetailClient() {
   const canTransfer =
     IZIN_UNDUH.every((izin) => hasPermission(user, izin)) &&
     (STATUS_RUN_TRANSFER as readonly string[]).includes(status);
+  const catatanPajak = catatanPajakRun(
+    items.map((item) => item.breakdown_snapshot || "{}"),
+  );
 
   const transitions: Transition[] = [];
   if (hasPermission(user, "payroll.run.create") && status === "DRAFT") {
@@ -356,6 +365,14 @@ export default function RunDetailClient() {
             </div>
           ) : (
             <ul className="flex flex-col gap-2">
+              {catatanPajak ? (
+                <li
+                  id="catatan-pajak-run"
+                  className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-100"
+                >
+                  {catatanPajak}
+                </li>
+              ) : null}
               {items.map((item) => (
                 <li
                   key={item.id}
@@ -422,6 +439,25 @@ export default function RunDetailClient() {
                       <dd className="font-mono font-bold text-rose-300">
                         {IDR.format(item.pph21_amount)}
                       </dd>
+                      {(() => {
+                        const pajak = bacaPajakSnapshot(
+                          item.breakdown_snapshot || "{}",
+                        );
+                        return pajak ? (
+                          <dd className="mt-0.5 text-[11px] text-slate-400">
+                            {labelPph(
+                              pajak,
+                              item.pph21_amount,
+                              item.ptkp_status,
+                            )}
+                            {pajak.tanda.map((t) => (
+                              <span key={t} className="block text-amber-200">
+                                {LABEL_TANDA_PAJAK[t]}
+                              </span>
+                            ))}
+                          </dd>
+                        ) : null;
+                      })()}
                     </div>
                   </dl>
                   <Link

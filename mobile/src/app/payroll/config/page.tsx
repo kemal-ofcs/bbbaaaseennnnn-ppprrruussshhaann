@@ -107,6 +107,8 @@ interface ComponentDraft {
   value: string;
   applies_to: string;
   is_active: number;
+  /** 1 = tunjangan tetap, ikut dasar BPJS (v45). */
+  dasar_bpjs: number;
 }
 
 type DeleteTarget =
@@ -453,6 +455,7 @@ export default function MobilePayrollConfigPage() {
       value: "0",
       applies_to: "ALL",
       is_active: 1,
+      dasar_bpjs: 0,
     });
   };
 
@@ -466,6 +469,7 @@ export default function MobilePayrollConfigPage() {
       value: String(comp.default_value),
       applies_to: comp.applies_to || "ALL",
       is_active: comp.is_active,
+      dasar_bpjs: comp.dasar_bpjs === 1 ? 1 : 0,
     });
   };
 
@@ -511,6 +515,17 @@ export default function MobilePayrollConfigPage() {
             : (employeeNames.get(componentDraft.applies_to)?.nama ??
               componentDraft.applies_to),
       },
+      ...(componentDraft.category === "ALLOWANCE"
+        ? [
+            {
+              label: "Dasar BPJS",
+              nilai:
+                componentDraft.dasar_bpjs === 1
+                  ? "Ya, tunjangan tetap"
+                  : "Tidak",
+            },
+          ]
+        : []),
     ]);
     if (!lanjut) return;
     isSubmittingRef.current = true;
@@ -525,6 +540,10 @@ export default function MobilePayrollConfigPage() {
         default_value: value,
         applies_to: componentDraft.applies_to,
         is_active: componentDraft.is_active,
+        dasar_bpjs:
+          componentDraft.category === "ALLOWANCE"
+            ? componentDraft.dasar_bpjs
+            : 0,
       });
       triggerHaptic("success");
       setComponentDraft(null);
@@ -1247,6 +1266,33 @@ export default function MobilePayrollConfigPage() {
                 className={`${CONFIG_INPUT_CLASS} font-mono`}
               />
             </div>
+            {componentDraft.category === "ALLOWANCE" ? (
+              <label
+                htmlFor="m-component-dasar-bpjs"
+                className="flex min-h-11 items-start gap-2 text-sm text-slate-300"
+              >
+                <input
+                  id="m-component-dasar-bpjs"
+                  type="checkbox"
+                  checked={componentDraft.dasar_bpjs === 1}
+                  onChange={(event) =>
+                    setComponentDraft((prev) =>
+                      prev
+                        ? { ...prev, dasar_bpjs: event.target.checked ? 1 : 0 }
+                        : prev,
+                    )
+                  }
+                  className="mt-1"
+                />
+                <span>
+                  Tunjangan tetap (dasar BPJS)
+                  <span className="block text-xs text-slate-500">
+                    BPJS dihitung dari gaji pokok ditambah tunjangan yang
+                    dicentang.
+                  </span>
+                </span>
+              </label>
+            ) : null}
           </>
         ) : null}
       </ConfigFormModal>

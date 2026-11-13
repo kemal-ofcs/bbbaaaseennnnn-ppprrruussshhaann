@@ -113,7 +113,13 @@ for (const file of filesToSync) {
 // karena `mobile/payroll.rs` sudah dipakai command baca-saja `mobile_*`
 // (slip & estimasi karyawan). Command-nya tetap bernama `desktop_*` supaya
 // gateway `payroll.ts` yang sama dipakai kedua build tanpa cabang baru.
-const payrollAdminFiles = ["mod.rs", "commands.rs", "engine.rs", "models.rs"];
+const payrollAdminFiles = [
+  "mod.rs",
+  "commands.rs",
+  "engine.rs",
+  "models.rs",
+  "pajak.rs",
+];
 const payrollAdminDest = join(mobileDir, "payroll_admin");
 mkdirSync(payrollAdminDest, { recursive: true });
 for (const file of payrollAdminFiles) {
