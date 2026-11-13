@@ -1,16 +1,17 @@
 # ANTISLOP.md — hasil antislop
 
-- Waktu: 13 November 2026 15:58 WIB
-- Commit: 9310e63 (+ 4 berkas diformat Biome)
+- Waktu: 13 November 2026 18:44 WIB
+- Commit: 9310e63 (+ 5 berkas berubah, belum commit)
 - Berkas disunting: 0
 
 ## Disunting
-(Tidak ada komentar AI-slop atau teks antarmuka yang perlu disunting)
+(Tidak ada — komentar menjelaskan alasan arsitektur/fallback dan teks UI sudah ringkas, lugas, dan bebas AI-slop)
 
 ## Dilewati
-- `scripts/schema-audit.ts` — diformat Biome, struktur audit skema tetap utuh dan lulus 100%
-- `scripts/lib/cloud-schema.ts` — diformat Biome
-- `scripts/inspect-local-db.ts` — diformat Biome
-- `scripts/generate_doc_pdf.js` — diformat Biome
+- `prd-hris.md` — dokumen catatan perencanaan HRIS
+- `web-desktop/src/app/operators/page.tsx` — komentar dan teks UI tautan personil sudah bersih
+- `mobile/src/app/operators/page.tsx` — padanan mobile, bersih dan ringkas
+- `web-desktop/src/components/perjalanan/FormSuratJalan.tsx` — komentar alasan pencocokan lokasi dan teks peringatan sudah tepat
+- `mobile/src/components/perjalanan/FormSuratJalan.tsx` — padanan mobile, bersih dan tepat
 
 ## Perlu tindakan

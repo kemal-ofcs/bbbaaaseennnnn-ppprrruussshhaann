@@ -6289,8 +6289,8 @@ Mobile 313, tanpa izin baru. Gerbang yang dijalankan:
 - Typecheck kedua workspace dan Biome berkas yang diubah bersih; `cargo check`
   tanpa peringatan baru.
 
-`bun run check` penuh belum dijalankan (pemilik). Layar belum dicoba di
-aplikasi yang berjalan (tema gelap dan terang, lebar 360 px).
+`bun run check` penuh lulus (dijalankan pemilik, 13 Nov 2026). Layar belum
+dicoba di aplikasi yang berjalan (tema gelap dan terang, lebar 360 px).
 
 Penyimpangan dan catatan, untuk ditinjau:
 

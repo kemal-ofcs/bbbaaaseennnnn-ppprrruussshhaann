@@ -12,6 +12,7 @@ import { PilihCari } from "@/components/ui/PilihCari";
 import { hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
+import { getDaftarKaryawan } from "@/lib/gateways/employee";
 import {
   createOperator,
   createRole,
@@ -54,7 +55,29 @@ const EMPTY_OPERATOR: OperatorDraft = {
   password: "",
   roleId: 0,
   status: "Aktif",
+  idKaryawan: null,
 };
+
+interface PersonilPilihan {
+  id: string;
+  label: string;
+  aktif: boolean;
+}
+
+function bacaPersonil(rows: Record<string, unknown>[]): PersonilPilihan[] {
+  return rows
+    .map((row) => {
+      const divisi = String(row.divisi ?? "").trim();
+      return {
+        id: String(row.id_unik ?? ""),
+        label: `${String(row.nama ?? "")} (${String(row.id_unik ?? "")})${
+          divisi ? ` · ${divisi}` : ""
+        }`,
+        aktif: String(row.status_aktif ?? "Aktif") === "Aktif",
+      };
+    })
+    .filter((item) => item.id);
+}
 
 const EDITABLE_PERMISSION_GROUPS = PERMISSION_CATALOG.filter(
   ({ key }) => !SUPERADMIN_ONLY_PERMISSIONS.has(key),
@@ -122,6 +145,7 @@ export default function MobileMasterOperatorPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("operators");
   const [operators, setOperators] = useState<OperatorRecord[]>([]);
   const [roles, setRoles] = useState<RoleRecord[]>([]);
+  const [personil, setPersonil] = useState<PersonilPilihan[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   // State `saving` baru terbaca pada render berikutnya, jadi dua ketukan dalam
@@ -178,13 +202,18 @@ export default function MobileMasterOperatorPage() {
       if (!user?.isSuperadmin) return;
       if (!silent) setLoading(true);
       try {
-        const [operatorData, roleData, security] = await Promise.all([
-          getMasterOperators(user.id),
-          getRoleRecords(user.id),
-          getScanSecurity(),
-        ]);
+        const [operatorData, roleData, security, personilData] =
+          await Promise.all([
+            getMasterOperators(user.id),
+            getRoleRecords(user.id),
+            getScanSecurity(),
+            // Daftar personil hanya untuk isian tautan; gagal memuatnya tidak
+            // boleh menahan halaman operator.
+            getDaftarKaryawan().catch(() => []),
+          ]);
         setOperators(operatorData);
         setRoles(roleData);
+        setPersonil(bacaPersonil(personilData));
         setScanSecurity({
           photoEnabled: security.photoEnabled,
           ipRestrictionEnabled: security.ipRestrictionEnabled,
@@ -254,6 +283,7 @@ export default function MobileMasterOperatorPage() {
       password: "",
       roleId: operator.roleId,
       status: operator.status,
+      idKaryawan: operator.idKaryawan,
     });
     setOperatorModal(true);
   };
@@ -272,6 +302,13 @@ export default function MobileMasterOperatorPage() {
         nilai: roles.find((role) => role.id === operatorDraft.roleId)?.name,
       },
       { label: "Status", nilai: operatorDraft.status },
+      {
+        label: "Personil",
+        nilai: operatorDraft.idKaryawan
+          ? (personil.find((item) => item.id === operatorDraft.idKaryawan)
+              ?.label ?? operatorDraft.idKaryawan)
+          : "Tidak ditautkan",
+      },
       {
         label: "Password",
         nilai: operatorDraft.password
@@ -576,6 +613,7 @@ export default function MobileMasterOperatorPage() {
         editingOperator={editingOperator}
         draft={operatorDraft}
         roles={roles}
+        personil={personil}
         saving={saving}
         onChange={setOperatorDraft}
         onClose={() => {
@@ -678,6 +716,11 @@ function OperatorCard({
             <span className="text-[10px] font-bold text-sky-300">
               Akun aktif
             </span>
+          ) : null}
+          {operator.idKaryawan ? (
+            <p className="truncate text-[11px] text-slate-400">
+              Personil: {operator.idKaryawan}
+            </p>
           ) : null}
         </div>
         <Pill tone={operator.status === "Aktif" ? "success" : "neutral"}>
@@ -817,6 +860,7 @@ function OperatorFormModal({
   editingOperator,
   draft,
   roles,
+  personil,
   saving,
   onChange,
   onClose,
@@ -826,6 +870,7 @@ function OperatorFormModal({
   editingOperator: OperatorRecord | null;
   draft: OperatorDraft;
   roles: RoleRecord[];
+  personil: PersonilPilihan[];
   saving: boolean;
   onChange: (draft: OperatorDraft) => void;
   onClose: () => void;
@@ -993,6 +1038,33 @@ function OperatorFormModal({
             </select>
           </FormField>
         </div>
+        <FormField label="Personil (data karyawan)" htmlFor="operator-personil">
+          <PilihCari
+            id="operator-personil"
+            value={draft.idKaryawan ?? ""}
+            onChange={(event) =>
+              onChange({ ...draft, idKaryawan: event.target.value || null })
+            }
+            className={INPUT_CLASS}
+          >
+            <option value="">Tidak ditautkan</option>
+            {personil
+              .filter((item) => item.aktif || item.id === draft.idKaryawan)
+              .map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.aktif ? item.label : `${item.label} (nonaktif)`}
+                </option>
+              ))}
+            {draft.idKaryawan &&
+            !personil.some((item) => item.id === draft.idKaryawan) ? (
+              <option value={draft.idKaryawan}>{draft.idKaryawan}</option>
+            ) : null}
+          </PilihCari>
+        </FormField>
+        <p className="text-[11px] leading-4 text-slate-500">
+          Wajib untuk akun Driver: laporan perjalanan dari HP dicatat atas nama
+          personil ini. Satu personil hanya boleh punya satu akun aktif.
+        </p>
         <ModalActions saving={saving} onCancel={onClose} />
       </form>
     </Modal>
