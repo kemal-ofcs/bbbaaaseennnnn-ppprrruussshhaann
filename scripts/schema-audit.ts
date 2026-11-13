@@ -49,10 +49,14 @@ function heading(text: string) {
 
 function renderDiff(diff: SchemaDiff, leftLabel: string, rightLabel: string) {
   for (const table of diff.missingTables) {
-    console.log(`    • tabel '${table}' ada di ${leftLabel}, TIDAK ada di ${rightLabel}`);
+    console.log(
+      `    • tabel '${table}' ada di ${leftLabel}, TIDAK ada di ${rightLabel}`,
+    );
   }
   for (const table of diff.extraTables) {
-    console.log(`    • tabel '${table}' ada di ${rightLabel}, TIDAK ada di ${leftLabel}`);
+    console.log(
+      `    • tabel '${table}' ada di ${rightLabel}, TIDAK ada di ${leftLabel}`,
+    );
   }
   for (const entry of diff.columnDiffs) {
     if (entry.missing.length > 0) {
@@ -115,12 +119,18 @@ async function buildWebSchema(): Promise<TableSchema> {
   return schemaFromJson(JSON.parse(process_.stdout.toString()));
 }
 
-console.log("══════════════════════════════════════════════════════════════════════");
+console.log(
+  "══════════════════════════════════════════════════════════════════════",
+);
 console.log("   Absensi SPPG — Audit Konsistensi Skema 4-Layer");
-console.log("══════════════════════════════════════════════════════════════════════");
+console.log(
+  "══════════════════════════════════════════════════════════════════════",
+);
 
 const desktopTurso = readSource("web-desktop/src-tauri/src/desktop/turso.rs");
-const desktopStorage = readSource("web-desktop/src-tauri/src/desktop/storage.rs");
+const desktopStorage = readSource(
+  "web-desktop/src-tauri/src/desktop/storage.rs",
+);
 const desktopSync = readSource("web-desktop/src-tauri/src/desktop/sync.rs");
 const mobileTurso = readSource("mobile/src-tauri/src/mobile/turso.rs");
 const mobileStorage = readSource("mobile/src-tauri/src/mobile/storage.rs");
@@ -150,7 +160,9 @@ check(
   "Web",
 );
 for (const table of CLOUD_ONLY_IN_RUST) {
-  console.log(`  ℹ️  '${table}' sengaja hanya dibuat jalur Rust (lihat CLOUD_ONLY_IN_RUST).`);
+  console.log(
+    `  ℹ️  '${table}' sengaja hanya dibuat jalur Rust (lihat CLOUD_ONLY_IN_RUST).`,
+  );
 }
 
 // ── 2. Definisi repair vs definisi utama ────────────────────────────────────
@@ -284,7 +296,9 @@ if (requiredTables.length === 0) {
   const notInWeb = requiredTables.filter((table) => !web.has(table));
 
   if (notInRust.length === 0 && notInWeb.length === 0) {
-    console.log(`  ✅ ${requiredTables.length} tabel wajib dibuat oleh kedua jalur`);
+    console.log(
+      `  ✅ ${requiredTables.length} tabel wajib dibuat oleh kedua jalur`,
+    );
   } else {
     failures++;
     console.log(`  ❌ Tabel wajib tidak terbentuk`);
@@ -297,9 +311,8 @@ if (requiredTables.length === 0) {
   const declaredCount = Number(
     schemaTs.match(/REQUIRED_TABLE_COUNT\s*=\s*(\d+)/)?.[1] ?? 0,
   );
-  const derivedCount = /REQUIRED_TABLE_COUNT\s*=\s*REQUIRED_TABLES\.length/.test(
-    schemaTs,
-  );
+  const derivedCount =
+    /REQUIRED_TABLE_COUNT\s*=\s*REQUIRED_TABLES\.length/.test(schemaTs);
 
   if (derivedCount) {
     console.log(
@@ -311,7 +324,9 @@ if (requiredTables.length === 0) {
       `  ❌ REQUIRED_TABLE_COUNT = ${declaredCount} tetapi daftarnya berisi ${requiredTables.length} tabel`,
     );
   } else {
-    console.log(`  ✅ REQUIRED_TABLE_COUNT cocok dengan panjang daftarnya (${declaredCount})`);
+    console.log(
+      `  ✅ REQUIRED_TABLE_COUNT cocok dengan panjang daftarnya (${declaredCount})`,
+    );
   }
 }
 
@@ -337,7 +352,8 @@ const expectedDomains: [string, string][] = [
 
 const missingDomains = expectedDomains.filter(
   ([first, second]) =>
-    !desktopTurso.includes(`"${first}"`) && !desktopTurso.includes(`"${second}"`),
+    !desktopTurso.includes(`"${first}"`) &&
+    !desktopTurso.includes(`"${second}"`),
 );
 
 if (missingDomains.length === 0) {
@@ -375,10 +391,14 @@ for (const relativePath of transportModules) {
   const problems: string[] = [];
 
   if (/\bCREATE\s+TABLE\b/i.test(code)) {
-    problems.push("memuat CREATE TABLE — DDL hanya boleh lahir dari ensure_schema()");
+    problems.push(
+      "memuat CREATE TABLE — DDL hanya boleh lahir dari ensure_schema()",
+    );
   }
   if (code.includes("Statement::new")) {
-    problems.push("menyusun Statement sendiri — transport hanya boleh meneruskannya");
+    problems.push(
+      "menyusun Statement sendiri — transport hanya boleh meneruskannya",
+    );
   }
   if (/DatabaseProvider::/.test(code)) {
     problems.push(
@@ -439,7 +459,9 @@ const excluded = new Set(
 
 if (planned.size === 0) {
   failures++;
-  console.log("  ❌ PROMOTION_PLAN tidak dapat dibaca dari database-promotion.ts.");
+  console.log(
+    "  ❌ PROMOTION_PLAN tidak dapat dibaca dari database-promotion.ts.",
+  );
 } else {
   const unaccounted = [...cloudDesktop.keys()]
     .filter((table) => !planned.has(table) && !excluded.has(table))

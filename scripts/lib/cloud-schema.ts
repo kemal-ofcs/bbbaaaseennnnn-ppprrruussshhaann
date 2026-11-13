@@ -229,7 +229,10 @@ export function buildRepairSchema(tursoSource: string): TableSchema {
 }
 
 export function buildLocalSchema(storageSource: string): TableSchema {
-  return buildSchemaFromDdl(collectLocalDdl(storageSource), "lokal (storage.rs)");
+  return buildSchemaFromDdl(
+    collectLocalDdl(storageSource),
+    "lokal (storage.rs)",
+  );
 }
 
 /** Baca tabel dan kolom sebuah database lewat PRAGMA. */

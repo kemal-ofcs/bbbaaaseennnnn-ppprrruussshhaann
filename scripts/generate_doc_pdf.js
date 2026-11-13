@@ -1,32 +1,35 @@
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-const { marked } = require('marked');
+const fs = require("fs");
+const path = require("path");
+const { execSync } = require("child_process");
+const { marked } = require("marked");
 
-const mdPath = path.resolve(__dirname, '../PANDUAN_LENGKAP_APLIKASI_SPPG.md');
-const htmlPath = path.resolve(__dirname, '../PANDUAN_LENGKAP_APLIKASI_SPPG.html');
-const pdfPath = path.resolve(__dirname, '../PANDUAN_LENGKAP_APLIKASI_SPPG.pdf');
+const mdPath = path.resolve(__dirname, "../PANDUAN_LENGKAP_APLIKASI_SPPG.md");
+const htmlPath = path.resolve(
+  __dirname,
+  "../PANDUAN_LENGKAP_APLIKASI_SPPG.html",
+);
+const pdfPath = path.resolve(__dirname, "../PANDUAN_LENGKAP_APLIKASI_SPPG.pdf");
 
-const mdContent = fs.readFileSync(mdPath, 'utf8');
+const mdContent = fs.readFileSync(mdPath, "utf8");
 
 // Custom Marked Renderer
 const renderer = new marked.Renderer();
 
 // Custom Heading
-renderer.heading = function({ text, depth }) {
+renderer.heading = function ({ text, depth }) {
   if (depth === 1) {
     // Title is already on cover page
-    return '';
+    return "";
   }
 
-  const cleanText = text.replace(/<[^>]*>/g, '');
-  const id = cleanText.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const cleanText = text.replace(/<[^>]*>/g, "");
+  const id = cleanText.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
   if (depth === 2) {
-    if (cleanText.startsWith('BAB ')) {
-      const parts = cleanText.split(':');
+    if (cleanText.startsWith("BAB ")) {
+      const parts = cleanText.split(":");
       const babNum = parts[0].trim();
-      const babTitle = parts.slice(1).join(':').trim();
+      const babTitle = parts.slice(1).join(":").trim();
       return `
         <div class="chapter-break"></div>
         <div class="chapter-header" id="${id}">
@@ -35,7 +38,7 @@ renderer.heading = function({ text, depth }) {
         </div>
       `;
     }
-    if (cleanText === 'DAFTAR ISI') {
+    if (cleanText === "DAFTAR ISI") {
       return `
         <div class="toc-header">
           <h2 class="toc-title">DAFTAR ISI</h2>
@@ -50,7 +53,7 @@ renderer.heading = function({ text, depth }) {
   }
 
   if (depth === 4) {
-    if (cleanText.startsWith('Q') && cleanText.includes(':')) {
+    if (cleanText.startsWith("Q") && cleanText.includes(":")) {
       return `
         <div class="faq-question">
           <span class="faq-q-badge">FAQ</span>
@@ -65,82 +68,87 @@ renderer.heading = function({ text, depth }) {
 };
 
 // Custom Code Block
-renderer.code = function({ text, lang }) {
+renderer.code = function ({ text, lang }) {
   const rawCode = text;
 
-  if (lang === 'mermaid') {
+  if (lang === "mermaid") {
     return renderMermaidSteps(rawCode);
   }
-  if (lang === 'text' && rawCode.includes('CLOUD SERVER & DATABASE')) {
+  if (lang === "text" && rawCode.includes("CLOUD SERVER & DATABASE")) {
     return renderArchitectureDiagram(rawCode);
   }
-  if (lang === 'text' && rawCode.includes('ALUR SETUP AWAL APLIKASI')) {
+  if (lang === "text" && rawCode.includes("ALUR SETUP AWAL APLIKASI")) {
     return renderSetupFlowBox(rawCode);
   }
-  if (lang === 'text' && rawCode.includes('PROVISIONING SATU KALI')) {
+  if (lang === "text" && rawCode.includes("PROVISIONING SATU KALI")) {
     return renderProvisioningBox(rawCode);
   }
-  if (lang === 'text' && rawCode.includes('FITUR SCANNER QR CODE')) {
+  if (lang === "text" && rawCode.includes("FITUR SCANNER QR CODE")) {
     return renderScannerMatrix(rawCode);
   }
-  if (lang === 'text' && rawCode.includes('DYNAMIC ID CARD STUDIO')) {
+  if (lang === "text" && rawCode.includes("DYNAMIC ID CARD STUDIO")) {
     return renderIdStudioBox(rawCode);
   }
-  if (lang === 'text' && rawCode.includes('STANDAR OPERASIONAL PEMINDAIAN QR')) {
+  if (
+    lang === "text" &&
+    rawCode.includes("STANDAR OPERASIONAL PEMINDAIAN QR")
+  ) {
     return renderSopBox(rawCode);
   }
 
-  const langTag = lang ? `<div class="code-lang-tag">${lang.toUpperCase()}</div>` : '';
+  const langTag = lang
+    ? `<div class="code-lang-tag">${lang.toUpperCase()}</div>`
+    : "";
   const escaped = rawCode
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 
   return `
     <div class="code-block-wrapper">
       ${langTag}
-      <pre><code class="language-${lang || 'text'}">${escaped}</code></pre>
+      <pre><code class="language-${lang || "text"}">${escaped}</code></pre>
     </div>
   `;
 };
 
 // Custom Table
-renderer.table = function({ header, rows }) {
-  let headerHtml = '<thead><tr>';
+renderer.table = function ({ header, rows }) {
+  let headerHtml = "<thead><tr>";
   for (let cell of header) {
     headerHtml += `<th>${marked.parseInline(cell.text)}</th>`;
   }
-  headerHtml += '</tr></thead>';
+  headerHtml += "</tr></thead>";
 
-  let bodyHtml = '<tbody>';
+  let bodyHtml = "<tbody>";
   for (let row of rows) {
-    bodyHtml += '<tr>';
+    bodyHtml += "<tr>";
     for (let cell of row) {
       let formattedCell = marked.parseInline(cell.text);
       formattedCell = formatBadges(formattedCell);
       bodyHtml += `<td>${formattedCell}</td>`;
     }
-    bodyHtml += '</tr>';
+    bodyHtml += "</tr>";
   }
-  bodyHtml += '</tbody>';
+  bodyHtml += "</tbody>";
 
   return `<div class="table-container"><table>${headerHtml}${bodyHtml}</table></div>`;
 };
 
 // Custom Paragraph
-renderer.paragraph = function({ text }) {
-  if (text.startsWith('### (Web Admin Cloud')) {
-    return ''; // Included in cover page
+renderer.paragraph = function ({ text }) {
+  if (text.startsWith("### (Web Admin Cloud")) {
+    return ""; // Included in cover page
   }
-  if (text.startsWith('**Jawab**:')) {
+  if (text.startsWith("**Jawab**:")) {
     let parsed = marked.parseInline(text);
     return `<div class="faq-answer">${parsed}</div>`;
   }
-  if (text.startsWith('$$') && text.endsWith('$$')) {
+  if (text.startsWith("$$") && text.endsWith("$$")) {
     const formula = text.slice(2, -2).trim();
     return `<div class="math-block"><div class="math-formula">${formula}</div></div>`;
   }
-  if (text.startsWith('*Dokumen ini merupakan')) {
+  if (text.startsWith("*Dokumen ini merupakan")) {
     let parsed = marked.parseInline(text);
     return `<div class="doc-footer-notice">${parsed}</div>`;
   }
@@ -153,30 +161,88 @@ renderer.paragraph = function({ text }) {
 // Helper badge formatter
 function formatBadges(str) {
   return str
-    .replace(/<strong>Hadir Tepat Waktu<\/strong>/g, '<span class="badge badge-success">Hadir Tepat Waktu</span>')
-    .replace(/<strong>Terlambat<\/strong>/g, '<span class="badge badge-warning">Terlambat</span>')
-    .replace(/<strong>Pulang Cepat<\/strong>/g, '<span class="badge badge-orange">Pulang Cepat</span>')
-    .replace(/<strong>Pulang Normal \/ Lembur<\/strong>/g, '<span class="badge badge-info">Pulang Normal / Lembur</span>')
-    .replace(/<strong>Alfa \(Tidak Hadir\)<\/strong>/g, '<span class="badge badge-danger">Alfa (Tidak Hadir)</span>')
-    .replace(/<strong>Alfa<\/strong>/g, '<span class="badge badge-danger">Alfa</span>')
-    .replace(/<strong>Izin \/ Sakit \/ Dispensasi \/ Cuti<\/strong>/g, '<span class="badge badge-blue">Izin / Sakit / Dispen / Cuti</span>')
-    .replace(/<strong>Libur \(Tidak dibangkitkan Alfa\)<\/strong>/g, '<span class="badge badge-purple">Libur</span>');
+    .replace(
+      /<strong>Hadir Tepat Waktu<\/strong>/g,
+      '<span class="badge badge-success">Hadir Tepat Waktu</span>',
+    )
+    .replace(
+      /<strong>Terlambat<\/strong>/g,
+      '<span class="badge badge-warning">Terlambat</span>',
+    )
+    .replace(
+      /<strong>Pulang Cepat<\/strong>/g,
+      '<span class="badge badge-orange">Pulang Cepat</span>',
+    )
+    .replace(
+      /<strong>Pulang Normal \/ Lembur<\/strong>/g,
+      '<span class="badge badge-info">Pulang Normal / Lembur</span>',
+    )
+    .replace(
+      /<strong>Alfa \(Tidak Hadir\)<\/strong>/g,
+      '<span class="badge badge-danger">Alfa (Tidak Hadir)</span>',
+    )
+    .replace(
+      /<strong>Alfa<\/strong>/g,
+      '<span class="badge badge-danger">Alfa</span>',
+    )
+    .replace(
+      /<strong>Izin \/ Sakit \/ Dispensasi \/ Cuti<\/strong>/g,
+      '<span class="badge badge-blue">Izin / Sakit / Dispen / Cuti</span>',
+    )
+    .replace(
+      /<strong>Libur \(Tidak dibangkitkan Alfa\)<\/strong>/g,
+      '<span class="badge badge-purple">Libur</span>',
+    );
 }
 
 // Visual Component Renderers
 function renderMermaidSteps(raw) {
   const steps = [
-    { num: '1', title: 'Buat DB Turso', desc: 'Database tenant mandiri & auth token isolasi' },
-    { num: '2', title: 'Deploy Web Server', desc: 'Next.js 16 API ke Vercel/VPS + Custom Domain' },
-    { num: '3', title: 'Provisioning Superadmin', desc: 'Inisialisasi schema & akun SPD001 pertama' },
-    { num: '4', title: 'Uji Web Admin Portal', desc: 'Verifikasi login & modul dashboard operational' },
-    { num: '5', title: 'Compile Desktop Setup', desc: 'Build release NSIS Installer (.exe/.msi)' },
-    { num: '6', title: 'Compile Mobile APK', desc: 'Build release APK Android ARM64/Split' },
-    { num: '7', title: 'Uji Offline & Sync', desc: 'Verifikasi Outbox SQLite & Push Cloud' },
-    { num: '8', title: 'Serah Terima Customer', desc: 'Penyerahan kredensial, APK, Desktop, & Manual' }
+    {
+      num: "1",
+      title: "Buat DB Turso",
+      desc: "Database tenant mandiri & auth token isolasi",
+    },
+    {
+      num: "2",
+      title: "Deploy Web Server",
+      desc: "Next.js 16 API ke Vercel/VPS + Custom Domain",
+    },
+    {
+      num: "3",
+      title: "Provisioning Superadmin",
+      desc: "Inisialisasi schema & akun SPD001 pertama",
+    },
+    {
+      num: "4",
+      title: "Uji Web Admin Portal",
+      desc: "Verifikasi login & modul dashboard operational",
+    },
+    {
+      num: "5",
+      title: "Compile Desktop Setup",
+      desc: "Build release NSIS Installer (.exe/.msi)",
+    },
+    {
+      num: "6",
+      title: "Compile Mobile APK",
+      desc: "Build release APK Android ARM64/Split",
+    },
+    {
+      num: "7",
+      title: "Uji Offline & Sync",
+      desc: "Verifikasi Outbox SQLite & Push Cloud",
+    },
+    {
+      num: "8",
+      title: "Serah Terima Customer",
+      desc: "Penyerahan kredensial, APK, Desktop, & Manual",
+    },
   ];
 
-  let cards = steps.map(s => `
+  let cards = steps
+    .map(
+      (s) => `
     <div class="step-card">
       <div class="step-number">${s.num}</div>
       <div class="step-content">
@@ -184,7 +250,9 @@ function renderMermaidSteps(raw) {
         <div class="step-desc">${s.desc}</div>
       </div>
     </div>
-  `).join('');
+  `,
+    )
+    .join("");
 
   return `
     <div class="pipeline-wrapper">
@@ -268,15 +336,19 @@ function renderSetupFlowBox(raw) {
     "Input Kalender Hari Libur Nasional & Khusus Instansi",
     "Buat Akun Operator & Role Hak Akses (Admin, Manajer, Scanner)",
     "Masukkan Data Karyawan (Input Form / Import Excel)",
-    "Desain Template di ID Card Studio & Cetak Kartu Karyawan"
+    "Desain Template di ID Card Studio & Cetak Kartu Karyawan",
   ];
 
-  let items = steps.map((s, idx) => `
+  let items = steps
+    .map(
+      (s, idx) => `
     <div class="setup-flow-item">
       <span class="setup-flow-num">${idx + 1}</span>
       <span class="setup-flow-text">${s}</span>
     </div>
-  `).join('');
+  `,
+    )
+    .join("");
 
   return `
     <div class="setup-flow-card">
@@ -448,15 +520,18 @@ bodyContent = bodyContent.replace(
   /<div class="toc-header">[\s\S]*?<ol>([\s\S]*?)<\/ol>/,
   (match, listItems) => {
     // Convert list items to toc cards
-    const cardItems = listItems.replace(/<li><a href="([^"]+)">BAB (\d+): (.*?)<\/a><\/li>/g, (m, href, num, title) => {
-      return `
+    const cardItems = listItems.replace(
+      /<li><a href="([^"]+)">BAB (\d+): (.*?)<\/a><\/li>/g,
+      (m, href, num, title) => {
+        return `
         <a href="${href}" class="toc-item">
           <span class="toc-num">BAB ${num}</span>
           <span class="toc-text">${title}</span>
           <span class="toc-arrow">➔</span>
         </a>
       `;
-    });
+      },
+    );
 
     return `
       <div class="toc-container">
@@ -468,7 +543,7 @@ bodyContent = bodyContent.replace(
         </div>
       </div>
     `;
-  }
+  },
 );
 
 const fullHTML = `<!DOCTYPE html>
@@ -1564,17 +1639,17 @@ const fullHTML = `<!DOCTYPE html>
 </html>
 `;
 
-fs.writeFileSync(htmlPath, fullHTML, 'utf8');
-console.log('Generated HTML at:', htmlPath);
+fs.writeFileSync(htmlPath, fullHTML, "utf8");
+console.log("Generated HTML at:", htmlPath);
 
 // Execute Chrome to render PDF
 const chromeExe = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
-const chromeCmd = `"${chromeExe}" --headless=new --disable-gpu --no-pdf-header-footer --print-to-pdf="${pdfPath}" "file:///${htmlPath.replace(/\\/g, '/')}"`;
+const chromeCmd = `"${chromeExe}" --headless=new --disable-gpu --no-pdf-header-footer --print-to-pdf="${pdfPath}" "file:///${htmlPath.replace(/\\/g, "/")}"`;
 
-console.log('Executing Chrome PDF generation...');
+console.log("Executing Chrome PDF generation...");
 try {
-  execSync(chromeCmd, { stdio: 'inherit' });
-  console.log('SUCCESS: PDF Generated at:', pdfPath);
+  execSync(chromeCmd, { stdio: "inherit" });
+  console.log("SUCCESS: PDF Generated at:", pdfPath);
 } catch (err) {
-  console.error('Error generating PDF:', err);
+  console.error("Error generating PDF:", err);
 }

@@ -1,16 +1,24 @@
 # HASIL.md — hasil `bun run check`
 
-- Waktu: 12 November 2026, 14:39 WIB
-- Commit: edf05d8 (+ 1 berkas berubah, belum commit)
+- Waktu: 13 November 2026 16:28 WIB
+- Commit: 9310e63 (+ 6 berkas berubah, belum commit)
 - Perintah: `bun run check` (root)
 - Exit code: 0
 - Status: **LULUS**
 - Log penuh: `.claude/check.log`
 
 ## Gate yang gagal
-(tidak ada — seluruh gate lulus)
+| Gate | Status |
+| :--- | :--- |
+| `audit:schema` (scripts/schema-audit.ts) | Lulus |
+| `audit:contract` (.agents/skills/absensi-sppg-rules/scripts/audit-sync-contract.ts) | Lulus |
+| `audit:docs` (.agents/skills/absensi-sppg-rules/scripts/audit-docs.ts) | Lulus |
+| `web-desktop` (`lint` + `typecheck` + `bun test` + `cargo test`) | Lulus |
+| `mobile` (`lint` + `typecheck` + `bun test` + `cargo test`) | Lulus |
+
+## Galat (maks 10, urutan kemunculan)
+(Tidak ada galat)
 
 ## Catatan
-- Seluruh 5 gate (`audit:schema`, `audit:contract`, `audit:docs`, `web-desktop`, `mobile`) berstatus **LULUS**.
-- Total 90 route outbox kanonik, 68 tabel snapshot, 301 desktop Tauri commands, dan 307 mobile Tauri commands konsisten.
-- Unit & cargo test: seluruh pengujian TypeScript dan 440 tes Rust di kedua workspace lulus 100%.
+- Seluruh pengujian skema 4-layer, 90 rute kontrak sinkronisasi, dan audit dokumentasi berhasil 100%.
+- TypeScript typecheck, Biome lint, Bun test, dan 475+ cargo unit test di kedua workspace web-desktop dan mobile lulus tanpa kegagalan.

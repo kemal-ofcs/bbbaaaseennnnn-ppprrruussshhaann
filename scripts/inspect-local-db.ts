@@ -21,7 +21,9 @@ if (!fs.existsSync(targetDbPath)) {
 const db = new Database(targetDbPath);
 
 console.log("\n=== company_profile in desktop-security.db ===");
-console.log(JSON.stringify(db.query("SELECT * FROM company_profile").all(), null, 2));
+console.log(
+  JSON.stringify(db.query("SELECT * FROM company_profile").all(), null, 2),
+);
 
 console.log("\n=== id_card_template in desktop-security.db ===");
 console.log(
