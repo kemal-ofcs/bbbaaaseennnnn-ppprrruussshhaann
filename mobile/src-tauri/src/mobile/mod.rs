@@ -30,6 +30,8 @@ mod hr_kinerja;
 // oleh sync-rust-modules.ts.
 mod hr_rekrutmen;
 mod hr_pelatihan;
+// HRIS fase 12: SALINAN `desktop/transfer.rs` oleh sync-rust-modules.ts.
+mod transfer;
 // Notifikasi grup Telegram: SALINAN `desktop/telegram.rs` oleh sync-rust-modules.ts.
 pub mod telegram;
 // Lisensi offline Ed25519: SALINAN `desktop/license.rs` oleh sync-rust-modules.ts.

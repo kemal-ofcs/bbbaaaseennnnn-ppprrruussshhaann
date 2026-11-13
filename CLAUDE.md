@@ -1506,6 +1506,117 @@ dan 9 (Q-125); HP HRD butuh APK baru.
   (Cabang → Divisi, `<details>`). Garis dari border pseudo-element
   `slate-500`, tanpa CSS baru. Daftar berjenjang lama dihapus.
 
+## HRIS fase 11: rencana dan anggaran pelatihan (schema versi 43)
+
+Rincian dan keputusan pemilik di `prd-hris.md` §26 (Q-137 sampai Q-149).
+Logika di `desktop/hr_pelatihan.rs` (disalin ke Mobile) ↔
+`validations/hr-pelatihan.ts` + `services/hr-pelatihan.ts`, vektor sama; SQL
+kembar diperiksa harfiah oleh `hr-pelatihan.test.ts`, dan vektor
+`ringkas_anggaran` ↔ `ringkasAnggaran` satu berkas
+(`validations/hr-pelatihan-anggaran.vektor.json`, dibaca Rust lewat
+`include_str!`). Sentinel `-2039`, `REQUIRED_TABLE_COUNT` 104, command Desktop
+304 / Mobile 310, tanpa izin baru.
+
+- **Khusus cloud** (Q-138, pola Q-87): `hr_pelatihan_anggaran` (PK
+  `<tahun>:<id_divisi|umum>`, upsert `SIMPAN_PAGU_SQL`, dihapus barisnya,
+  tanpa riwayat, Q-149) dan `hr_pelatihan_rencana` (`rcn-<hex>`, dibatalkan,
+  tidak dihapus), plus kolom `hr_pelatihan.id_rencana` (kosong = di luar
+  rencana; `ensure_column`/`hasColumn`, indeks `idx_hr_pelatihan_rencana`
+  sesudahnya). `storage.rs`, snapshot, rute, dan `CLOUD_MIRRORED_TABLES` tidak
+  disentuh; `PROMOTION_PLAN` rencana → pelatihan → peserta.
+- **Tahun kalender = tahun `tanggal_mulai`** (Q-139). Pelatihan yang ditautkan
+  wajib setahun dengan rencananya (`periksa_rencana_pelatihan` ↔
+  `periksaRencanaPelatihan`, juga saat tautannya tetap); tahun rencana terkunci
+  selama ada pelatihan tertaut yang tidak batal, dan rencana bertaut tidak bisa
+  dibatalkan. Kedua larangan itu dieja ulang di `UBAH_RENCANA_SQL` /
+  `BATAL_RENCANA_SQL` supaya tautan yang lahir di sela pemeriksaan menang.
+  Build v42 masih bisa memindah tanggal tanpa menyentuh `id_rencana`, jadi
+  `REALISASI_SQL` juga membaca pelatihan tahun lain yang menautkan rencana
+  tahun itu (tanda `beda_tahun`).
+- **Tidak disimpan**: status rencana (`status_rencana` ↔ `statusRencana`:
+  Dibatalkan, Terlaksana, Berlangsung, Dijadwalkan, Terlewat, Belum
+  dijadwalkan) dan realisasi. Beban divisi = divisi rencananya, tanpa rencana
+  = Umum (Q-141). Terikat = biaya pelatihan Dijadwalkan, Terpakai = Berlangsung
+  + Selesai, Sisa = Pagu − keduanya, boleh minus (Q-142). Total pagu = jumlah
+  semua pagu tahun itu (Q-140); kelompok tanpa baris pagu bersisa kosong.
+- **Tanda, tidak menolak** (Q-143): `lewat_pagu`, `rencana_lewat_pagu`,
+  `tanpa_pagu`, dan per rencana `lewat_estimasi`, `beda_tahun`. Form
+  pelatihan menampilkan sisa pagu kelompoknya (biaya lama dikembalikan dulu
+  saat diubah) dan memperingatkan di `konfirmasiData`, lalu tetap menyimpan.
+- Divisi wajib aktif saat pagu dibuat atau divisi rencana berubah; pagu lama
+  untuk divisi nonaktif tetap bisa diubah. Realisasi adalah biaya yang dicatat
+  di pelatihan, bukan jurnal; pembukuan tetap jurnal manual tanpa akun baru
+  (Q-146).
+- RBAC (Q-145): baca `hr.training.view` atau `manage`, tulis rencana dan pagu
+  `hr.training.manage` (jadi paket Admin juga). Command
+  `desktop_hr_training_plan`, `desktop_hr_training_plan_save`; Web aksi
+  `rencana` dan `rencana_simpan` di `POST /api/hris/training`.
+- Layar: pilihan "Pelatihan" / "Rencana dan anggaran" di tab Pelatihan
+  `/hris`, pemilih tahun bersama; `components/hris/RencanaPelatihan.tsx`
+  (ringkasan per kelompok, isian pagu, rencana dengan `DaftarRincian`, ekspor
+  Excel sheet Ringkasan dan Rencana lewat `AngkaExcel` + `saveFileWithPicker`,
+  Q-147). Ketiga versi; Mobile ikut lewat `dirsToCopy`.
+- **Semua perangkat wajib diperbarui**: begitu cloud naik ke v43, perangkat
+  v42 berhenti sinkron (`SCHEMA_VERSION_OUTDATED`).
+
+## HRIS fase 12: berkas transfer gaji ke bank (schema versi 44)
+
+Rincian dan keputusan pemilik di `prd-hris.md` §27 (Q-150 sampai Q-159,
+Q-173 sampai Q-176). Logika `desktop/transfer.rs` (disalin ke Mobile) ↔
+`validations/transfer.ts` + `services/transfer.ts`, vektor sama
+(`validations/transfer.vektor.json`, dibaca Rust lewat `include_str!`); SQL,
+konstanta, pesan, dan tanda diperiksa harfiah oleh `transfer.test.ts`.
+Sentinel `-2040`, `REQUIRED_TABLE_COUNT` 107, command Desktop 307 / Mobile
+313, tanpa izin baru. Aplikasi menyiapkan berkas, TIDAK mentransfer.
+
+- **Khusus cloud** (pola `app_telegram_setting`): `app_bank`,
+  `app_bank_rekening`, `app_bank_format`. `storage.rs`, snapshot, rute, dan
+  `CLOUD_MIRRORED_TABLES` tidak disentuh; `PROMOTION_PLAN` bank → rekening,
+  format. Tanpa UNIQUE; nama/alias bank, rekening (bank + nomor), dan nama
+  format unik ditegakkan aplikasi (`bank_bentrok`, `rekening_bentrok`,
+  `nama_bentrok`).
+- **Bank bawaan** dari `validations/bank-bawaan.json` (19 bank, kode BI
+  diverifikasi 13 Nov 2026; BSI 451 dengan alias eks BSM/BNI Syariah/BRI
+  Syariah), `INSERT OR IGNORE` hanya di `turso.rs` dan `db-migrations.ts`.
+  Tidak ada hapus bank: `hr_profil.bank` tetap teks nama dan dicocokkan lewat
+  `cocok_bank` ↔ `cocokBank` (nama lalu alias, huruf besar kecil dan spasi
+  dirapikan). Ganti nama menambah nama lama ke alias (Q-176).
+- **Nominal = `payroll_items.net_salary`** apa adanya (sudah termasuk kasbon
+  dan reimburse mode gaji), dijumlahkan sebagai bilangan bulat. Rekening
+  karyawan dibaca saat mengunduh, tidak dibekukan. `susun_transfer` ↔
+  `susunTransfer` membagi baris menjadi masuk berkas, "Perlu dibayar manual"
+  (`tanpa_rekening`, `bank_tidak_dikenal` termasuk bank nonaktif,
+  `tanpa_kode_bank` bila format memakai kode, `nominal_nol`), dan di luar
+  cakupan (`sesama`/`antarbank`, untuk berkas yang lain). `nama_berbeda` dan
+  `karyawan_keluar` hanya peringatan. Tanda, tidak menolak.
+- **Berkas** dirender di TS untuk ketiga versi (`lib/client/berkas-transfer.ts`,
+  tanpa kembaran Rust): Excel umum (sheet Transfer, Perlu dibayar manual,
+  Ringkasan) dan format kustom CSV/TXT/xlsx dari `app_bank_format.kolom`
+  (larik `{isian, judul, teks}`, `validasi_kolom` ↔ `validasiKolom`). Teks
+  berisi pemisah selalu dikutip; `desimal` hanya nominal CSV/TXT; CRLF, UTF-8
+  tanpa BOM; tanggal selalu `YYYY-MM-DD`. Format bank khusus (lebar tetap,
+  baris kepala/total) DITUNDA sampai ada contoh berkas asli (§27.8 langkah 8).
+- **Unduh** hanya run `APPROVED`/`PAID`, wajib KEDUA `payroll.run.disburse`
+  dan `hr.finance.view` (`IZIN_UNDUH`, Q-157; tidak ada paket bawaan yang
+  memegang keduanya). `catat = true` menulis `payroll_audit_logs`
+  `TRANSFER_EXPORT` langsung di cloud (status lama = baru, catatan JSON kunci
+  urut abjad, Q-156); `PAID` tetap manual (Q-155). Unduhan sebelumnya
+  dikembalikan sebagai `riwayat` untuk peringatan unggahan ganda.
+- **Pengaturan** (`desktop_transfer_settings_save`, aksi `simpan_pengaturan`)
+  khusus `payroll.config.manage` (Superadmin, Q-173). Bacaan
+  `desktop_transfer_settings` cukup sesi untuk bank aktif (isian profil
+  keuangan); pemegang kedua izin unduh mendapat rekening dan format aktif.
+  Web `POST /api/payroll/transfer` (`pengaturan`, `simpan_pengaturan`, `berkas`).
+- **Layar**: Pengaturan tab "Transfer Bank" (`TransferBankCard.tsx`,
+  Web/Desktop) dengan penyusun kolom dan pratinjau data contoh; tab "Berkas
+  Transfer" di rincian proses gaji (`components/payroll/BerkasTransfer.tsx`,
+  di `filesToCopy`, dipasang kedua `RunDetailClient`) yang hanya menawarkan
+  format umum atau format bank rekening debet; isian bank profil keuangan
+  menjadi `PilihCari` (`RincianKaryawan.tsx`). Jejak unduhan tampil terbaca di
+  audit trail (`ringkasCatatanUnduhan`).
+- **Semua perangkat wajib diperbarui**: begitu cloud naik ke v44, perangkat
+  v43 berhenti sinkron (`SCHEMA_VERSION_OUTDATED`).
+
 ## Domain contoh
 
 `master_item` dan `log_aktivitas` adalah tabel peraga yang memperagakan pola

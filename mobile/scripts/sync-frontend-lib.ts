@@ -69,6 +69,9 @@ const filesToCopy = [
   "components/keuangan/KasbonWorkspace.tsx",
   // Pemilih akun Kas/Bank: dipakai Kasbon dan detail proses gaji.
   "components/keuangan/PilihAkunBayar.tsx",
+  // Berkas transfer gaji ke bank (HRIS fase 12) di detail proses gaji; kedua
+  // `RunDetailClient` (milik masing-masing workspace) memasangnya.
+  "components/payroll/BerkasTransfer.tsx",
   // Tab Cicilan di Keuangan (v31).
   "components/keuangan/CicilanWorkspace.tsx",
   "components/keuangan/TutupBukuPanel.tsx",

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PilihAkunBayar } from "@/components/keuangan/PilihAkunBayar";
 import { MobileAppShell } from "@/components/MobileAppShell";
+import { BerkasTransferPanel } from "@/components/payroll/BerkasTransfer";
 import {
   RunStatusBadge,
   runStatusLabel,
@@ -14,6 +15,10 @@ import { Icon } from "@/components/ui/Icon";
 import { konfirmasiData } from "@/components/ui/KonfirmasiData";
 import { Modal } from "@/components/ui/Modal";
 import { hasPermission } from "@/lib/auth/access";
+import {
+  AKSI_UNDUH_TRANSFER,
+  ringkasCatatanUnduhan,
+} from "@/lib/client/berkas-transfer";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
 import {
@@ -21,6 +26,7 @@ import {
   type PayrollRunDetail,
   transitionPayrollStatus,
 } from "@/lib/gateways/payroll";
+import { IZIN_UNDUH, STATUS_RUN_TRANSFER } from "@/lib/validations/transfer";
 
 /*
  * Detail batch payroll untuk Mobile — padanan
@@ -58,7 +64,7 @@ export default function RunDetailClient() {
 
   const [detail, setDetail] = useState<PayrollRunDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"items" | "audit">("items");
+  const [tab, setTab] = useState<"items" | "audit" | "transfer">("items");
   const [feedback, setFeedback] = useState<{
     type: "success" | "error";
     message: string;
@@ -124,6 +130,10 @@ export default function RunDetailClient() {
   const items = detail?.items ?? [];
   const auditLogs = detail?.audit_logs ?? [];
   const status = run?.status ?? "DRAFT";
+  // Berkas transfer (prd-hris.md §27.5): kedua izin unduh, run APPROVED/PAID.
+  const canTransfer =
+    IZIN_UNDUH.every((izin) => hasPermission(user, izin)) &&
+    (STATUS_RUN_TRANSFER as readonly string[]).includes(status);
 
   const transitions: Transition[] = [];
   if (hasPermission(user, "payroll.run.create") && status === "DRAFT") {
@@ -298,11 +308,16 @@ export default function RunDetailClient() {
           </div>
         ) : null}
 
-        <div className="grid grid-cols-2 gap-1 rounded-2xl border border-white/10 bg-slate-950/80 p-1">
+        <div
+          className={`grid gap-1 rounded-2xl border border-white/10 bg-slate-950/80 p-1 ${
+            canTransfer ? "grid-cols-3" : "grid-cols-2"
+          }`}
+        >
           {(
             [
               ["items", `Rincian (${items.length})`],
-              ["audit", `Audit Trail (${auditLogs.length})`],
+              ["audit", `Audit (${auditLogs.length})`],
+              ...(canTransfer ? [["transfer", "Transfer"] as const] : []),
             ] as const
           ).map(([value, label]) => (
             <button
@@ -332,6 +347,8 @@ export default function RunDetailClient() {
               />
             ))}
           </div>
+        ) : tab === "transfer" && canTransfer ? (
+          <BerkasTransferPanel runId={runId} status={status} />
         ) : tab === "items" ? (
           items.length === 0 ? (
             <div className="rounded-2xl border border-white/10 bg-slate-900/40 p-8 text-center text-xs text-slate-500">
@@ -433,7 +450,9 @@ export default function RunDetailClient() {
                 <p className="text-xs font-bold text-slate-200">
                   {log.action === "CREATE_RUN"
                     ? "Batch dibuat"
-                    : `Status → ${runStatusLabel(log.new_status)}`}
+                    : log.action === AKSI_UNDUH_TRANSFER
+                      ? "Berkas transfer diunduh"
+                      : `Status → ${runStatusLabel(log.new_status)}`}
                 </p>
                 <p className="text-[11px] text-slate-400">
                   oleh {log.performed_by} ·{" "}
@@ -447,7 +466,9 @@ export default function RunDetailClient() {
                 </p>
                 {log.notes ? (
                   <p className="mt-1.5 rounded-lg bg-white/5 p-2 text-[11px] italic text-slate-300">
-                    {log.notes}
+                    {log.action === AKSI_UNDUH_TRANSFER
+                      ? ringkasCatatanUnduhan(log.notes)
+                      : log.notes}
                   </p>
                 ) : null}
               </li>

@@ -51,6 +51,9 @@ const filesToSync = [
   // karyawan, dan SQL retensi wajib identik dengan Desktop dan TS.
   "hr_rekrutmen.rs",
   "hr_pelatihan.rs",
+  // HRIS fase 12: pencocokan bank, tanda baris, dan render format transfer
+  // wajib identik dengan Desktop dan TS.
+  "transfer.rs",
   "commands.rs",
   // Tarif default payroll: satu sumber untuk SQLite lokal dan Turso cloud, di
   // kedua workspace. Perbedaan sekecil apa pun di sini membuat baris seed lokal

@@ -4830,12 +4830,12 @@ Penyimpangan dan catatan, untuk ditinjau:
 
 ## 26. Urutan pengerjaan fase 11
 
-**Belum disetujui.** Ditulis setelah menelusuri kode (13 Nov 2026). Isinya butir
-terakhir §15.1 "Urutan fase yang berlaku": rencana dan anggaran pelatihan
-(memperluas Q-26, yang di fase 7 dijawab "riwayat + sertifikat"). Pertanyaan
-Q-137 sampai Q-149 di §26.11 belum dijawab; rancangan di bawah memakai
-usulannya. Bila §11.2, §15, §22.7, atau §22.10 dan bagian ini berbeda, **bagian
-ini yang berlaku** setelah disetujui.
+**Disetujui pemilik (13 Nov 2026).** Ditulis setelah menelusuri kode (13 Nov
+2026); jawaban Q-137 sampai Q-149 di §26.12, semuanya sesuai usulan. Isinya
+butir terakhir §15.1 "Urutan fase yang berlaku": rencana dan anggaran
+pelatihan (memperluas Q-26, yang di fase 7 dijawab "riwayat + sertifikat").
+Bila §11.2, §15, §22.7, atau §22.10 dan bagian ini berbeda, **bagian ini yang
+berlaku**.
 
 ### 26.1 Temuan dari kode
 
@@ -5186,3 +5186,668 @@ rincian pelatihan membawa nama dan status rencananya.
 | Q-147 | Ekspor Excel ringkasan dan rencana per tahun? | Ya, sheet Ringkasan dan Rencana, ketiga versi | Keuangan biasanya membaca anggaran di Excel; `excel-export.ts` dan `AngkaExcel` sudah ada, Mobile lewat SAF |
 | Q-148 | Telegram atau kartu "Perlu perhatian" untuk pagu terlewati dan rencana terlewat? | Tidak di fase ini | Tanda di layar cukup untuk HRD yang membuka tab Pelatihan. Kejadian baru menambah generasi parkir dan sakelar di kartu Notifikasi |
 | Q-149 | Pagu: boleh diubah dan dihapus tanpa riwayat? Rencana: dibatalkan, tidak dihapus? | Ya, ya | Riwayat revisi pagu butuh tabel append-only tambahan dan belum ada laporan yang membacanya. Rencana dibatalkan supaya realisasi dan pelatihan tertautnya tetap terbaca |
+
+### 26.12 Jawaban fase 11 (13 Nov 2026)
+
+Semua jawaban sesuai usulan §26.11, dan penanda §26.10 disetujui, jadi isi
+§26.2–§26.10 tidak berubah.
+
+| No | Pertanyaan | Jawaban |
+| :-- | :-- | :-- |
+| Q-137 | Rilis fase 11 | (a) bersama fase 8–10 |
+| Q-138 | Rencana dan pagu | Tabel khusus cloud `hr_pelatihan_anggaran`, `hr_pelatihan_rencana`, kolom `hr_pelatihan.id_rencana` (v43) |
+| Q-139 | Periode anggaran | Tahun kalender |
+| Q-140 | Tingkat pagu | (a) per divisi per tahun + pagu Umum, total = jumlahnya |
+| Q-141 | Beban divisi pelatihan | (a) divisi rencananya, tanpa rencana = Umum |
+| Q-142 | Realisasi | Terpakai (Berlangsung + Selesai) dan Terikat (Dijadwalkan) sama-sama mengurangi sisa |
+| Q-143 | Pagu terlewati | Tanda + peringatan, tetap tersimpan |
+| Q-144 | Isian rencana | Sesuai usulan; satu rencana banyak pelatihan, satu pelatihan satu rencana, tahun sama, tanpa persetujuan |
+| Q-145 | Yang mengatur pagu | (a) `hr.training.manage`, tanpa izin baru |
+| Q-146 | Pembukuan | (a) jurnal manual, tanpa akun bawaan baru |
+| Q-147 | Ekspor Excel | Ya, sheet Ringkasan dan Rencana, ketiga versi |
+| Q-148 | Telegram / kartu Perlu perhatian | Tidak di fase ini |
+| Q-149 | Riwayat pagu dan rencana | Pagu boleh diubah dan dihapus tanpa riwayat; rencana dibatalkan, tidak dihapus |
+
+### 26.13 Sudah dibangun (13 Nov 2026)
+
+Langkah 1–6 dibangun: skema v43 (sentinel `-2039`, `REQUIRED_TABLE_COUNT` 104,
+68 tabel snapshot, 90 rute), command Desktop 304 / Mobile 310, tanpa izin baru.
+Gerbang yang dijalankan:
+
+- `audit:schema` lulus (104 tabel wajib, 98 tabel dipromosikan);
+  `audit:contract` lulus (304/310, tanpa command hantu); `audit:docs` lulus.
+- `cargo test --lib` Desktop dan Mobile: `sentinel_20*` 14 lulus (termasuk
+  `sentinel_2038_memicu_skema_rencana_pelatihan`), `provisioning_lokal_*`
+  (Desktop), dan `hr_pelatihan` 7 lulus (termasuk
+  `ringkas_anggaran_vektor_bersama` dan `rencana_cloud_pagu_dan_realisasi`
+  dengan semua kasus langkah 4).
+- `bun test` Web dan Mobile: `validations/hr-pelatihan.test.ts` (vektor
+  kembar, teks SQL, pesan, dan konstanta harfiah terhadap kedua
+  `hr_pelatihan.rs`), `services/hr-pelatihan.test.ts` (alur Web sama dengan
+  alur Rust langkah 4), `web-rbac-boundary`, `schema-consistency`,
+  `rbac-migration`, `database-promotion`.
+- Typecheck kedua workspace dan Biome berkas yang diubah bersih.
+
+`bun run check` penuh belum dijalankan (pemilik). Layar belum dicoba di
+aplikasi yang berjalan: gerbang "Desktop tema gelap dan terang" dan "Web di
+lebar 360 px" belum dilakukan.
+
+Penyimpangan dan catatan, untuk ditinjau:
+
+- **`REALISASI_SQL` juga membaca pelatihan tahun lain yang menautkan rencana
+  tahun itu** (`… OR r.tahun = ?1`): build v42 masih bisa memindah tanggal
+  pelatihan tanpa menyentuh `id_rencana` (§26.1). Realisasi kelompok tetap
+  menurut tahun `tanggal_mulai` (§26.4); angka per rencana memakai semua
+  pelatihan tertautnya dan bertanda **`beda_tahun`** bila ada yang tahunnya
+  lain (tanda tambahan). `id_rencana` dan divisi dibaca dari rencana yang
+  benar-benar ada, jadi tautan patah terhitung "di luar rencana".
+- **Pesan keempat `PESAN_RENCANA_TAHUN_TERKUNCI`** untuk "tahun tidak bisa
+  diubah selama ada pelatihan tertaut" (§26.3). Larangan ini dan larangan
+  batal bertaut dieja ulang di `UBAH_RENCANA_SQL` / `BATAL_RENCANA_SQL`; bila
+  statement itu mengubah 0 baris, pesannya dipilih dari keadaan terbaru.
+  Satu celah tersisa: menautkan pelatihan tidak dijaga di statement yang sama,
+  jadi pembatalan rencana tepat di sela pemeriksaan dan penulisan bisa
+  meninggalkan pelatihan yang tertaut ke rencana batal.
+- **SQL tambahan** `RENCANA_SATU_SQL` dan `TAUTAN_RENCANA_SQL` (kembar): satu
+  bacaan untuk status rencana di rincian pelatihan, hitungan tertaut, dan
+  larangan batal/ubah tahun.
+- **Tahun dikirim sebagai INTEGER** di ketiga bacaan baru
+  (`DAFTAR_PELATIHAN_SQL` lama tetap teks). Tahun di luar 2000–2100 ditolak.
+- **Sisa kosong** untuk kelompok tanpa baris pagu; total pagu kosong hanya bila
+  tahun itu tidak punya pagu sama sekali. Kelompok: Umum lebih dulu, lalu urut
+  nama dan id divisi (perbandingan teks biasa, sama di Rust dan TS untuk huruf
+  Latin). Kelompok hanya memuat divisi yang punya pagu, rencana tidak batal,
+  atau pelatihan tertaut tahun itu; divisi lain diisi pagunya lewat tombol
+  "Atur pagu".
+- **Pesan divisi** "Divisi tidak ditemukan." / "Divisi sudah nonaktif." sama
+  dengan lowongan.
+- **Vektor `ringkas_anggaran` satu berkas JSON** dibaca kedua tes, bukan dua
+  salinan literal.
+- **Tes `sentinel_2037_memicu_skema_rekrutmen`**: angka indeks harapan 9 → 12,
+  karena saringan `idx_hr_pelatihan_%` ikut menghitung tiga indeks v43.
+- **Helper `bulat`/`nama_wajib`** ↔ `bulat`/`namaWajib` menggantikan pemeriksa
+  bilangan dan nama di `validasi_pelatihan`; pesannya tidak berubah.
+- **Layar**: pemilih tahun pindah ke atas, dipakai bersama kedua pilihan;
+  daftar pelatihan kini berjudul "Pelatihan (n)". `PelatihanWorkspace`
+  menerima `divisi` dari `HrisWorkspace` (organisasi yang sudah dimuat). Form
+  pelatihan membaca rencana tahun `tanggal_mulai` sendiri, jadi pemilih rencana
+  dan sisa pagu ikut berubah saat tanggal pindah tahun; rencana tertaut yang
+  tidak ada di tahun itu ditandai dengan `PESAN_RENCANA_TAHUN`. Rincian rencana
+  menampilkan estimasi, realisasi, selisih, peserta aktual dibanding rencana,
+  dan pelatihan tertautnya. Hapus pagu memakai `konfirmasiData` dengan baris
+  peringatan (pola §25.13).
+- **SKILL.md** mendapat butir fase 11 di daftar §4.8; CLAUDE.md bagian "HRIS
+  fase 11". `audit:docs` tidak memeriksa versi skema atau jumlah command.
+
+## 27. Urutan pengerjaan fase 12: berkas transfer gaji ke bank
+
+**Disetujui pemilik (13 Nov 2026).** Ditulis setelah menelusuri kode
+(13 Nov 2026); jawaban Q-150 sampai Q-159 dan Q-173 sampai Q-176 di §27.11,
+semuanya sesuai usulan §27.10 kecuali yang dicatat di sana. Isinya butir "Transfer
+gaji ke bank" §15 / §15.1, yang dijadwalkan sesudah fase 11.
+
+### 27.1 Temuan dari kode
+
+- **Jumlah yang ditransfer sudah ada**: `payroll_items.net_salary` adalah gaji
+  bersih AKHIR, sesudah kasbon dipotong dan reimbursement mode `gaji`
+  ditambahkan (`net = pay.net − kasbon + reimburse`, pembekuan di
+  `payroll/commands.rs` ↔ `computePayrollRecap`). Tidak ada angka lain yang
+  perlu dihitung untuk berkas transfer.
+- **Status run**: `DRAFT → SUBMITTED → REVIEWED → APPROVED → PAID` (atau
+  `REJECTED`). `PAID` ditandai manual oleh pemegang `payroll.run.disburse`
+  ("Tandai Dibayar & Kunci Slip"), dan saat itulah angsuran kasbon, jurnal
+  `pay-<run>`, dan pemeriksaan reimburse ditulis. Aplikasi tidak tahu apakah
+  uangnya benar-benar sudah ditransfer.
+- **Rekening karyawan ada di `hr_profil`** (KHUSUS CLOUD, Q-30/Q-45): `bank`,
+  `no_rekening`, `nama_rekening`, bagian "keuangan" yang dibaca
+  `hr.finance.view` (rahasia, `CONFIDENTIAL_PERMISSIONS`) dan ditulis
+  `hr.finance.manage` (sensitif). Jadi berkas transfer selalu butuh koneksi ke
+  database, Desktop sekalipun.
+- **`bank` teks bebas** (`teksTerbatas`, maks `MAKS_NAMA`), bukan kode. Satu
+  bank bisa tertulis "BCA", "Bank BCA", "bca ", "Bank Central Asia". Transfer
+  antarbank massal biasanya butuh kode bank (3 digit BI) atau kode BI-FAST/SKN.
+  `no_rekening` hanya angka 5–20 digit (`PANJANG_REKENING`), `nama_rekening`
+  teks bebas.
+- **Ada izin `payroll.export`** ("Ekspor Laporan & Slip Gaji", sort 320) yang
+  ditanam di seed tetapi **tidak dipakai guard mana pun** di Rust maupun Web.
+- **Belum ada ekspor Excel apa pun di layar payroll**; slip dicetak lewat
+  `SlipGajiPrintView`. Penulis Excel yang dipakai modul lain:
+  `buildXlsxWorkbook` + `AngkaExcel` + `saveFileWithPicker` (SAF di Mobile,
+  aturan 46).
+- **`payroll_audit_logs`** (tersinkron, `action` tanpa CHECK) mencatat
+  transisi status. Tidak ada rute outbox untuk baris log saja; satu-satunya
+  rute yang menulisnya `payroll/transition-status`.
+- **Pembayaran lain di luar gaji**: upah surat jalan (`drv_upah_bayar`),
+  reimbursement mode `terpisah` dan cuti diuangkan (`hr_reimburse_bayar`),
+  pesangon (jurnal manual). Ketiganya dicatat tanpa berkas transfer.
+- **Format berkas transfer massal milik masing-masing bank**, tidak ada standar
+  nasional. Contoh yang umum dipakai perusahaan: KlikBCA Bisnis (payroll/
+  transfer massal), Mandiri Cash Management (MCM), BRI CMS / Qlola, BNI Direct.
+  Format persisnya (CSV, teks lebar tetap, atau Excel; urutan kolom; baris
+  kepala/total; kode rekening debet; tanggal efektif) berubah antar versi dan
+  per kontrak layanan, jadi **tidak bisa ditebak**: setiap format dibangun dari
+  contoh berkas asli bank pemilik (Q-151).
+
+### 27.2 Model data (skema v44, sentinel `-2040` `payroll-transfer-v1`)
+
+**Diubah atas permintaan pemilik (13 Nov 2026)**: daftar bank, rekening debet
+perusahaan, dan bentuk berkas per bank diatur di **Pengaturan**, supaya bisa
+diubah dan ditambah tanpa build baru. Usulan awal "daftar bank di kode, tanpa
+skema" ditinggalkan.
+
+**Tiga tabel baru, khusus cloud** (pola `app_telegram_setting`,
+`hr_dokumen_jenis`): hanya `turso.rs` + `db-schema.ts`/`db-migrations.ts`,
+tidak di `storage.rs`, snapshot, outbox, atau `CLOUD_MIRRORED_TABLES`. Isinya
+hanya dibutuhkan berkas transfer dan profil keuangan karyawan, yang keduanya
+sudah khusus cloud, dan tidak boleh ikut ke terminal scanner. Tanpa `UNIQUE`
+selain PK; keunikan nama ditegakkan aplikasi.
+
+| Tabel | Kolom |
+| :-- | :-- |
+| `app_bank` | `id_bank` PK (bawaan `bnk-<kode>`, buatan pengguna `bnk-<hex>`); `nama` NOT NULL (nama kanonik yang disimpan di `hr_profil.bank`); `kode` (3 digit kode bank BI, boleh kosong); `alias` (teks JSON larik nama lain, mis. `["BCA","Bank Central Asia","PT Bank Central Asia Tbk"]`); `is_aktif` 0/1; `is_bawaan` 0/1; `diubah_oleh`, `created_at`, `updated_at` |
+| `app_bank_rekening` | `id_rekening` PK (`rek-<hex>`); `id_bank` NOT NULL; `no_rekening` NOT NULL (5–20 digit, `PANJANG_REKENING`); `nama_rekening` NOT NULL; `keterangan`; `is_aktif` 0/1; `diubah_oleh`, `created_at`, `updated_at` |
+| `app_bank_format` | `id_format` PK (`fmt-<hex>`); `nama` NOT NULL; `id_bank` (bank sasaran, boleh kosong = umum); `jenis` CHECK `csv`/`txt`/`xlsx`; `pemisah` CHECK `,` `;` `\t` `|` atau kosong (xlsx); `pakai_judul` 0/1; `kutip` 0/1 (teks dibungkus kutip ganda); `desimal` 0/1 (nominal `1500000` atau `1500000.00`); `cakupan` CHECK `semua`/`sesama`/`antarbank`; `kolom` NOT NULL (teks JSON, §27.3); `maks_berita` INTEGER; `is_aktif` 0/1; `diubah_oleh`, `created_at`, `updated_at` |
+
+- **Seed bank bawaan** `INSERT OR IGNORE` di `turso.rs` dan
+  `db-migrations.ts` (pola `hr_keluar_alasan`), dari satu berkas
+  `validations/bank-bawaan.json` (pola `akun-bawaan.json`): BCA, Mandiri, BSI,
+  BRI, BNI, dan bank umum lain. Kode BI diverifikasi ulang di langkah 1 dan
+  tetap bisa diubah di Pengaturan. Bank bawaan boleh diganti nama, alias, dan
+  kodenya serta dinonaktifkan; tidak ada hapus untuk bank mana pun, karena
+  `hr_profil.bank` merujuk namanya (Q-12).
+- **Tanpa seed rekening dan format.** Rekening debet diisi perusahaan; format
+  kustom dibuat sesudah contoh berkas bank diketahui.
+- **`hr_profil.bank` tetap teks.** Isian bank di profil keuangan menjadi
+  `PilihCari` dari `app_bank` aktif dan menyimpan `nama`. Data lama tidak
+  ditulis ulang: pencocokan memakai `nama` dan `alias` sesudah huruf besar
+  kecil dan spasi dirapikan (`cocok_bank` ↔ `cocokBank`). Ganti nama bank di
+  Pengaturan menambahkan nama lamanya ke `alias` (pola `hr_divisi_nama`), jadi
+  profil lama tetap cocok.
+- Kedua jalur: `CURRENT_SCHEMA_VERSION`/`CLIENT_SCHEMA_VERSION` 44 (Desktop DAN
+  Mobile), sentinel `-2040`, `REQUIRED_TABLE_COUNT` 107, `isDatabaseSchemaReady`
+  dan `schema-consistency.test.ts` + 3, daftar khusus cloud
+  `audit-sync-contract.ts` + 3, `PROMOTION_PLAN` + 3 (`app_bank` →
+  `app_bank_rekening`, `app_bank_format`), daftar versi `rbac-migration.test.ts`
+  + 44. Tetap 68 tabel snapshot dan 90 rute.
+
+### 27.3 Isi berkas
+
+**Sumber**: satu `payroll_runs` berstatus `APPROVED` atau `PAID` (Q-154),
+satu rekening debet (`app_bank_rekening` aktif) yang dipilih saat mengunduh.
+Baris = `payroll_items` run itu, digabung `hr_profil` (cloud) dan `app_bank`.
+
+| Isian | Isi |
+| :-- | :-- |
+| `nama_karyawan`, `kode_karyawan` | `payroll_items.nama_karyawan` (beku saat run dibuat), `master_data.kode_karyawan` |
+| `nama_bank`, `kode_bank` | `hr_profil.bank` → `app_bank` lewat `cocok_bank` |
+| `no_rekening`, `nama_rekening` | `hr_profil` |
+| `nominal` | `payroll_items.net_salary` (INTEGER rupiah) |
+| `berita` | `Gaji <period_start> s.d. <period_end>`, dipangkas ke `maks_berita` |
+| `rekening_debet`, `nama_debet` | rekening debet terpilih |
+| `tanggal_efektif` | diisi saat mengunduh, bawaan tanggal WIB jam database |
+| `nomor_urut` | 1, 2, 3, … menurut urutan baris |
+| `teks_tetap` | teks yang diketik di format (mis. kode layanan bank) |
+
+**Jenis transfer** per baris: `sesama` bila bank karyawan = bank rekening
+debet, selain itu `antarbank`. Format ber-`cakupan` `sesama`/`antarbank` hanya
+memuat baris jenis itu; baris lainnya masuk ringkasan "belum ada di berkas
+ini", supaya dua berkas (sesama + antarbank) tidak tumpang tindih atau
+tertinggal.
+
+**Tanda, tidak menolak** (pola fase 4–11): baris yang tidak bisa ditransfer
+tidak masuk berkas bank, tetapi tampil di layar dan di sheet "Perlu dibayar
+manual":
+
+- `tanpa_rekening` (bank atau nomor kosong),
+- `bank_tidak_dikenal` (tidak cocok `app_bank`, atau banknya nonaktif),
+- `tanpa_kode_bank` (format memakai `kode_bank` tetapi bank itu belum punya
+  kode),
+- `nominal_nol` (`net_salary` 0),
+- `nama_berbeda` (nama pemilik rekening ≠ nama karyawan sesudah dirapikan;
+  hanya peringatan, rekening atas nama keluarga bisa sah),
+- `karyawan_keluar` (`master_data.id_keluar` terisi; tetap ditransfer, hanya
+  diberi tahu).
+
+**Tiga bentuk berkas** (Q-151):
+
+1. **Excel umum, selalu ada**: sheet "Transfer" (semua isian, nominal sel
+   Angka) + "Perlu dibayar manual" + "Ringkasan" (jumlah baris, total per bank
+   dan per jenis, total = Σ `net_salary` run, dan selisih bila ada baris
+   dikeluarkan).
+2. **Format kustom dari Pengaturan** (`app_bank_format`): `kolom` adalah larik
+   `{ "isian": <salah satu isian di atas>, "judul": <teks judul kolom>,
+   "teks": <isi bila teks_tetap> }`, divalidasi persis di kedua sisi (isian
+   dari daftar tetap, judul ≤ 60, teks ≤ 100, 1–30 kolom; aturan 37/43).
+   Dirender fungsi murni `render_format` ↔ `renderFormat`: CSV/TXT dengan
+   pemisah, kutip, dan desimal sesuai format; xlsx lewat `buildXlsxWorkbook`.
+   Cukup untuk format bank berbentuk baris per penerima dengan kolom terpisah.
+3. **Format bank khusus di kode**, hanya bila format bank itu tidak bisa
+   dinyatakan dengan format kustom: teks lebar tetap, baris kepala/penutup
+   berisi jumlah, total, atau checksum. Satu fungsi murni per bank dengan vektor
+   dari contoh berkas asli. **Ditunda** sampai contoh berkas BCA, BSI, atau
+   Mandiri didapat (§27.11).
+
+Pratinjau 5 baris pertama tampil sebelum diunduh. Total nominal berkas wajib
+sama dengan Σ `net_salary` baris yang masuk; dijumlahkan sebagai bilangan
+bulat, tanpa pembagian (aturan 13).
+
+### 27.4 Alur dan status
+
+- Berkas diunduh dari run `APPROVED` (sebelum transfer) dan bisa diunduh ulang
+  dari `PAID` (Q-154 (a)). Menandai `PAID` **tetap manual** sesudah transfer
+  berhasil di bank (Q-155 (a)); aplikasi tidak menerima balikan dari bank.
+- Setiap unduhan mencatat satu baris `payroll_audit_logs`
+  `action = 'TRANSFER_EXPORT'` langsung di cloud (Q-156 (b), pola Berlakukan
+  keluar fase 5): siapa, kapan, format, rekening debet, jumlah baris, total.
+  Status run tidak berubah.
+- Layar memperingatkan bila run sudah `PAID` atau sudah pernah diunduh, karena
+  aplikasi tidak bisa mencegah unggahan ganda di internet banking.
+
+### 27.5 Hak akses
+
+- **Mengunduh berkas** membuka nomor rekening semua karyawan: wajib
+  `payroll.run.disburse` **dan** `hr.finance.view` (Q-157 (a)), diperiksa di
+  command dan rute.
+- **Mengatur Pengaturan transfer** (bank, rekening debet, format):
+  `payroll.config.manage`, yang hari ini khusus Superadmin
+  (`SUPERADMIN_ONLY_PERMISSIONS`). Mengubah rekening debet atau urutan kolom
+  bisa membuat uang masuk ke tempat yang salah, jadi pemegangnya sedikit
+  (Q-173). Membaca daftar bank aktif cukup sesi, karena dipakai isian profil
+  keuangan.
+
+### 27.6 Command, rute, dan layar
+
+- Rust (modul baru `desktop/transfer.rs`, disalin ke Mobile):
+  `desktop_transfer_settings` (bank, rekening, format), 
+  `desktop_transfer_settings_save` (aksi `bank`, `rekening`, `format`, masing-
+  masing simpan/nonaktifkan), `desktop_payroll_transfer(run_id)` (baris +
+  jenis + tanda + ringkasan; mencatat log saat `catat = true`). Berkas dirender
+  di TS, sama untuk ketiga versi. Command Desktop 304 → 307, Mobile 310 → 313.
+- Web: kembaran di `validations/transfer.ts` + `services/transfer.ts`, rute
+  `POST /api/payroll/transfer` dengan peta `IZIN` per aksi, tanpa `GET`.
+- Layar:
+  1. **Pengaturan → kartu "Transfer bank"** (Web/Desktop): daftar bank (nama,
+     kode, alias, aktif), rekening debet, dan format kustom dengan penyusun
+     kolom (tambah, ubah urutan, hapus kolom) + pratinjau dari data contoh.
+     `konfirmasiData` sebelum simpan; nomor rekening tampil utuh di ringkasan
+     (bukan rahasia seperti token).
+  2. **Rincian run → "Berkas transfer"** (`RunDetailClient`): pilih rekening
+     debet, format, dan tanggal efektif; tabel baris bertanda; pratinjau;
+     unduh lewat `saveFileWithPicker`.
+  3. **Profil keuangan karyawan**: isian bank menjadi `PilihCari`; nilai lama
+     yang tidak dikenal tetap tampil dengan tanda.
+- Mobile: kartu Pengaturan tidak; tombol berkas transfer hanya bila layar run
+  payroll ada di salinan Mobile (diperiksa saat eksekusi).
+
+### 27.7 Tidak dikerjakan di fase ini
+
+- Integrasi langsung API bank (H2H/SNAP): butuh kontrak bank, sertifikat, dan
+  host eksternal di CSP Desktop (dilarang tanpa persetujuan).
+- Membaca mutasi/rekening koran untuk menandai `PAID` otomatis.
+- Format bank lebar tetap dengan baris kepala/penutup sebelum contohnya ada.
+- Berkas transfer untuk upah surat jalan, reimbursement terpisah, cuti
+  diuangkan, dan pesangon (Q-158).
+- Validasi nama pemilik rekening ke bank (inquiry).
+- Riwayat perubahan Pengaturan transfer selain `diubah_oleh`/`updated_at`.
+
+### 27.8 Langkah
+
+| # | Langkah | Gerbang |
+| :-- | :-- | :-- |
+| 1 | **Skema v44**: tiga tabel khusus cloud + seed `bank-bawaan.json`, sentinel `-2040`, versi 44 kedua workspace, `REQUIRED_TABLE_COUNT` 107, semua daftar + 3 | `audit:schema` + `cargo test sentinel_2039_memicu_skema_transfer` (database `-2039` mendapat tiga tabel dan seed bank) di kedua workspace |
+| 2 | **Aturan kembar**: validasi bank (nama, kode, alias), rekening, format (`kolom` JSON), `cocok_bank`, susun baris + jenis + tanda + ringkasan; `render_format` ↔ `renderFormat`; SQL kembar | `bun test validations/transfer.test.ts` + `cargo test transfer` kedua workspace: vektor sama, SQL harfiah |
+| 3 | **Command + rute + guard** (§27.5) | `audit:contract` (307/313) + `web-rbac-boundary` |
+| 4 | **Transaksi/bacaan cloud** Rust: Pengaturan simpan/nonaktifkan, ganti nama bank menambah alias, baris transfer dari run APPROVED/PAID, log `TRANSFER_EXPORT` | tes `local_file` `transfer_cloud_pengaturan_dan_baris` |
+| 5 | **Web**: service, rute, gateway | `services/transfer.test.ts`: alur langkah 4, data dan hasil sama |
+| 6 | **Berkas**: Excel umum + render format kustom | tes teks CSV/TXT dan workbook: pemisah, kutip, desimal, cakupan, total |
+| 7 | **Layar** §27.6, `sync:mobile`, CLAUDE.md, angka di skill, "Sudah dibangun" | typecheck + Biome + `audit:docs`; `bun run check` oleh pemilik |
+| 8 | **Format bank khusus** BCA/BSI/Mandiri yang tidak bisa dinyatakan format kustom | **ditunda** sampai contoh berkas asli; vektor dari contoh itu |
+
+### 27.9 Penanda yang ditinjau pemilik
+
+- **Aplikasi menyiapkan berkas, bukan mentransfer.** Unggah ke internet
+  banking dan otorisasi (token/approver bank) tetap manual.
+- **Naik skema ke v44**: semua perangkat wajib diperbarui. Karena v43 fase 11
+  belum dirilis, v44 sebaiknya ikut rilis yang sama (Q-159).
+- **Format kustom yang salah susun menghasilkan berkas yang ditolak bank atau,
+  lebih buruk, kolom tertukar.** Pratinjau dan transfer uji bernilai kecil
+  sebelum dipakai untuk gaji sungguhan.
+- **Nominal = gaji bersih yang dibekukan run**, termasuk kasbon dan
+  reimbursement mode gaji. Gaji yang berubah sesudah berkas diunduh berarti
+  run baru.
+- **Rekening karyawan dibaca saat mengunduh**, tidak dibekukan di run.
+- **Unggahan ganda tidak bisa dicegah aplikasi**, hanya diperingatkan.
+- Bank bawaan tetap bisa diubah dan dinonaktifkan, tidak bisa dihapus.
+
+### 27.10 Pertanyaan untuk pemilik
+
+| No | Pertanyaan | Usulan | Alasan |
+| :-- | :-- | :-- | :-- |
+| Q-150 | Bank yang dipakai klien? | Dijawab: BCA, BSI, Mandiri | §27.11 |
+| Q-151 | Bentuk berkas? | Excel umum + format kustom Pengaturan + format kode bila perlu | Format kustom menutup kebutuhan selama belum ada contoh |
+| Q-152 | Daftar bank di mana? | Dijawab: Pengaturan (`app_bank`, v44) | §27.11 |
+| Q-153 | Rekening debet di mana? | Dijawab: Pengaturan (`app_bank_rekening`) | §27.11 |
+| Q-154 | Berkas dari run berstatus apa: (a) `APPROVED` dan `PAID`; (b) hanya `APPROVED`? | (a) | Unduh ulang sesudah dibayar berguna untuk arsip |
+| Q-155 | Sesudah transfer: (a) tandai `PAID` manual; (b) otomatis saat berkas diunduh? | (a) | Mengunduh bukan bukti transfer berhasil; `PAID` memicu jurnal dan angsuran kasbon |
+| Q-156 | Catat jejak unduhan? (a) tidak; (b) `payroll_audit_logs` `TRANSFER_EXPORT` | (b) | Siapa yang mengunduh rekening semua karyawan layak tercatat |
+| Q-157 | Izin unduh: (a) `payroll.run.disburse` + `hr.finance.view`; (b) `payroll.export` + `hr.finance.view`; (c) izin baru sensitif? | (a) | Yang menandai dibayar adalah yang mentransfer |
+| Q-158 | Upah surat jalan, reimbursement terpisah, cuti diuangkan, pesangon ikut? | Tidak di fase ini | Sumber dan statusnya berbeda; generator yang sama bisa dipakai sesudahnya |
+| Q-159 | Rilis v44 bersama fase 8–11 (v43)? | Ya | Satu putaran pembaruan perangkat, bukan dua |
+| Q-173 | Yang mengatur Pengaturan transfer: (a) `payroll.config.manage` (Superadmin); (b) `hr.finance.manage`; (c) izin baru sensitif `payroll.transfer.config`? | (a) | Rekening debet dan urutan kolom menentukan ke mana uang pergi |
+| Q-174 | Format kustom boleh memilih cakupan `sesama`/`antarbank`? | Ya | Beberapa bank memisahkan berkas transfer sesama bank dan antarbank |
+| Q-175 | Lebih dari satu rekening debet (mis. BCA dan Mandiri)? | Ya | Perusahaan bisa menggaji dari dua bank |
+| Q-176 | Ganti nama bank di Pengaturan otomatis menambah nama lama ke alias? | Ya | Profil karyawan lama tetap cocok tanpa ditulis ulang |
+
+### 27.11 Jawaban (13 Nov 2026)
+
+- **Q-150**: belum ada klien (aplikasi belum dikomersialkan). Bank yang paling
+  sering dipakai menurut pemilik: **BCA, BSI, Mandiri**; ketiganya wajib ada di
+  `bank-bawaan.json` beserta aliasnya.
+- **Q-151**: belum ada contoh berkas bank. Excel umum dan format kustom
+  dibangun lebih dulu; format bank khusus (langkah 8) **ditunda sampai contoh
+  berkas asli didapat** pemilik dari calon klien.
+- **Q-152, Q-153**: daftar bank, rekening debet, dan bentuk berkas **diatur di
+  Pengaturan** supaya bisa diubah dan ditambah (permintaan pemilik). §27.2–§27.6
+  sudah ditulis ulang menurut jawaban ini.
+- **Q-170**: fase 12 (transfer) dikerjakan lebih dulu.
+- **Q-154 sampai Q-159 dan Q-173 sampai Q-176**: semuanya sesuai usulan
+  §27.10 (disetujui pemilik 13 Nov 2026), dan penanda §27.9 disetujui.
+
+**Fase 12 disetujui pemilik (13 Nov 2026)** dan siap dieksekusi per langkah
+§27.8. Langkah 8 (format bank khusus) tetap menunggu contoh berkas asli.
+
+### 27.12 Sudah dibangun (13 Nov 2026)
+
+Langkah 1–7 dibangun: skema v44 (sentinel `-2040`, `REQUIRED_TABLE_COUNT` 107,
+68 tabel snapshot, 90 rute), command Desktop 307 / Mobile 313, tanpa izin baru.
+Langkah 8 ditunda sampai contoh berkas BCA, BSI, atau Mandiri didapat.
+Gerbang yang dijalankan:
+
+- `audit:schema` lulus (107 tabel wajib, 101 tabel dipromosikan);
+  `audit:contract` lulus (307/313, tanpa command hantu); `audit:docs` lulus.
+- `cargo test --lib` Desktop dan Mobile: `sentinel_20*` 15 lulus (termasuk
+  `sentinel_2039_memicu_skema_transfer`: tiga tabel dan seed, seed tidak
+  menimpa bank yang disunting), `provisioning_lokal_*` (Desktop), dan
+  `transfer` 6 lulus (vektor bersama validasi/cocok/bentrok/susun dan
+  `transfer_cloud_pengaturan_dan_baris`).
+- `bun test` Web dan Mobile: `validations/transfer.test.ts` (vektor kembar dan
+  teks harfiah terhadap kedua `transfer.rs`), `services/transfer.test.ts`
+  (alur Web sama dengan langkah 4, teks catatan unduhan sama persis),
+  `lib/client/berkas-transfer.test.ts` dan `excel-export.test.ts`,
+  `web-rbac-boundary`, `schema-consistency`, `rbac-migration`,
+  `database-promotion`.
+- Typecheck kedua workspace dan Biome berkas yang diubah bersih; clippy bersih
+  untuk `transfer.rs`.
+
+`bun run check` penuh belum dijalankan (pemilik). Layar belum dicoba di
+aplikasi yang berjalan (tema gelap dan terang, lebar 360 px, unduh di
+Desktop/Android).
+
+Penyimpangan dan catatan, untuk ditinjau:
+
+- **Tidak ada paket bawaan yang bisa mengunduh berkas.** `payroll.run.disburse`
+  ada di paket Admin dan `hr.finance.view` di paket HRD; Q-157 (a) mewajibkan
+  keduanya, jadi hanya Superadmin atau role buatan sendiri. Paket tidak diubah;
+  `web-rbac-boundary` mengunci keadaan ini.
+- **`render_format` tidak punya kembaran Rust.** §27.3 menyebut kembar, §27.6
+  menyatakan berkas dirender di TS; yang diikuti §27.6, karena perender Rust
+  tidak pernah dipanggil.
+- **Modul `transfer.rs`/`transfer.ts` lahir di langkah 1** (seed bank butuh
+  tempat). `hris.rs` `PANJANG_REKENING` dijadikan `pub` supaya dipakai ulang.
+- **Angka dan aturan yang tidak disebut §27**: alias paling banyak 20,
+  `maks_berita` 1–200, judul kolom wajib 1–60 karakter, teks tetap boleh kosong
+  (kolom kosong bank), tab/baris baru ditolak di judul dan teks. CHECK DDL
+  tambahan: kode 3 digit, nomor rekening 5–20 digit, `xlsx` ⇔ pemisah kosong
+  (`char(9)` = tab). Tanpa indeks untuk tiga tabel kecil ini.
+- **Aturan tanda**: bank nonaktif = `bank_tidak_dikenal`; Excel umum tidak
+  pernah `tanpa_kode_bank`; baris di luar cakupan punya daftar sendiri, bukan
+  "manual"; nama pemilik rekening kosong tidak ditandai; `nominal_nol` =
+  `net_salary` ≤ 0 (CHECK membuatnya hanya 0).
+- **Parameter command**: `desktop_payroll_transfer(draft)` dengan `run_id`,
+  `id_rekening`, `id_format`, `tanggal_efektif`, `catat`
+  (`validasi_pilihan_transfer` ↔ `validasiPilihanTransfer`);
+  `desktop_transfer_settings_save(jenis, id, draft)`; nonaktifkan = simpan
+  `is_aktif = 0`. Rute dibuat di langkah 3, layanannya di langkah 5.
+- **Rekening debet berbank nonaktif ditolak saat mengunduh** (pesan sama dengan
+  rekening nonaktif); menonaktifkan bank di Pengaturan tetap tidak ditolak.
+- **Keunikan diperiksa sebelum menulis**, tidak dalam satu statement: dua
+  Superadmin yang menyimpan bersamaan bisa menghasilkan nama ganda.
+- **Format berbank hanya ditawarkan untuk rekening debet bank itu** (layar);
+  backend tidak memeriksa kecocokan bank format dan rekening debet.
+- **Catatan `TRANSFER_EXPORT` berkunci urut abjad** supaya teksnya sama di Rust
+  dan TS dengan atau tanpa fitur `preserve_order` serde_json. Ditulis sebelum
+  berkas disimpan: pengguna yang membatalkan dialog simpan tetap tercatat
+  mengunduh (yang dicatat adalah akses ke nomor rekening).
+- **Berkas teks**: teks yang memuat pemisah, kutip, atau baris baru selalu
+  dikutip walau format "tanpa kutip" (kolom tidak pernah bergeser); `desimal`
+  hanya nominal dan hanya CSV/TXT (xlsx selalu sel Angka); CRLF, UTF-8 tanpa
+  BOM; tanggal selalu `YYYY-MM-DD` (format kustom belum bisa memilih bentuk
+  tanggal).
+- **`buildXlsxWorkbook` mendapat opsi `tanpaJudul`** (aditif, bawaan tetap
+  menulis judul) untuk format xlsx tanpa baris judul.
+- **MSRV 1.77.2**: `Option::is_none_or` (1.82) diganti `map_or`.
+- **Layar**: Pengaturan tab "Transfer Bank" dimuat hanya saat tabnya dibuka;
+  isian bank profil keuangan memakai daftar bank aktif dan menampilkan nilai
+  lama yang tidak dikenal beserta nasibnya di berkas ("dikenali sebagai …" atau
+  "Perlu dibayar manual"); bila daftar bank gagal dimuat (database v43) isiannya
+  tetap teks. Mobile punya `RunDetailClient` sendiri, jadi tab "Transfer" dipasang
+  di sana dengan komponen bersama yang sama. Jejak unduhan di audit trail kedua
+  layar tampil sebagai "Berkas transfer diunduh" dengan ringkasan terbaca.
+- **Fungsi bantu baca database** `objek` ditulis ulang di
+  `services/transfer.ts`; padanannya di layanan HR lain privat.
+
+## 28. Urutan pengerjaan fase 14: pelaporan DJP, BPJS, dan Wajib Lapor
+
+**Rancangan, menunggu persetujuan pemilik.** Semula ditulis sebagai fase 13;
+sejak Q-161 (b) perbaikan rumus PPh 21 dan BPJS menjadi fase 13 dan bagian ini
+fase 14 (§28.11). §15.1 mencatat alurnya belum
+dipahami pemilik, jadi bagian ini dimulai dengan penjelasan (§28.1), lalu
+temuan kode yang memengaruhi kebenaran angka (§28.2), baru rancangan.
+Pertanyaan Q-160 sampai Q-172 di §28.10.
+
+**Catatan sumber**: aturan di §28.1 ditulis dari pengetahuan umum tentang
+peraturan sampai pertengahan 2026, bukan dari dokumen resmi terbaru. Nama
+formulir, kode objek pajak, kolom template, dan tenggat **wajib dicek ulang**
+dengan template resmi atau konsultan pajak pemilik sebelum langkah format
+(Q-160). Aplikasi tidak mengirim apa pun ke DJP atau BPJS.
+
+### 28.1 Penjelasan alur (untuk pemilik)
+
+**DJP: PPh 21 karyawan (Coretax, sejak 2025).**
+
+- Setiap bulan perusahaan (pemotong) memotong PPh 21 dari gaji, menyetorkannya
+  (sekitar tanggal 15 bulan berikutnya), lalu melapor SPT Masa PPh 21/26
+  (sekitar tanggal 20). Untuk setiap karyawan dibuat **bukti potong bulanan**
+  (BPMP untuk pegawai tetap; pegawai tidak tetap/harian memakai bukti potong
+  tersendiri). Di akhir tahun (atau saat karyawan keluar) dibuat **bukti
+  potong tahunan A1**.
+- Bulan Januari–November dipotong dengan **tarif efektif (TER)** dari bruto
+  sebulan. Bulan terakhir (Desember atau bulan keluar) dihitung ulang setahun
+  dengan **tarif Pasal 17**, dikurangi biaya jabatan, iuran pensiun/JHT pekerja,
+  dan PTKP; selisihnya menjadi PPh bulan itu (bisa lebih bayar).
+- Coretax menerima bukti potong diketik satu per satu atau **diimpor massal**
+  lewat template Excel resmi DJP yang dikonversi ke XML. Data per karyawan:
+  NIK (= NPWP 16 digit), status PTKP, kode objek pajak, penghasilan bruto,
+  tarif/TER, PPh dipotong, masa pajak. Data pemotong: NPWP dan NITKU
+  perusahaan.
+- **Yang bisa dilakukan aplikasi**: menyusun rekap per bulan per karyawan dan
+  berkas Excel berbentuk template impor Coretax, lalu HRD/keuangan
+  mengimpornya sendiri.
+
+**BPJS Ketenagakerjaan (SIPP) dan BPJS Kesehatan (e-Dabu).**
+
+- Iuran dibayar bulanan berdasarkan **tagihan** yang dihitung BPJS dari data
+  upah yang terdaftar di portal (BPJS TK sekitar tanggal 15, Kesehatan sekitar
+  tanggal 10 bulan berikutnya). Komponen TK: JHT, JKK, JKM, JP; Kesehatan
+  satu komponen, masing-masing bagian pekerja dan perusahaan.
+- "Pelaporan" BPJS terutama berarti **menjaga data di portal sama dengan
+  kenyataan**: menambah karyawan baru, menonaktifkan yang keluar, dan
+  memperbarui upah (lewat unggah Excel/template portal), lalu mencocokkan
+  tagihan dengan potongan di slip.
+- **Yang bisa dilakukan aplikasi**: rekap iuran per karyawan per komponen per
+  bulan dari angka yang benar-benar dipotong di payroll, dan daftar perubahan
+  bulan itu (masuk, keluar, upah berubah) untuk diperbarui di portal; tanda
+  bila karyawan dipotong BPJS tetapi nomor kepesertaannya kosong, atau
+  sebaliknya.
+
+**Wajib Lapor Ketenagakerjaan (WLKP, Kemnaker).**
+
+- Perusahaan melapor data ketenagakerjaan saat berdiri/berubah dan secara
+  berkala setiap tahun, lewat formulir daring (bukan unggah berkas gaji):
+  jumlah tenaga kerja menurut jenis kelamin, status hubungan kerja
+  (PKWT/PKWTT/harian/magang), pendidikan, jabatan, kewarganegaraan, rentang
+  upah, kepesertaan BPJS, dan data perusahaan.
+- **Yang bisa dilakukan aplikasi**: satu lembar rekap angka per tahun (atau per
+  tanggal acuan) yang tinggal disalin ke formulir.
+
+### 28.2 Temuan dari kode yang memengaruhi kebenaran laporan
+
+Rumus gaji, pajak, dan BPJS **tidak diubah** fase ini (preseden fase 2–5),
+tetapi laporan yang dibaca dari payroll mewarisi perilakunya:
+
+- **TER dihitung per proses gaji, bukan per bulan** (`calculate_pph21_ter`
+  menerima bruto satu run). Untuk gaji per jam yang diproses mingguan atau
+  dua mingguan, bruto tiap run lebih kecil dari bruto sebulan, sehingga
+  bracket TER lebih rendah dan PPh terpotong kurang.
+- **BPJS juga per run**: batas upah (JP, Kesehatan) diterapkan per run, dan
+  dasar iurannya bruto termasuk lembur.
+- **Gaji harian tetap (`FLAT_DAILY`) tidak dipotong PPh 21 maupun BPJS sama
+  sekali.** Pegawai harian di atas batas tarif harian tetap terutang PPh 21
+  menurut aturan pegawai tidak tetap.
+- **Tidak ada perhitungan ulang Desember/bulan keluar dengan Pasal 17.**
+  Bracket `PASAL_17` ditanam di `tax_rules` tetapi tidak dipakai rumus mana pun.
+  Akibatnya bukti potong A1 tidak bisa disusun dengan benar dari data
+  sekarang.
+- **Data pemotong belum ada**: `company_profile` tidak menyimpan NPWP, NITKU,
+  atau nomor pendaftaran BPJS perusahaan.
+- Data karyawan yang dibutuhkan sudah ada: NIK, NPWP, nomor BPJS (`hr_profil`,
+  khusus cloud, `hr.finance.view`/`hr.personal.view`), PTKP (`salary_configs`),
+  jenis kelamin, kontrak, pendidikan, jabatan (`master_data`, `hr_kontrak`,
+  `hr_profil`), angka potongan per komponen di
+  `payroll_items.breakdown_snapshot` (`bpjs[]`, `tax`).
+- **Bulan sebuah run** di repo ini sudah ditetapkan = bulan `period_start`
+  (jatah kasbon, schema v22). Laporan bulanan memakai aturan yang sama dan hanya
+  run `PAID` (Q-162).
+
+Usulan (Q-161): fase 13 **membaca angka apa adanya dan menandai** baris yang
+terdampak temuan di atas; perbaikan rumus (TER bulanan, dasar BPJS, PPh harian,
+rekonsiliasi Desember) menjadi **fase tersendiri sebelum atau sesudah** fase
+13, karena menyentuh uang di dua bahasa dan butuh vektor uji resmi.
+
+### 28.3 Model data
+
+- **Data pemotong/pemberi kerja** (Q-163): NPWP perusahaan 16 digit, NITKU,
+  nama penandatangan bukti potong, nomor pendaftaran BPJS TK dan Kesehatan.
+  Usulan (a): tabel khusus cloud baru `app_lapor_setting` (key/value, pola
+  `app_telegram_setting`), di versi skema berikutnya sesudah fase 12 (v44) dan
+  fase 13, tidak tersinkron ke perangkat. Alternatif (b):
+  kolom di `company_profile` (tabel platform tersinkron, aturan 29; menyentuh
+  keempat lapis); (c) `setting_gex_system` (tersinkron ke terminal scanner).
+- Tanpa tabel laporan: rekap dihitung saat dibuka dari `payroll_runs` +
+  `payroll_items` + profil, tidak ada status "sudah dilapor" yang disimpan
+  (Q-164 (a)).
+
+### 28.4 Laporan yang disusun
+
+1. **Rekap PPh 21 bulanan** (masa = bulan `period_start`, run `PAID`): per
+   karyawan NIK/NPWP, nama, PTKP, kategori TER, bruto (Σ run bulan itu), PPh
+   dipotong (Σ), jumlah run, tanda (`run_lebih_dari_satu` = TER per run,
+   `harian_tanpa_pph`, `tanpa_nik`, `ptkp_kosong`). Total = Σ setoran bulan itu.
+   Ekspor: Excel rekap + Excel berbentuk template impor Coretax (dibangun dari
+   template resmi yang diberikan pemilik, Q-160).
+2. **Rekap BPJS bulanan**: per karyawan nomor kepesertaan TK dan Kesehatan,
+   dasar upah, setiap komponen (`JHT_EMP`, `JHT_CO`, `JP_EMP`, `JP_CO`,
+   `JKK_CO`, `JKM_CO`, `BPJS_KES_EMP`, `BPJS_KES_CO`) dari
+   `breakdown_snapshot.bpjs`, total pekerja/perusahaan. Tanda
+   `dipotong_tanpa_nomor`, `bernomor_tanpa_potongan`, `run_lebih_dari_satu`.
+   Daftar perubahan bulan itu: masuk (`tanggal_daftar`), keluar (`id_keluar`
+   berlaku), upah berubah (`salary_configs.effective_date` di bulan itu).
+3. **Rekap WLKP tahunan** (per tanggal acuan, bawaan 31 Desember atau hari
+   ini): jumlah karyawan Aktif menurut L/P × jenis kontrak terakhir, menurut
+   pendidikan, menurut jabatan, WNA (Q-166: belum ada kolom kewarganegaraan),
+   kepesertaan BPJS (nomor terisi), rentang upah dari run terakhir.
+4. **A1 tahunan**: Q-165. Usulan: belum disusun sampai rekonsiliasi Pasal 17
+   ada; sementara disediakan rekap setahun (bruto, PPh dipotong, iuran
+   pekerja) sebagai bahan konsultan.
+
+Semua angka INTEGER rupiah, dijumlahkan tanpa pembagian; nominal dari
+`payroll_items`, tidak dihitung ulang.
+
+### 28.5 Hak akses
+
+Laporan memuat NIK, NPWP, dan gaji semua karyawan. Usulan (Q-167): wajib
+`payroll.export` (kini menganggur, cocok namanya) **dan** `hr.finance.view`;
+pengaturan data pemotong `payroll.config.manage` (Superadmin saja). Area tetap
+`payroll`; Mobile tidak (Q-168).
+
+### 28.6 Command, rute, dan layar
+
+- Rust: `desktop_report_tax_monthly`, `desktop_report_bpjs_monthly`,
+  `desktop_report_wlkp`, `desktop_report_setting(_save)` (perkiraan 4–5
+  command), bacaan payroll lokal + profil cloud. Web: aksi di rute payroll
+  atau rute baru `POST /api/payroll/reports`.
+- Layar: halaman "Pelaporan" di menu Penggajian (Web/Desktop), tiga tab
+  (PPh 21, BPJS, Wajib Lapor), pemilih bulan/tahun, tabel bertanda, ekspor
+  Excel; kartu "Data pemotong" di Pengaturan.
+
+### 28.7 Tidak dikerjakan di fase ini
+
+- Mengirim/menyetor ke Coretax, SIPP, e-Dabu, atau WLKP (tidak ada API terbuka
+  untuk perusahaan kecil, dan CSP Desktop menolak host eksternal).
+- Membuat kode billing, NTPN, atau menyimpan bukti setor.
+- PPh 21 bukan pegawai (driver lepas, tenaga ahli), PPh 21 final pesangon,
+  PPh 26.
+- Perbaikan rumus payroll §28.2 (fase tersendiri, Q-161).
+- Bukti potong A1 lengkap (Q-165).
+
+### 28.8 Langkah (setelah Q dijawab)
+
+| # | Langkah | Gerbang |
+| :-- | :-- | :-- |
+| 1 | Skema data pemotong (bila Q-163 (a): versi dan sentinel berikutnya sesudah fase 12 dan 13, tabel khusus cloud) | `audit:schema` + tes sentinel kedua workspace |
+| 2 | Aturan murni rekap PPh 21, BPJS, WLKP + tanda (kembar Rust ↔ TS, SQL harfiah) | vektor sama |
+| 3 | Command + rute + guard | `audit:contract` + `web-rbac-boundary` |
+| 4 | Bacaan cloud/lokal Rust + Web | tes `local_file` + `services/*.test.ts`: bulan = `period_start`, hanya `PAID`, dua run sebulan dijumlah dan ditandai |
+| 5 | Excel rekap ketiga laporan | tes workbook |
+| 6 | Template impor Coretax (dari template resmi, Q-160) | vektor dari template |
+| 7 | Layar, CLAUDE.md, "Sudah dibangun" | typecheck + Biome + `audit:docs`; `bun run check` oleh pemilik |
+
+### 28.9 Penanda yang ditinjau pemilik
+
+- **Aplikasi menyusun rekap dan berkas impor; melapor dan menyetor tetap
+  manual** di portal masing-masing.
+- **Angka laporan = angka yang dipotong payroll.** Bila rumus payroll keliru
+  untuk suatu kasus (§28.2), laporan ikut keliru dan hanya ditandai.
+- **A1 belum bisa disusun** tanpa rekonsiliasi Pasal 17.
+- Aturan pajak/BPJS di §28.1 perlu diverifikasi dengan template dan konsultan
+  sebelum format impor dibangun.
+
+### 28.10 Pertanyaan untuk pemilik
+
+| No | Pertanyaan | Usulan | Alasan |
+| :-- | :-- | :-- | :-- |
+| Q-160 | Bisa memberi template resmi terbaru (impor bukti potong Coretax, unggah upah SIPP/e-Dabu) atau kontak konsultan pajak? | Ya, sebelum langkah 6 | Format dan kolom resmi berubah; tidak boleh ditebak |
+| Q-161 | Temuan §28.2 (TER per run, dasar BPJS, harian tanpa PPh, tanpa rekonsiliasi Desember): (a) fase 13 menandai saja, perbaikan rumus fase tersendiri; (b) perbaiki rumus dulu sebelum fase 13; (c) biarkan? | (a), lalu putuskan urutan fase perbaikan | Perbaikan rumus menyentuh uang di Rust dan TS dan butuh vektor resmi; laporan tetap berguna dengan tanda |
+| Q-162 | Masa laporan: run `PAID` dengan `period_start` di bulan itu? | Ya | Sama dengan aturan kasbon; run yang belum dibayar belum dipotong |
+| Q-163 | Data pemotong (NPWP, NITKU, penandatangan, nomor BPJS perusahaan): (a) tabel khusus cloud baru; (b) kolom `company_profile`; (c) `setting_gex_system`? | (a) | Tidak perlu ada di terminal scanner; (b) menyentuh keempat lapis tabel platform |
+| Q-164 | Simpan status "sudah dilapor/disetor" per bulan? | Tidak di fase ini | Status di portal adalah sumber kebenarannya |
+| Q-165 | A1 tahunan: (a) rekap setahun sebagai bahan konsultan; (b) tunggu rekonsiliasi Pasal 17? | (a) | A1 yang benar butuh perhitungan setahun yang belum ada |
+| Q-166 | Ada karyawan WNA? Perlu kolom kewarganegaraan untuk WLKP? | Tanya klien | Belum ada kolomnya |
+| Q-167 | Izin laporan: `payroll.export` + `hr.finance.view`? | Ya | `payroll.export` sudah ada dan belum dipakai |
+| Q-168 | Pelaporan di Mobile? | Tidak | Pekerjaan bulanan meja keuangan; laporan lebar |
+| Q-169 | PPh 21 bukan pegawai (driver lepas) dan pesangon ikut? | Tidak di fase ini | Sumber dan tarifnya berbeda |
+| Q-170 | Urutan: fase 12 (transfer) lalu fase 13 (pelaporan)? | Ya | Transfer lebih jelas lingkupnya |
+| Q-171 | Rekap BPJS memakai angka yang dipotong payroll, atau upah terdaftar di portal? | Yang dipotong payroll, dengan tanda | Upah terdaftar portal tidak ada di aplikasi |
+| Q-172 | WLKP: tanggal acuan 31 Desember tahun lalu, atau bisa dipilih? | Bisa dipilih, bawaan 31 Desember | Laporan perubahan bisa diminta di tengah tahun |
+
+### 28.11 Jawaban sementara (13 Nov 2026)
+
+- **Q-160**: pemilik belum punya template resmi maupun konsultan; contoh akan
+  diminta dari calon klien. Langkah 6 (template impor Coretax) menunggu itu.
+- **Q-161: (b) perbaiki rumus dulu.** Alasan pemilik: ada perusahaan yang
+  menggaji karyawannya dua minggu sekali, jadi TER per proses gaji langsung
+  salah. Perbaikan rumus menjadi **fase 13 tersendiri** (rancangannya ditulis
+  terpisah), dan pelaporan ini bergeser menjadi **fase 14**.
+- **Q-170**: urutan yang berlaku: fase 12 berkas transfer, fase 13 perbaikan
+  rumus PPh 21 dan BPJS, fase 14 pelaporan.
+- Q-162 sampai Q-169, Q-171, dan Q-172 belum dijawab.

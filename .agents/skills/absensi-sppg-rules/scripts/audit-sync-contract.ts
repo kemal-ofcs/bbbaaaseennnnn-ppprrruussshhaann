@@ -246,6 +246,16 @@ const expectedCloudOnlyTables = [
   "hr_pelamar_berkas",
   "hr_pelatihan",
   "hr_pelatihan_peserta",
+  // HRIS fase 11 (v43, Q-138): pagu dan rencana pelatihan, induknya khusus
+  // cloud dan layarnya sudah butuh koneksi.
+  "hr_pelatihan_anggaran",
+  "hr_pelatihan_rencana",
+  // HRIS fase 12 (v44, §27.2): bank, rekening debet, dan format berkas
+  // transfer. Dipakai berkas transfer dan profil keuangan yang sudah khusus
+  // cloud, dan tidak boleh ikut ke terminal scanner.
+  "app_bank",
+  "app_bank_rekening",
+  "app_bank_format",
   "app_permission",
   "app_role",
   "app_session",
