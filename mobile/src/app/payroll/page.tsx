@@ -246,6 +246,7 @@ ${
 Upah Harian: ${IDR.format(detail.basic_salary)}`
     : `Kehadiran: ${detail.total_hadir ?? 0} Hari (${(detail.total_regular_hours || 0).toFixed(1)} Jam Reguler)
 Jam Lembur: ${(detail.total_overtime_hours || 0).toFixed(1)} Jam (Indeks ${(detail.total_overtime_index || 0).toFixed(2)})
+Jam Hari Libur: ${(detail.total_holiday_hours || 0).toFixed(1)} Jam (Indeks ${(detail.total_holiday_overtime_index || 0).toFixed(2)})
 Gaji Pokok: ${IDR.format(detail.basic_salary)}
 Upah Lembur: ${IDR.format(detail.overtime_salary)}`
 }
@@ -527,6 +528,14 @@ Status: Estimasi Real-Time ${companyName}`;
                           : `${(estimateDetail.total_overtime_hours || 0).toFixed(1)}j`}
                       </span>
                     </div>
+                    <div>
+                      Libur:{" "}
+                      <span className="font-bold text-rose-300">
+                        {isFlatDaily
+                          ? "–"
+                          : `${(estimateDetail.total_holiday_hours || 0).toFixed(1)}j`}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -721,7 +730,7 @@ Status: Estimasi Real-Time ${companyName}`;
               </div>
 
               {/* Rincian Kehadiran & Jam */}
-              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 grid grid-cols-3 gap-2 text-center">
+              <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 grid grid-cols-2 gap-2 text-center">
                 <div>
                   <span className="text-[10px] text-slate-400 block">
                     Total Hadir
@@ -746,6 +755,16 @@ Status: Estimasi Real-Time ${companyName}`;
                     {isFlatDaily
                       ? "–"
                       : `${(estimateDetail.total_overtime_hours || 0).toFixed(2)}j`}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] text-rose-400 block">
+                    Jam Hari Libur
+                  </span>
+                  <span className="font-bold text-rose-300 text-sm">
+                    {isFlatDaily
+                      ? "–"
+                      : `${(estimateDetail.total_holiday_hours || 0).toFixed(2)}j`}
                   </span>
                 </div>
               </div>
