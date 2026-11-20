@@ -1,7 +1,7 @@
 # HASIL.md — hasil `bun run check`
 
-- Waktu: 13 November 2026 16:28 WIB
-- Commit: 9310e63 (+ 6 berkas berubah, belum commit)
+- Waktu: 20 November 2026 12:55 WIB
+- Commit: 152878b (+ 26 berkas berubah/baru, belum commit)
 - Perintah: `bun run check` (root)
 - Exit code: 0
 - Status: **LULUS**
@@ -21,4 +21,4 @@
 
 ## Catatan
 - Seluruh pengujian skema 4-layer, 90 rute kontrak sinkronisasi, dan audit dokumentasi berhasil 100%.
-- TypeScript typecheck, Biome lint, Bun test, dan 475+ cargo unit test di kedua workspace web-desktop dan mobile lulus tanpa kegagalan.
+- TypeScript typecheck, Biome lint, Bun test, serta 477 cargo unit test di workspace mobile dan seluruh cargo unit test di web-desktop lulus tanpa kegagalan.

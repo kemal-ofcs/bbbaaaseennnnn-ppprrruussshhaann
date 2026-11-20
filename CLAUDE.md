@@ -45,6 +45,8 @@ bun run test:e2e:report   # buka HTML report setelah test selesai
 bun run test:e2e:install  # install Chromium browser (sekali saja)
 ```
 
+Supaya tidak membaca dua kali: (1) saat diagnosis, baris yang akan disunting dibaca UTUH sekali (tanpa `cut -c`/pemotongan), karena teks itulah `old_string` nanti; pemotongan hanya untuk menjelajah. (2) Bagian yang baru diperlukan setelah keputusan user (opsi terpilih) baru dibaca setelah keputusan itu, satu kali. (3) Satu berkas satu alat: jangan menyunting berkas dengan `sed` lalu dengan Edit, karena `sed` memaksa Read ulang sebelum Edit. (4) Cek hasil `sync:mobile` di salinan Mobile dengan grep literal kode satu baris yang baru ditulis (nama konstanta, potongan SQL), bukan kalimat komentar yang bisa terlipat ke baris berikutnya; grep 0 hasil berarti periksa polanya dulu sebelum menyimpulkan sinkron gagal.
+
 ## Pengujian End-to-End dengan Playwright
 
 Playwright dipakai untuk menguji **Web path** di `web-desktop/` — lapisan UI,

@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import {
   BATAS_IMPORT_MASSAL,
   BATAS_KOREKSI_MASSAL,
+  denganShift,
   jalankanBerurutan,
   ringkasHasil,
 } from "@/components/operational/aturanPilihPersonil";
@@ -35,6 +36,7 @@ import {
   prosesImportOffline,
 } from "@/lib/gateways/offline-import";
 import { getDaftarShift } from "@/lib/gateways/shift";
+import { eventImportKembar } from "@/lib/validations/import-kembar";
 import { tanggalTampil } from "@/lib/validations/tutup-buku";
 
 type OperationalTab = "koreksi" | "backup" | "manual";
@@ -74,12 +76,18 @@ export default function OperationalPage() {
   // Data Masters
   const [employees, setEmployees] = useState<Record<string, unknown>[]>([]);
   const [shifts, setShifts] = useState<Record<string, unknown>[]>([]);
+  // Nama dan jam shift master tampil di samping divisi pada pemilih personil.
+  const personilShift = useMemo(
+    () => denganShift(employees, shifts),
+    [employees, shifts],
+  );
   const [loadingMaster, setLoadingMaster] = useState<boolean>(true);
 
   // Lists for selected date
   const [corrections, setCorrections] = useState<Record<string, unknown>[]>([]);
   const [backups, setBackups] = useState<Record<string, unknown>[]>([]);
   const [imports, setImports] = useState<Record<string, unknown>[]>([]);
+  const importKembar = eventImportKembar(imports);
   const [loadingList, setLoadingList] = useState<boolean>(false);
 
   // Feedback State
@@ -745,7 +753,7 @@ export default function OperationalPage() {
               <PilihPersonil
                 id="kor-karyawan"
                 label="Pilih karyawan (bisa lebih dari satu)"
-                personil={employees}
+                personil={personilShift}
                 terpilih={korIds}
                 onChange={setKorIds}
                 batas={BATAS_KOREKSI_MASSAL}
@@ -897,7 +905,7 @@ export default function OperationalPage() {
               <PilihPersonil
                 id="bck-asal"
                 label="Karyawan asal (yang berhalangan)"
-                personil={employees}
+                personil={personilShift}
                 terpilih={bckAsalId ? [bckAsalId] : []}
                 onChange={(ids) => {
                   setBckAsalId(ids[0] ?? "");
@@ -910,7 +918,7 @@ export default function OperationalPage() {
               <PilihPersonil
                 id="bck-pengganti"
                 label="Karyawan pengganti"
-                personil={employees}
+                personil={personilShift}
                 terpilih={bckPenggantiId ? [bckPenggantiId] : []}
                 onChange={(ids) => setBckPenggantiId(ids[0] ?? "")}
                 disabled={loadingMaster || busy}
@@ -1068,7 +1076,7 @@ export default function OperationalPage() {
               <PilihPersonil
                 id="man-karyawan"
                 label="Pilih karyawan (bisa lebih dari satu)"
-                personil={employees}
+                personil={personilShift}
                 terpilih={manIds}
                 onChange={setManIds}
                 batas={BATAS_IMPORT_MASSAL}
@@ -1208,6 +1216,11 @@ export default function OperationalPage() {
                           {String(item.jam_pulang || "--:--")} •{" "}
                           {String(item.status_kehadiran || "Hadir")}
                         </span>
+                        {importKembar.has(evKey) ? (
+                          <span className="text-[11px] font-bold text-amber-300 mt-0.5">
+                            Dobel dengan baris lain. Hapus salah satunya.
+                          </span>
+                        ) : null}
                       </div>
                       <button
                         type="button"

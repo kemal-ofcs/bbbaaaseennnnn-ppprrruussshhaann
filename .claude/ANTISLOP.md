@@ -1,18 +1,18 @@
 # ANTISLOP.md — hasil antislop
 
-- Waktu: 13 November 2026 18:44 WIB
-- Commit: 9310e63 (+ 5 berkas berubah, belum commit)
+- Waktu: 20 November 2026 12:23 WIB
+- Commit: 152878b (+ 26 berkas berubah/baru, belum commit)
 - Berkas disunting: 0
 
 ## Disunting
-(Tidak ada — komentar menjelaskan alasan arsitektur/fallback dan teks UI sudah ringkas, lugas, dan bebas AI-slop)
+(Tidak ada — komentar menjelaskan alasan arsitektur/domain/keamanan dan teks UI sudah ringkas, lugas, dan bebas AI-slop)
 
 ## Dilewati
-- `prd-hris.md` — dokumen catatan perencanaan HRIS
-- `web-desktop/src/app/operators/page.tsx` — komentar dan teks UI tautan personil sudah bersih
-- `mobile/src/app/operators/page.tsx` — padanan mobile, bersih dan ringkas
-- `web-desktop/src/components/perjalanan/FormSuratJalan.tsx` — komentar alasan pencocokan lokasi dan teks peringatan sudah tepat
-- `mobile/src/components/perjalanan/FormSuratJalan.tsx` — padanan mobile, bersih dan tepat
+- `CLAUDE.md`, lockfiles, `package.json`, patches — di luar cakupan antislop
+- Berkas tes (`*.test.ts`) — data fixture pengujian
+- `mobile/src/lib/**`, `mobile/src-tauri/src/mobile/**` — salinan mobile dari web-desktop
+- `web-desktop/src/components/hris/ImporDataDiri.tsx` — komentar dan teks UI sudah ringkas
+- `web-desktop/src/lib/validations/` (`impor-data-diri.ts`, `import-kembar.ts`, `waktu-import.ts`) — komentar domain teknis bersih
+- `web-desktop/src/app/operational/page.tsx`, `PilihPersonil.tsx`, `HrisWorkspace.tsx` — teks UI operasional presisi
 
 ## Perlu tindakan
-selesai
