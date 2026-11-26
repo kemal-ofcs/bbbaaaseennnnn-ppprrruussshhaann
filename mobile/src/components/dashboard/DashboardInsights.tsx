@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/ui/Icon";
+import { TabBar } from "@/components/ui/TabBar";
 import { triggerHaptic } from "@/lib/client/haptics";
 import {
   getRekapBulanan,
@@ -145,27 +146,17 @@ export function DashboardInsights() {
 
   return (
     <section className="flex flex-col gap-3 rounded-3xl border border-white/10 bg-slate-900/70 p-3.5">
-      <div className="grid grid-cols-2 gap-1 rounded-2xl border border-white/10 bg-slate-950/80 p-1">
-        {(
-          [
-            ["bulanan", "Rekap Bulan Ini"],
-            ["peringkat", "Peringkat Terajin"],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => switchTab(value)}
-            className={`min-h-11 rounded-xl px-2 text-xs font-bold transition active:scale-95 ${
-              tab === value
-                ? "bg-sky-700 text-on-accent shadow-md"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      <TabBar
+        ariaLabel="Ringkasan kehadiran"
+        idPrefix="wawasan"
+        panelId="panel-wawasan"
+        value={tab}
+        onChange={switchTab}
+        tabs={[
+          { id: "bulanan", label: "Rekap Bulan Ini" },
+          { id: "peringkat", label: "Peringkat Terajin" },
+        ]}
+      />
 
       {error ? (
         <div className="rounded-2xl border border-rose-400/30 bg-rose-400/10 p-3 text-xs text-rose-200">

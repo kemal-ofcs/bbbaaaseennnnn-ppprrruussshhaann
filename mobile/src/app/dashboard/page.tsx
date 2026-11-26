@@ -206,7 +206,7 @@ export default function DashboardPage() {
         <Link
           href="/scanner"
           onClick={() => triggerHaptic("success")}
-          className="theme-invariant ikon-navy group relative flex items-center justify-between overflow-hidden rounded-3xl p-5 shadow-xl shadow-black/40 active:scale-[0.98] transition-all"
+          className="theme-invariant ikon-navy ikon-navy-tetap group relative flex items-center justify-between overflow-hidden rounded-3xl p-5 shadow-xl shadow-black/40 active:scale-[0.98] transition-all"
         >
           <div className="flex items-center gap-3.5">
             <div className="grid size-12 place-items-center rounded-2xl border border-[#f6c453]/40 bg-white/10 shadow-md">

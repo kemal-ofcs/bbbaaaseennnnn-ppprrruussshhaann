@@ -62,9 +62,14 @@ Perintah ini otomatis menjalankan build frontend (build:desktop) dulu.
 Hasil ada di web-desktop/src-tauri/target/release/bundle/
 
   Windows : nsis/Absensi Perusahaan_<versi>_x64-setup.exe   <- yang dibagikan
-            msi/Absensi Perusahaan_<versi>_x64_en-US.msi
+            (paket .msi dipisah agar build cepat; bila perlu .msi jalankan:
+            bun run tauri:build:msi)
   Linux   : deb/*.deb, rpm/*.rpm, appimage/*.AppImage
   Mac     : dmg/*.dmg, macos/*.app
+
+Varian iterasi cepat lokal (lewati tsc & React Compiler saat uji tampilan;
+JANGAN dipakai untuk paket rilis klien, tetap jalankan bun run check):
+  bun run tauri:build:fast
 
 Prasyarat per OS:
   Windows : Rust, Bun, Microsoft C++ Build Tools, WebView2 (sudah ada di Win 10/11).
@@ -83,15 +88,18 @@ protected your PC". Klien klik "More info" > "Run anyway".
 -----------------
   bun run sync:mobile                       (dari root, wajib dulu)
   cd mobile
-  bun run tauri:android:build:arm64         <- yang biasa dipakai (HP modern)
+  bun run tauri:android:build:arm64         <- yang biasa dipakai (APK ARM64)
 
 Hasil:
   mobile/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk
   (nama foldernya "universal" walau isinya hanya arm64; itu normal)
 
 Varian lain:
-  bun run tauri:android:build           semua arsitektur dalam satu APK (besar)
-  bun run tauri:android:build:split     satu APK per arsitektur
+  bun run tauri:android:build:aab           paket .aab ARM64 untuk Play Store
+  bun run tauri:android:build:split         satu APK per arsitektur
+  bun run tauri:android:build               semua arsitektur sekaligus (besar)
+  bun run tauri:android:build:arm64:fast    iterasi cepat lokal (lewati tsc &
+                                            React Compiler; bukan untuk rilis)
 
 Tanda tangan APK memakai mobile/src-tauri/keystore.properties (kunci rilis,
 di-gitignore). Simpan keystore dan kata sandinya baik-baik: kalau hilang,
@@ -111,6 +119,8 @@ lamanya, baru install APK baru. Pastikan antrean sinkronisasi sudah kosong.
 4. MOBILE iOS
 -------------
 WAJIB di Mac dengan Xcode. Tidak bisa dari Windows sama sekali.
+Sebelum build iOS, tambahkan kembali "staticlib" ke crate-type di
+mobile/src-tauri/Cargo.toml (dihapus di PC agar tidak membuat berkas .a iOS).
 
   bun run sync:mobile
   cd mobile
@@ -126,3 +136,28 @@ hanya bisa dicoba di iPhone sendiri lewat Xcode dan kedaluwarsa tiap 7 hari.
 --------------------
 Lihat web-desktop/src-tauri/icons/sumber/README.md. Setelah generate ulang,
 build ulang Desktop dan Android.
+
+
+6. TUNING MESIN WINDOWS PENGEMBANG (SEKALI SETEL MANUAL DI OS)
+--------------------------------------------------------------
+Agar kompilasi Rust/LLVM dan Gradle tidak terhambat swap HDD atau antivirus:
+
+a) Matikan Pagefile pada partisi HDD mekanik (D: dan E:):
+   Tekan Win+R -> SystemPropertiesAdvanced.exe -> Performance [Settings] ->
+   tab Advanced -> Virtual memory [Change] -> hilangkan centang "Automatically
+   manage paging file size" -> pilih D: dan E: lalu set "No paging file" [Set]
+   -> pastikan C: (SSD) tetap "System managed size" [Set] -> OK lalu restart.
+
+b) Tambahkan Folder Exclusion di Windows Security:
+   Windows Security -> Virus & threat protection -> Manage settings ->
+   Exclusions -> Add or remove exclusions -> tambahkan Folder:
+     C:\dev\absensi-perusahaan
+     C:\Users\<user>\.cargo
+     C:\Users\<user>\.rustup
+     C:\Users\<user>\.gradle
+
+c) Kebersihan RAM & artefak lama sebelum build rilis penuh:
+   - Tutup browser berat saat menjalankan tauri:build / tauri:android:build:arm64
+     agar sisa RAM cukup untuk rustc + Gradle (-Xmx2048m).
+   - Bila target/release/build/absensi_sppg_* menumpuk dari build bulan lama,
+     hapus folder duplikat lama sekali sebelum mengukur baseline baru.

@@ -8,6 +8,7 @@ import { Icon } from "@/components/ui/Icon";
 import { konfirmasiData } from "@/components/ui/KonfirmasiData";
 import { Modal } from "@/components/ui/Modal";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { TabBar } from "@/components/ui/TabBar";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { exportToCsv, exportToExcel } from "@/lib/client/excel-export";
 import { triggerHaptic } from "@/lib/client/haptics";
@@ -525,32 +526,26 @@ export default function HistoryPage() {
             </button>
           </div>
 
-          {/* Segmented Tab Switcher */}
-          <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-950/80 p-1 border border-white/10 mb-3">
-            <button
-              type="button"
-              onClick={() => handleTabChange("daily")}
-              className={`flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-bold transition active:scale-95 ${
-                activeTab === "daily"
-                  ? "bg-sky-700 text-on-accent shadow-md"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <Icon name="calendar" className="size-4" />
-              <span>Absensi Harian</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleTabChange("scan-logs")}
-              className={`flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-bold transition active:scale-95 ${
-                activeTab === "scan-logs"
-                  ? "bg-sky-700 text-on-accent shadow-md"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <Icon name="scanner" className="size-4" />
-              <span>Log Scan Mentah</span>
-            </button>
+          <div className="mb-3">
+            <TabBar
+              ariaLabel="Jenis riwayat"
+              idPrefix="riwayat"
+              panelId="panel-riwayat"
+              value={activeTab}
+              onChange={handleTabChange}
+              tabs={[
+                {
+                  id: "daily",
+                  label: "Absensi Harian",
+                  icon: <Icon name="calendar" className="size-4" />,
+                },
+                {
+                  id: "scan-logs",
+                  label: "Log Scan Mentah",
+                  icon: <Icon name="scanner" className="size-4" />,
+                },
+              ]}
+            />
           </div>
 
           {/* Date Pickers */}

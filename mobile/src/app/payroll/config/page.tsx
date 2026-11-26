@@ -21,6 +21,7 @@ import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { konfirmasiData } from "@/components/ui/KonfirmasiData";
 import { PilihCari } from "@/components/ui/PilihCari";
+import { TabBar } from "@/components/ui/TabBar";
 import { hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import {
@@ -642,30 +643,17 @@ export default function MobilePayrollConfigPage() {
           ))}
         </nav>
 
-        <div className="grid grid-cols-2 gap-1.5 rounded-2xl border border-white/10 bg-slate-900/60 p-1">
-          <button
-            type="button"
-            onClick={() => setActiveTab("salary")}
-            className={`min-h-10 rounded-xl text-xs font-bold transition ${
-              activeTab === "salary"
-                ? "bg-sky-700 text-on-accent"
-                : "text-slate-400 hover:bg-white/5"
-            }`}
-          >
-            Rate Gaji ({salaryConfigs.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("components")}
-            className={`min-h-10 rounded-xl text-xs font-bold transition ${
-              activeTab === "components"
-                ? "bg-sky-700 text-on-accent"
-                : "text-slate-400 hover:bg-white/5"
-            }`}
-          >
-            Komponen ({components.length})
-          </button>
-        </div>
+        <TabBar
+          ariaLabel="Bagian konfigurasi gaji"
+          idPrefix="konfigurasi-gaji"
+          panelId="panel-konfigurasi-gaji"
+          value={activeTab}
+          onChange={setActiveTab}
+          tabs={[
+            { id: "salary", label: `Rate Gaji (${salaryConfigs.length})` },
+            { id: "components", label: `Komponen (${components.length})` },
+          ]}
+        />
 
         {activeTab === "salary" ? (
           <div className="flex flex-col gap-3">

@@ -14,6 +14,7 @@ import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
 import { konfirmasiData } from "@/components/ui/KonfirmasiData";
 import { Modal } from "@/components/ui/Modal";
+import { TabBar } from "@/components/ui/TabBar";
 import { hasPermission } from "@/lib/auth/access";
 import {
   AKSI_UNDUH_TRANSFER,
@@ -317,35 +318,23 @@ export default function RunDetailClient() {
           </div>
         ) : null}
 
-        <div
-          className={`grid gap-1 rounded-2xl border border-white/10 bg-slate-950/80 p-1 ${
-            canTransfer ? "grid-cols-3" : "grid-cols-2"
-          }`}
-        >
-          {(
-            [
-              ["items", `Rincian (${items.length})`],
-              ["audit", `Audit (${auditLogs.length})`],
-              ...(canTransfer ? [["transfer", "Transfer"] as const] : []),
-            ] as const
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => {
-                triggerHaptic("light");
-                setTab(value);
-              }}
-              className={`min-h-11 rounded-xl text-xs font-bold transition active:scale-95 ${
-                tab === value
-                  ? "bg-sky-700 text-on-accent shadow-md"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <TabBar
+          ariaLabel="Bagian proses gaji"
+          idPrefix="proses-gaji"
+          panelId="panel-proses-gaji"
+          value={tab}
+          onChange={(next) => {
+            triggerHaptic("light");
+            setTab(next);
+          }}
+          tabs={[
+            { id: "items", label: `Rincian (${items.length})` },
+            { id: "audit", label: `Audit (${auditLogs.length})` },
+            ...(canTransfer
+              ? [{ id: "transfer" as const, label: "Transfer" }]
+              : []),
+          ]}
+        />
 
         {loading ? (
           <div className="flex flex-col gap-2">

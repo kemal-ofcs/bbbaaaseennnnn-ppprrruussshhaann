@@ -9,6 +9,7 @@ import { Icon } from "@/components/ui/Icon";
 import { konfirmasiData } from "@/components/ui/KonfirmasiData";
 import { Modal } from "@/components/ui/Modal";
 import { PilihCari } from "@/components/ui/PilihCari";
+import { TabBar } from "@/components/ui/TabBar";
 import { hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -507,27 +508,20 @@ export default function MobileMasterOperatorPage() {
 
         {/* Tabs & Primary Action */}
         <div className="rounded-3xl border border-white/15 bg-slate-900/90 p-3 shadow-xl">
-          <div className="grid grid-cols-2 gap-1 rounded-2xl border border-white/10 bg-slate-950/80 p-1">
-            {(["operators", "roles"] as const).map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => {
-                  triggerHaptic("light");
-                  setActiveTab(tab);
-                }}
-                className={`min-h-11 rounded-xl px-2 text-xs font-bold transition active:scale-95 ${
-                  activeTab === tab
-                    ? "bg-sky-700 text-on-accent shadow-md"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                {tab === "operators"
-                  ? `Pengguna (${operators.length})`
-                  : `Role & Akses (${roles.length})`}
-              </button>
-            ))}
-          </div>
+          <TabBar
+            ariaLabel="Bagian operator"
+            idPrefix="operator"
+            panelId="panel-operator"
+            value={activeTab}
+            onChange={(next) => {
+              triggerHaptic("light");
+              setActiveTab(next);
+            }}
+            tabs={[
+              { id: "operators", label: `Pengguna (${operators.length})` },
+              { id: "roles", label: `Role & Akses (${roles.length})` },
+            ]}
+          />
 
           {activeTab === "operators" ? (
             <input

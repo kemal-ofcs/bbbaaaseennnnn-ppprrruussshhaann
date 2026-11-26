@@ -9,6 +9,7 @@ import { Icon } from "@/components/ui/Icon";
 import { MemuatHalaman } from "@/components/ui/MemuatHalaman";
 import { Modal } from "@/components/ui/Modal";
 import { PilihCari } from "@/components/ui/PilihCari";
+import { TabBar } from "@/components/ui/TabBar";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { shareText } from "@/lib/client/share";
@@ -365,37 +366,20 @@ Status: Estimasi Real-Time ${companyName}`;
           </div>
         ) : null}
 
-        {/* Tab Navigation */}
-        <div className="grid grid-cols-2 gap-2 p-1 bg-slate-900 border border-slate-800 rounded-2xl">
-          <button
-            type="button"
-            onClick={() => {
-              triggerHaptic();
-              setActiveTab("estimate");
-            }}
-            className={`py-2 text-xs font-bold rounded-xl transition ${
-              activeTab === "estimate"
-                ? "bg-sky-700 text-on-accent shadow-md shadow-sky-500/20"
-                : "text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            Estimasi Real-Time
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              triggerHaptic();
-              setActiveTab("archive");
-            }}
-            className={`py-2 text-xs font-bold rounded-xl transition ${
-              activeTab === "archive"
-                ? "bg-sky-700 text-on-accent shadow-md shadow-sky-500/20"
-                : "text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            Arsip Slip Resmi
-          </button>
-        </div>
+        <TabBar
+          ariaLabel="Bagian gaji"
+          idPrefix="gaji"
+          panelId="panel-gaji"
+          value={activeTab}
+          onChange={(next) => {
+            triggerHaptic();
+            setActiveTab(next);
+          }}
+          tabs={[
+            { id: "estimate", label: "Estimasi Real-Time" },
+            { id: "archive", label: "Arsip Slip Resmi" },
+          ]}
+        />
 
         {/* Pemilih Personil Karyawan */}
         {employees.length > 0 && (

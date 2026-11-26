@@ -15,6 +15,7 @@ import { PilihPersonil } from "@/components/operational/PilihPersonil";
 import { Icon } from "@/components/ui/Icon";
 import { konfirmasiData } from "@/components/ui/KonfirmasiData";
 import { PilihCari } from "@/components/ui/PilihCari";
+import { TabBar } from "@/components/ui/TabBar";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { useAuth } from "@/lib/context/AuthContext";
@@ -670,54 +671,22 @@ export default function OperationalPage() {
             />
           </div>
 
-          {/* 3-Tab Segmented Control */}
-          <div className="grid grid-cols-3 gap-1 rounded-2xl bg-slate-950/80 p-1 border border-white/10">
-            <button
-              type="button"
-              onClick={() => {
-                triggerHaptic("light");
-                setActiveTab("koreksi");
-                setFeedback(null);
-              }}
-              className={`rounded-xl py-2 text-[11px] font-bold transition active:scale-95 ${
-                activeTab === "koreksi"
-                  ? "bg-sky-700 text-on-accent shadow-md"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              Koreksi Admin
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                triggerHaptic("light");
-                setActiveTab("backup");
-                setFeedback(null);
-              }}
-              className={`rounded-xl py-2 text-[11px] font-bold transition active:scale-95 ${
-                activeTab === "backup"
-                  ? "bg-sky-700 text-on-accent shadow-md"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              Backup Karyawan
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                triggerHaptic("light");
-                setActiveTab("manual");
-                setFeedback(null);
-              }}
-              className={`rounded-xl py-2 text-[11px] font-bold transition active:scale-95 ${
-                activeTab === "manual"
-                  ? "bg-sky-700 text-on-accent shadow-md"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              Entri Manual
-            </button>
-          </div>
+          <TabBar
+            ariaLabel="Bagian operasional"
+            idPrefix="operasional"
+            panelId="panel-operasional"
+            value={activeTab}
+            onChange={(next) => {
+              triggerHaptic("light");
+              setActiveTab(next);
+              setFeedback(null);
+            }}
+            tabs={[
+              { id: "koreksi", label: "Koreksi Admin" },
+              { id: "backup", label: "Backup Karyawan" },
+              { id: "manual", label: "Entri Manual" },
+            ]}
+          />
         </div>
 
         {/* Feedback Alert */}

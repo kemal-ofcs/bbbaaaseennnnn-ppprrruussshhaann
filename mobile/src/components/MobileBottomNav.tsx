@@ -77,7 +77,7 @@ export function MobileBottomNav() {
                 className="group flex min-w-12 flex-1 flex-col items-center gap-1 pb-1"
               >
                 <div
-                  className={`ikon-navy -mt-5 grid size-14 place-items-center rounded-2xl shadow-xl ring-4 ring-slate-950 transition-all active:scale-90 ${
+                  className={`ikon-navy ikon-navy-tetap -mt-5 grid size-14 place-items-center rounded-2xl shadow-xl ring-4 ring-slate-950 transition-all active:scale-90 ${
                     isActive ? "scale-105" : "hover:brightness-110"
                   }`}
                 >
