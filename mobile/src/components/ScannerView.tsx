@@ -722,7 +722,7 @@ export function ScannerView() {
                         faceHolding
                           ? "bg-emerald-400/20 text-emerald-200"
                           : faceVisible
-                            ? "bg-sky-400/20 text-sky-200"
+                            ? "bg-cyan-400/20 text-cyan-200"
                             : "bg-amber-400/20 text-amber-200"
                       }`}
                     >
@@ -795,7 +795,7 @@ export function ScannerView() {
               <button
                 type="button"
                 onClick={startCamera}
-                className="flex min-h-11 items-center gap-2 rounded-2xl bg-gradient-to-r from-sky-400 to-blue-600 px-6 font-bold text-slate-950 shadow-lg shadow-sky-950/50 active:scale-95 transition"
+                className="flex min-h-11 items-center gap-2 rounded-2xl bg-sky-700 px-6 font-bold text-on-accent shadow-lg shadow-sky-950/50 hover:bg-sky-600 active:scale-95 transition"
               >
                 <Icon name="scanner" className="size-4" />
                 <span>Buka Kamera</span>
@@ -946,7 +946,7 @@ export function ScannerView() {
           <button
             type="submit"
             disabled={!manualInput.trim() || isProcessing}
-            className="flex min-h-10 items-center justify-center rounded-xl bg-sky-500 px-4 text-xs font-bold text-slate-950 disabled:opacity-50 active:scale-95 transition"
+            className="flex min-h-10 items-center justify-center rounded-xl bg-sky-700 px-4 text-xs font-bold text-on-accent disabled:opacity-50 active:scale-95 transition"
           >
             Proses
           </button>

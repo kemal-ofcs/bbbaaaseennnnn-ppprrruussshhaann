@@ -544,7 +544,7 @@ export function EmployeeFormModal({
           <button
             type="submit"
             disabled={isSubmitting || shifts.length === 0}
-            className="px-5 py-2 bg-sky-600 text-on-accent rounded-xl font-bold hover:bg-sky-500 shadow-md shadow-sky-950 active:scale-95 transition disabled:opacity-50"
+            className="px-5 py-2 bg-sky-700 text-on-accent rounded-xl font-bold hover:bg-sky-600 shadow-md shadow-sky-950 active:scale-95 transition disabled:opacity-50"
           >
             {isSubmitting
               ? "Menyimpan..."

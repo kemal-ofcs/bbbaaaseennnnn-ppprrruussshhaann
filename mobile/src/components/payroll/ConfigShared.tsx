@@ -215,7 +215,7 @@ export function ConfigFormModal({
           <button
             type="submit"
             disabled={saving}
-            className="min-h-11 flex-1 rounded-xl bg-sky-500 font-black text-slate-950 shadow-lg transition active:scale-95 disabled:opacity-50"
+            className="min-h-11 flex-1 rounded-xl bg-sky-700 font-black text-on-accent shadow-lg transition active:scale-95 disabled:opacity-50"
           >
             {saving ? "Menyimpan..." : submitLabel}
           </button>

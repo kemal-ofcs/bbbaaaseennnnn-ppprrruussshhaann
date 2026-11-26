@@ -32,6 +32,7 @@ bun run check             # + cargo test
 
 bun run audit:schema      # JALANKAN DDL keempat lapisan, bandingkan hasilnya
 bun run audit:contract    # route kanonik, tabel snapshot, permission, command
+bun run audit:kontras     # text-white di atas latar berwarna -> pakai text-on-accent
 bun run verify:template   # semua gerbang sekaligus; --rust ikut cargo test
 
 bun run image:build --versi 1.0.0   # image Docker Web self-hosted -> rilis/ (butuh Docker)
@@ -598,8 +599,25 @@ Mobile) dan kembarannya `validations/accounting.ts` + `services/accounting.ts`.
   Rust lewat `include_str!` dan TS lewat import. Seed `INSERT OR IGNORE` di
   ketiga lapis, jadi akun yang diganti nama tidak ditimpa. Akun `sistem`
   dipakai jurnal otomatis (kasbon dan payroll, Fase 2): boleh diganti nama,
-  tidak boleh dinonaktifkan. Akun tidak pernah dihapus; menonaktifkan adalah
-  "hapus"-nya, karena jurnal lama tetap merujuknya.
+  tidak boleh dinonaktifkan. Akun yang sudah dipakai hanya bisa dinonaktifkan,
+  karena jurnal lama tetap merujuknya.
+- **Hapus permanen akun (schema versi 46).** Pola hapus barang v32:
+  `keu_akun.dihapus_pada` (keempat lapis + `ensure_column`/ALTER, sentinel
+  `-2042`), baris tidak pernah dibuang (snapshot `delete_missing: false`) dan
+  ikut outbox `accounting-account/save` tanpa rute baru. Syarat
+  `AKUN_BISA_DIHAPUS_SQL` (kembar `accounting.rs` ↔ `validations/accounting.ts`,
+  diperiksa harfiah oleh tes): tanpa baris jurnal dan tidak dirujuk
+  `keu_cicilan`, `keu_cicilan_bayar`, `keu_pinjaman`; akun sistem ditolak
+  terpisah. Daftar, neraca saldo, laporan, dan cek kode ganda menyaring
+  `AKUN_TAMPIL_SQL` (belum dihapus ATAU punya jurnal): kode akun terhapus bebas
+  dipakai lagi, dan akun yang ternyata dipakai jurnal perangkat offline tampil
+  lagi sebagai nonaktif (`dihapus: true`) supaya neraca tidak timpang.
+  `CLOUD_UPSERT_ACCOUNT_SQL` memakai `dihapus_pada = COALESCE(lama, baru)` dan
+  memaksa `is_aktif = 0`, di samping kunci kelompok/saldo normal yang sudah ada.
+  Izin sensitif `accounting.account.delete` (di `NOT IN` seed Admin Rust dan
+  `SENSITIVE_MUTATION_PERMISSIONS`); UI meminta mengetik `Hapus Permanen`. Akun
+  nonaktif disembunyikan di Bagan Akun kecuali "Tampilkan akun nonaktif"
+  dicentang; Neraca Saldo punya centang "Hanya akun bersaldo".
 - **Saldo tidak pernah disimpan**, jurnal append-only, pembatalan = jurnal
   pembalik `batal-<id>` (`accounting.reverse`, sensitif).
 - Header dan seluruh baris jurnal dikirim dalam SATU event
@@ -855,7 +873,17 @@ Pimpinan. Gaji hanya jumlah pegawai dan total bersih dari `payroll_runs`, dan
 totalnya disembunyikan bila pegawainya < 3 (`MIN_PEGAWAI_NOMINAL_GAJI`);
 `payroll_items` tidak pernah dibaca. Kejadian sebelum `aktif_sejak` atau lebih
 dari 7 hari tidak dikirim. Menambah kejadian = satu SQL sumber + fungsi pesan
-kembar + entri `BIDANG_KEJADIAN`/`bidang_kejadian`. Enam kejadian perjalanan
+kembar + entri `BIDANG_KEJADIAN`/`bidang_kejadian`. Satu pengecualian: saldo
+tutup buku yang berubah sesudah ditutup (`perlu_ditinjau`) diturunkan dari neraca,
+jadi tidak punya SQL sumber. Pencatatnya `tutup_buku::notify` ↔ `notify` di
+`services/tutup-buku.ts` (command `desktop_accounting_close_notify`, route
+`POST /api/accounting/close-notify`, `AutoTutupBukuRunner` tiap 30 menit di sesi
+`accounting.view`), yang menulis `tutup-berubah:<id_tutup>` berkejadian `tutup_buku`
+lewat `antrean_tutup_berubah` ↔ `antreanTutupBerubah`, hanya bila `tutup_buku_siap` ↔
+`tutupBukuSiap`. Ini KEADAAN sekarang, jadi `aktif_sejak`/7 hari tidak berlaku.
+Desktop/Mobile menghitung dari SQLite lokal, jadi hanya bila sinkron terakhir paling
+lama 900 detik (`MAKS_DETIK_SINKRON_PEMBERITAHUAN`). Rincian: `prd-tutup-buku-telegram.md`.
+Enam kejadian perjalanan
 ke grup Armada ada di subbagian "Notifikasi armada" di bawah, dan tiga belas
 kejadian HR ke grup HRD di "HRIS fase 8" dan "HRIS fase 9"; seluruhnya 26
 kejadian.
@@ -986,9 +1014,11 @@ Rincian dan keputusan pemilik di `prd-hris.md` §16. Logika `desktop/hris.rs`
 vektor yang sama; SQL kembar diperiksa harfiah oleh `hris.test.ts`. Sentinel
 `-2032`, `REQUIRED_TABLE_COUNT` 79.
 
-- **Tersinkron** (`delete_missing: false`, tidak ada baris yang dihapus):
-  `hr_cabang`, `hr_divisi`, `hr_divisi_nama` (setiap nama yang pernah dipakai,
-  menumpang `hr-division/save`), `hr_jabatan`, `hr_kontrak` (append-only,
+- **Tersinkron**: `hr_cabang`, `hr_divisi`, `hr_divisi_nama` (setiap nama yang
+  pernah dipakai, menumpang `hr-division/save`), `hr_jabatan` (`delete_missing:
+  true` sejak v47: master yang bukan bawaan dan tidak pernah dirujuk boleh dihapus
+  lewat `desktop_hr_master_delete` / aksi `hapus-master`, penjaga rujukan di
+  DELETE-nya, versi `_CLOUD_` menambah lowongan dan anggaran/rencana pelatihan), `hr_kontrak` (append-only,
   pembatalan `batal-<id>`). Rute `hr-branch|hr-division|hr-position/save`,
   `hr-contract/create`. `master_data` + `id_cabang/id_divisi/id_jabatan/id_atasan`.
 - **Khusus cloud** (Q-30, Q-45): `hr_profil`, `hr_dokumen_jenis`, `hr_dokumen`,
@@ -1058,6 +1088,12 @@ diperiksa harfiah oleh `hr-pengajuan.test.ts`. Sentinel `-2033`,
   menyetujui). HRD: view, submit, decide; Atasan: view, submit, urgent.
   Halaman `/pengajuan` (area `pengajuan`) di Web, Desktop, dan Mobile; tab Cuti
   di rincian karyawan dan jenis + aturan cuti di tab Organisasi `/hris`.
+
+- **Aturan cuti per jabatan** (2026-11-25, tanpa skema baru): kunci
+  `hr_cuti_<isian>:jab:<id_jabatan>` menimpa aturan umum per isian
+  (`aturanCutiKaryawan` ↔ `AturanCuti::karyawan`, dipakai `hitung_jatah`);
+  simpan `jabatan: {id: draft | null}` (`null` = kosongkan, ikut umum); akhir
+  periode menilai "diuangkan" per karyawan.
 
 ## HRIS fase 3: lembur (SPL), tukar shift, dinas luar (schema versi 38)
 
@@ -1132,7 +1168,10 @@ di `desktop/hr_pengajuan.rs` (disalin ke Mobile) ↔ `validations/hr-pengajuan.t
   `_baris` (rute `hr-reimburse-payment/create`, pola `drv_upah_bayar`, pembatalan
   `batal-<id_bayar>`) selalu tersedia, juga untuk cuti diuangkan (`uang:`,
   Q-62); total dari nominal berlaku, satu karyawan per pembayaran. Penyesuaian
-  `uang:` yang sudah dibayar tidak bisa dibatalkan. Pembukuannya jurnal manual.
+  `uang:` yang sudah dibayar tidak bisa dibatalkan. Sejak v47 dijurnal otomatis di transaksi yang sama
+  (`jrn-reimb-<id_bayar>`, sumber `Reimburse`: Reimburse → `akun-beban-reimburse`,
+  Cuti Diuangkan → `akun-beban-gaji`, kredit akun bayar `id_akun_bayar`, bawaan
+  `akun-kas`), dibalik `balik_jurnal_tx` saat pembayaran dibatalkan.
 - **Mode `hr_reimburse_bayar`** (`terpisah` bawaan / `gaji`, lewat aksi aturan
   cuti): `reimburse_gaji` ↔ `reimburseGaji` di rekap DAN pembekuan, ditambahkan
   SESUDAH kasbon (`net = pay.net − kasbon + reimburse`), bruto/PPh/BPJS tidak
@@ -1272,6 +1311,11 @@ cloud, baca) diperiksa harfiah oleh `hr-kinerja.test.ts`. Sentinel `-2037`,
   mengikuti peta `boleh` dari backend.
 - **Semua perangkat wajib diperbarui sebelum penilaian dipakai**: perangkat
   v40 tidak mengenal tiga rute baru dan enam tabel snapshot.
+
+- **Periode `Rentang Tanggal`** (v47, sentinel `-2043`): hanya untuk penilaian
+  (`JENIS_PERIODE_PENILAIAN`), bukan periode bawaan; `periode_rentang(jenis,
+  mulai, selesai)` maks 366 hari; CHECK `periode_jenis` dibangun ulang salin-DDL
+  di cloud dan lokal (`ensure_periode_kinerja_values`, Desktop + Mobile).
 
 ## HRIS fase 7: rekrutmen dan pelatihan (schema versi 42)
 

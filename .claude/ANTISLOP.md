@@ -1,18 +1,23 @@
 # ANTISLOP.md — hasil antislop
 
-- Waktu: 20 November 2026 12:23 WIB
-- Commit: 152878b (+ 26 berkas berubah/baru, belum commit)
-- Berkas disunting: 0
+- Waktu: 2026-11-26 22:00 WIB
+- Commit: 7275736 (+ 241 berkas berubah dan 35 berkas baru, belum commit)
+- Berkas disunting: 4 (+ 1 salinan lewat `sync:mobile`)
+- Cakupan: berkas langkah 1–7 PRD UI navy + emas (`prd-ui-navy-emas.md`)
 
 ## Disunting
-(Tidak ada — komentar menjelaskan alasan arsitektur/domain/keamanan dan teks UI sudah ringkas, lugas, dan bebas AI-slop)
+- `web-desktop/src/app/globals.css` — komentar — banner `====` PageHeader/Akses Cepat dan Login jadi 2 baris; komentar `@theme` sky, token emas, form terang, dan garis input gelap dipadatkan (rujukan PRD dibuang)
+- `mobile/src/app/globals.css` — komentar — banner Login dan `.hub-row` jadi 1–2 baris
+- `web-desktop/src/components/ui/TabBar.tsx` — komentar — kepala 8 baris jadi 3 (kontrak id tab/panel saja)
+- `web-desktop/src/components/ui/QuickActionTile.tsx` — komentar — rujukan "(Q-1)" dibuang
 
 ## Dilewati
-- `CLAUDE.md`, lockfiles, `package.json`, patches — di luar cakupan antislop
-- Berkas tes (`*.test.ts`) — data fixture pengujian
-- `mobile/src/lib/**`, `mobile/src-tauri/src/mobile/**` — salinan mobile dari web-desktop
-- `web-desktop/src/components/hris/ImporDataDiri.tsx` — komentar dan teks UI sudah ringkas
-- `web-desktop/src/lib/validations/` (`impor-data-diri.ts`, `import-kembar.ts`, `waktu-import.ts`) — komentar domain teknis bersih
-- `web-desktop/src/app/operational/page.tsx`, `PilihPersonil.tsx`, `HrisWorkspace.tsx` — teks UI operasional presisi
+- `QuickActionGrid.tsx`, `MemuatHalaman.tsx`, `PageHeader.tsx`, blok `.tab-bar*`/`.sakelar*`/`.memuat-halaman*` — komentar sudah satu baris dan membawa fakta (kontras, area sentuh, offset cincin)
+- Berkas B3 (±56 berkas `bg-sky-700 … text-on-accent`, B1 cyan/emerald) — hanya nama kelas, tanpa komentar atau teks baru
+- Berkas lain di `git diff` (pekerjaan HRIS/keuangan/tutup buku sebelum PRD ini) — di luar cakupan
+- `mobile/src/components/ui/{TabBar,MemuatHalaman,Sakelar}.tsx` — salinan `sync:mobile`
+- `*.test.ts`, `biome.json`, `prd-ui-navy-emas.md`, `CLAUDE.md` — aturan cakupan
 
 ## Perlu tindakan
+- `bun run sync:mobile` sudah dijalankan ulang; `TabBar.tsx` Mobile identik.
+- Peringatan `noDescendingSpecificity` di diagnostik editor `globals.css` Web bukan dari suntingan ini (hanya komentar); Biome repo lulus di check 13:13.

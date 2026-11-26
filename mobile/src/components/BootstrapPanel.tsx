@@ -401,7 +401,7 @@ export function BootstrapPanel({
                   </label>
                 </>
               ) : (
-                <p className="rounded-2xl border border-sky-400/30 bg-sky-400/5 p-3 text-[11px] font-bold leading-4 text-sky-100">
+                <p className="rounded-2xl border border-cyan-400/30 bg-cyan-400/5 p-3 text-[11px] font-bold leading-4 text-cyan-100">
                   Data disimpan pada berkas SQLite di perangkat ini. Tidak ada
                   alamat server maupun Auth Token yang perlu diisi, dan aplikasi
                   berjalan penuh tanpa internet.
@@ -589,7 +589,7 @@ export function BootstrapPanel({
             <button
               type="submit"
               disabled={submitting}
-              className="min-h-12 rounded-2xl bg-sky-400 px-4 text-sm font-black text-slate-950 disabled:opacity-50"
+              className="min-h-12 rounded-2xl bg-sky-700 px-4 text-sm font-black text-on-accent disabled:opacity-50"
             >
               {submitting ? "Mengamankan database..." : "Aktifkan Superadmin"}
             </button>

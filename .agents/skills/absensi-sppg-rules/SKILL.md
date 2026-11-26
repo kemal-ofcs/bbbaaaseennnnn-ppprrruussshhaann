@@ -421,7 +421,7 @@ Dokumen ini adalah **standar tertinggi (Golden Standard)** pengembangan pada pro
 
 Untuk detail implementasi teknis setiap area, rujuk file referensi berikut:
 1. [references/01-bootstrap-and-security.md](references/01-bootstrap-and-security.md) — Vault Argon2id, AES-GCM, Zero-Secret Build, RBAC, & Rate Limiting.
-2. [references/02-sync-canonical-and-outbox.md](references/02-sync-canonical-and-outbox.md) — 90 Route Kanonik, Idempotensi, Atomic Receipt, & Empty-Cloud Safety.
+2. [references/02-sync-canonical-and-outbox.md](references/02-sync-canonical-and-outbox.md) — 94 Route Kanonik, Idempotensi, Atomic Receipt, & Empty-Cloud Safety.
 3. [references/03-schema-4layer-consistency.md](references/03-schema-4layer-consistency.md) — 68 Snapshot Tables, DDL vs Zod vs Rust, & Shift Rekonsiliasi.
 4. [references/04-hardware-and-android-lifecycle.md](references/04-hardware-and-android-lifecycle.md) — Lifecycle Kamera Android WebView, WebPki TLS, ProGuard R8, & GPS Cache.
 5. [references/05-business-logic-edge-cases.md](references/05-business-logic-edge-cases.md) — Shift Malam Lintas Hari, Auto-Alfa, Koreksi Admin, & Geofence.
@@ -439,7 +439,7 @@ flowchart TD
     
     subgraph Phase1 [Tahap 1: Investigasi Tanpa Asumsi]
         A1[Periksa DDL storage.rs, turso.rs, db-schema.ts]
-        A2[Periksa 90 Canonical Routes & 68 Snapshot Tables]
+        A2[Periksa 94 Canonical Routes & 68 Snapshot Tables]
         A3[Reuse fungsi di gateways/ dan backend Rust]
     end
     

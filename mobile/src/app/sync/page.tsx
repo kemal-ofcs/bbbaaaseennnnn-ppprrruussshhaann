@@ -286,7 +286,7 @@ export default function SyncPage() {
             type="button"
             onClick={handleSyncNow}
             disabled={isSyncing}
-            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-sky-400 via-sky-500 to-blue-600 text-sm font-black text-slate-950 shadow-xl shadow-sky-950/60 active:scale-[0.98] transition disabled:opacity-50"
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-sky-700 text-sm font-black text-on-accent hover:bg-sky-600 shadow-xl shadow-sky-950/60 active:scale-[0.98] transition disabled:opacity-50"
           >
             <Icon
               name="sync"

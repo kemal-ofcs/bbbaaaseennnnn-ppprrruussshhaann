@@ -446,7 +446,7 @@ export function DigitalIdCardPreview({
             }}
             className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition-all ${
               previewMode === "card"
-                ? "bg-sky-500 text-slate-950 shadow"
+                ? "bg-sky-700 text-on-accent shadow"
                 : "text-slate-400 hover:text-slate-200"
             }`}
           >
@@ -460,7 +460,7 @@ export function DigitalIdCardPreview({
             }}
             className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition-all ${
               previewMode === "qr"
-                ? "bg-sky-500 text-slate-950 shadow"
+                ? "bg-sky-700 text-on-accent shadow"
                 : "text-slate-400 hover:text-slate-200"
             }`}
           >
@@ -589,7 +589,7 @@ export function DigitalIdCardPreview({
           type="button"
           disabled={sharingCard || templateRendering}
           onClick={() => void handleShareCard()}
-          className="flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 px-3 py-2.5 text-xs font-bold text-slate-950 hover:brightness-110 active:scale-95 transition disabled:opacity-40 shadow-sm"
+          className="flex items-center justify-center gap-1.5 rounded-xl bg-sky-700 px-3 py-2.5 text-xs font-bold text-on-accent hover:bg-sky-600 active:scale-95 transition disabled:opacity-40 shadow-sm"
         >
           <Icon name="share" className="size-4" />
           <span className="truncate">

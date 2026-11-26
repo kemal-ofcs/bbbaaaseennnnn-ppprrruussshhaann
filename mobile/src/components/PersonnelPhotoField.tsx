@@ -253,7 +253,7 @@ export function PersonnelPhotoField({
                 triggerHaptic("light");
                 fileInputRef.current?.click();
               }}
-              className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-500 active:scale-95 disabled:opacity-50"
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-sky-700 px-3 py-1.5 text-xs font-semibold text-on-accent shadow-sm transition hover:bg-sky-600 active:scale-95 disabled:opacity-50"
             >
               <Icon name="upload" className="size-3.5" />
               {photoDataUrl ? "Ganti Foto" : "Unggah Foto"}

@@ -9,6 +9,7 @@ import { Icon } from "@/components/ui/Icon";
 import { konfirmasiData } from "@/components/ui/KonfirmasiData";
 import { Modal } from "@/components/ui/Modal";
 import { PilihCari } from "@/components/ui/PilihCari";
+import { Sakelar } from "@/components/ui/Sakelar";
 import {
   hitungJamKerjaNormalMenit,
   isShiftFleksibel,
@@ -499,7 +500,7 @@ export default function MobileShiftPage() {
               <button
                 type="button"
                 onClick={openAddModal}
-                className="flex items-center gap-1.5 rounded-2xl bg-sky-500 px-3.5 py-2 text-xs font-black text-slate-950 shadow-md hover:bg-sky-400 active:scale-95 transition"
+                className="flex items-center gap-1.5 rounded-2xl bg-sky-700 px-3.5 py-2 text-xs font-black text-on-accent shadow-md hover:bg-sky-600 active:scale-95 transition"
               >
                 <svg
                   className="size-4"
@@ -875,25 +876,14 @@ export default function MobileShiftPage() {
                     tanpa keterlambatan dan tanpa batas jam pulang.
                   </span>
                 </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={modeFleksibel}
-                  aria-label="Jadikan shift ini fleksibel"
-                  onClick={() => {
+                <Sakelar
+                  checked={modeFleksibel}
+                  onChange={(aktif) => {
                     triggerHaptic("light");
-                    setModeFleksibel(!modeFleksibel);
+                    setModeFleksibel(aktif);
                   }}
-                  className={`relative h-6 w-11 shrink-0 rounded-full transition ${
-                    modeFleksibel ? "bg-violet-500" : "bg-slate-700"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-0.5 size-5 rounded-full bg-white transition-all ${
-                      modeFleksibel ? "left-[22px]" : "left-0.5"
-                    }`}
-                  />
-                </button>
+                  label="Jadikan shift ini fleksibel"
+                />
               </div>
               {modeFleksibel ? (
                 <p className="mt-2 rounded-xl bg-slate-950/60 p-2 text-[10px] leading-4 text-violet-200">
@@ -1250,7 +1240,7 @@ export default function MobileShiftPage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 rounded-xl bg-sky-500 py-3 text-xs font-black text-slate-950 shadow-lg hover:bg-sky-400 active:scale-95 transition disabled:opacity-50"
+                className="flex-1 rounded-xl bg-sky-700 py-3 text-xs font-black text-on-accent shadow-lg hover:bg-sky-600 active:scale-95 transition disabled:opacity-50"
               >
                 {saving
                   ? "Menyimpan..."

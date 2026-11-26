@@ -135,7 +135,7 @@ export default function DashboardPage() {
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">{formattedDate}</p>
             </div>
-            <div className="grid size-12 place-items-center rounded-2xl border border-sky-400/30 bg-sky-500/10 text-sky-300 shadow-inner">
+            <div className="ikon-navy grid size-12 place-items-center rounded-2xl shadow-inner">
               <Icon name="clock" className="size-6 stroke-[2]" />
             </div>
           </div>
@@ -206,10 +206,10 @@ export default function DashboardPage() {
         <Link
           href="/scanner"
           onClick={() => triggerHaptic("success")}
-          className="theme-invariant group relative flex items-center justify-between overflow-hidden rounded-3xl border border-sky-400/40 bg-gradient-to-r from-sky-500 via-sky-600 to-blue-700 p-5 shadow-xl shadow-sky-950/60 active:scale-[0.98] transition-all"
+          className="theme-invariant ikon-navy group relative flex items-center justify-between overflow-hidden rounded-3xl p-5 shadow-xl shadow-black/40 active:scale-[0.98] transition-all"
         >
           <div className="flex items-center gap-3.5">
-            <div className="grid size-12 place-items-center rounded-2xl bg-white/20 text-white shadow-md">
+            <div className="grid size-12 place-items-center rounded-2xl border border-[#f6c453]/40 bg-white/10 shadow-md">
               <Icon name="scanner" className="size-6 stroke-[2.2]" />
             </div>
             <div>
@@ -232,10 +232,10 @@ export default function DashboardPage() {
           <Link
             href="/karyawan"
             onClick={() => triggerHaptic("light")}
-            className="group flex items-center justify-between rounded-2xl border border-white/10 bg-slate-900/70 px-4 py-3.5 hover:bg-slate-900/90 active:scale-[0.98] transition-all"
+            className="hub-row group flex items-center justify-between rounded-2xl px-4 py-3.5 active:scale-[0.98]"
           >
             <div className="flex items-center gap-3">
-              <div className="grid size-10 place-items-center rounded-2xl border border-white/10 bg-slate-800/60 text-slate-300">
+              <div className="ikon-navy grid size-10 place-items-center rounded-2xl">
                 <Icon name="users" className="size-5" />
               </div>
               <div>
@@ -257,8 +257,8 @@ export default function DashboardPage() {
         {/* Statistics Grid (Hanya jika memiliki izin dashboard.view) */}
         {canViewMetrics ? (
           <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-4 backdrop-blur-md">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+            <div className="kartu-angka rounded-2xl p-4">
+              <span className="kartu-angka-label text-[11px] font-semibold uppercase tracking-wider">
                 Total Hadir
               </span>
               <div className="flex items-baseline gap-2 mt-1">
@@ -266,13 +266,19 @@ export default function DashboardPage() {
                   {isLoading ? "--" : (metrics?.hadirHariIni ?? 0)}
                 </span>
                 <span className="text-xs text-slate-400 font-medium">
-                  / {metrics?.totalKaryawan ?? 0}
+                  / {metrics?.wajibAbsenHariIni ?? metrics?.totalKaryawan ?? 0}
                 </span>
               </div>
+              {metrics?.belumAbsenHariIni !== undefined ? (
+                <p className="mt-1 text-[11px] text-slate-400">
+                  Belum absen {metrics.belumAbsenHariIni} • libur{" "}
+                  {metrics.liburHariIni}
+                </p>
+              ) : null}
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-4 backdrop-blur-md">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+            <div className="kartu-angka rounded-2xl p-4">
+              <span className="kartu-angka-label text-[11px] font-semibold uppercase tracking-wider">
                 Terlambat
               </span>
               <div className="flex items-baseline gap-2 mt-1">
@@ -285,8 +291,8 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-4 backdrop-blur-md">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+            <div className="kartu-angka rounded-2xl p-4">
+              <span className="kartu-angka-label text-[11px] font-semibold uppercase tracking-wider">
                 Izin / Sakit
               </span>
               <div className="flex items-baseline gap-2 mt-1">
@@ -299,8 +305,8 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-4 backdrop-blur-md">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+            <div className="kartu-angka rounded-2xl p-4">
+              <span className="kartu-angka-label text-[11px] font-semibold uppercase tracking-wider">
                 Alfa / Belum
               </span>
               <div className="flex items-baseline gap-2 mt-1">

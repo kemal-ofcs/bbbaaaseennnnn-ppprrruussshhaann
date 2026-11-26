@@ -77,17 +77,15 @@ export function MobileBottomNav() {
                 className="group flex min-w-12 flex-1 flex-col items-center gap-1 pb-1"
               >
                 <div
-                  className={`-mt-5 grid size-14 place-items-center rounded-2xl shadow-xl transition-all active:scale-90 ${
-                    isActive
-                      ? "bg-gradient-to-tr from-sky-400 via-sky-500 to-blue-600 text-slate-950 shadow-sky-500/40 ring-4 ring-slate-950 ring-offset-2 ring-offset-sky-500/30"
-                      : "bg-gradient-to-tr from-sky-500 to-blue-700 text-on-accent shadow-sky-950/60 ring-4 ring-slate-950 hover:brightness-110"
+                  className={`ikon-navy -mt-5 grid size-14 place-items-center rounded-2xl shadow-xl ring-4 ring-slate-950 transition-all active:scale-90 ${
+                    isActive ? "scale-105" : "hover:brightness-110"
                   }`}
                 >
                   <Icon name="scanner" className="size-7 stroke-[2.2]" />
                 </div>
                 <span
                   className={`text-[10px] font-semibold leading-none transition-colors ${
-                    isActive ? "text-sky-300 font-bold" : "text-slate-400"
+                    isActive ? "nav-aktif font-bold" : "text-slate-400"
                   }`}
                 >
                   {item.label}
@@ -103,13 +101,13 @@ export function MobileBottomNav() {
               onClick={() => triggerHaptic("light")}
               className={`flex min-h-12 min-w-12 flex-1 flex-col items-center justify-center gap-1 rounded-2xl py-1 text-center transition-all active:scale-95 ${
                 isActive
-                  ? "text-sky-300 font-bold"
+                  ? "nav-aktif font-bold"
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
               <div
                 className={`grid size-8 place-items-center rounded-xl transition-colors ${
-                  isActive ? "bg-sky-400/15" : "bg-transparent"
+                  isActive ? "nav-aktif-ikon" : "bg-transparent"
                 }`}
               >
                 <Icon name={item.icon} className="size-5" />

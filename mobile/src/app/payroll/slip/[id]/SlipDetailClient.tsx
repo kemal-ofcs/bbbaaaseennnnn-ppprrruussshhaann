@@ -7,6 +7,7 @@ import { LicenseHolderLabel } from "@/components/license/LicenseNotice";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
+import { MemuatHalaman } from "@/components/ui/MemuatHalaman";
 import { canAccessArea } from "@/lib/auth/access";
 import { triggerHaptic } from "@/lib/client/haptics";
 import { shareText } from "@/lib/client/share";
@@ -147,11 +148,7 @@ Status: LUNAS / DIBAYAR`;
   };
 
   if (!isHydrated || authLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-slate-950 text-slate-400">
-        Memuat otorisasi...
-      </div>
-    );
+    return <MemuatHalaman />;
   }
 
   let breakdown: BreakdownSnapshot = {};
@@ -189,7 +186,7 @@ Status: LUNAS / DIBAYAR`;
             type="button"
             onClick={handleShare}
             disabled={sharing || !slip}
-            className="px-3 py-2 bg-sky-600 hover:bg-sky-500 text-on-accent rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow"
+            className="px-3 py-2 bg-sky-700 hover:bg-sky-600 text-on-accent rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow"
           >
             <Icon name="share" className="w-4 h-4" />
             <span>{sharing ? "Membagikan..." : "Bagikan"}</span>

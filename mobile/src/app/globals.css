@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
+/* Skala sky = skala navy, sama dengan @theme Web. Tema terang membalik
+   ujungnya di blok "Skala aksen di tema terang". */
+@theme {
+  --color-sky-50: #eef2fc;
+  --color-sky-100: #dce4f9;
+  --color-sky-200: #bccbf3;
+  --color-sky-300: #93a9ea;
+  --color-sky-400: #7b93e3;
+  --color-sky-500: #4a68d4;
+  --color-sky-600: #2f4fbf;
+  --color-sky-700: #10308a;
+  --color-sky-800: #0c2470;
+  --color-sky-900: #0a1a4f;
+  --color-sky-950: #061033;
+}
+
 :root {
   color-scheme: dark;
   --app-background: #030712;
@@ -7,10 +23,19 @@
   --app-surface: rgba(15, 23, 42, 0.85);
   --app-surface-raised: rgba(30, 41, 59, 0.75);
   --app-border: rgba(255, 255, 255, 0.12);
-  --app-primary: #38bdf8;
-  --app-primary-strong: #0284c7;
+  --app-primary: #7b93e3;
+  --app-primary-strong: #2f4fbf;
+  /* Identitas navy + emas, sama dengan Web. Garis >= 3:1, teks >= 4,5:1. */
+  --app-navy: #0a1a4f;
+  --app-navy-strong: #10308a;
+  --app-gold: #f6c453;
+  --app-gold-line: #86682a;
+  --app-gold-text: #f6c453;
   --app-text: #f8fafc;
   --app-text-muted: #94a3b8;
+  /* Garis kontrol form >= 3:1 terhadap latar (WCAG 1.4.11), sama dengan Web. */
+  --app-input-border: #56658a;
+  --app-input-border-hover: #7584aa;
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", Roboto, sans-serif;
@@ -38,7 +63,7 @@ body {
   min-width: 320px;
   min-height: 100dvh;
   background:
-    radial-gradient(circle at 50% 0%, rgb(56 189 248 / 15%), transparent 28rem),
+    radial-gradient(circle at 50% 0%, rgb(123 147 227 / 15%), transparent 28rem),
     radial-gradient(
       circle at 100% 100%,
       rgb(59 130 246 / 10%),
@@ -70,7 +95,7 @@ textarea {
 }
 
 ::selection {
-  background: rgb(56 189 248 / 32%);
+  background: rgb(123 147 227 / 32%);
   color: white;
 }
 
@@ -128,7 +153,8 @@ textarea {
   --color-slate-800: #e2e8f0;
   --color-slate-700: #cbd5e1;
   --color-slate-600: #94a3b8;
-  --color-slate-500: #64748b;
+  /* #64748b hanya 4,34:1 di atas permukaan #f1f5f9; #5b677c 5,2:1. */
+  --color-slate-500: #5b677c;
   --color-slate-400: #475569;
   --color-slate-300: #334155;
   --color-slate-200: #1e293b;
@@ -153,15 +179,22 @@ textarea {
   --app-surface: rgba(255, 255, 255, 0.92);
   --app-surface-raised: rgba(241, 245, 249, 0.92);
   --app-border: rgba(15, 23, 42, 0.12);
-  --app-primary: #0284c7;
-  --app-primary-strong: #0369a1;
+  --app-primary: #2f4fbf;
+  --app-primary-strong: #10308a;
+  --app-gold: #d97706;
+  --app-gold-line: #d97706;
+  --app-gold-text: #92400e;
   --app-text: #0f172a;
   --app-text-muted: #475569;
+  /* Lebih gelap dari Web (#8391b5): isian Mobile juga duduk di slate-900/800
+     (#f1f5f9/#e2e8f0 di tema ini), dan garisnya tetap >= 3:1 di sana. */
+  --app-input-border: #7584aa;
+  --app-input-border-hover: #5b6b94;
 }
 
 :root[data-theme="light"] body {
   background:
-    radial-gradient(circle at 50% 0%, rgb(56 189 248 / 12%), transparent 28rem),
+    radial-gradient(circle at 50% 0%, rgb(47 79 191 / 12%), transparent 28rem),
     radial-gradient(
       circle at 100% 100%,
       rgb(59 130 246 / 8%),
@@ -171,7 +204,7 @@ textarea {
 }
 
 :root[data-theme="light"] ::selection {
-  background: rgb(2 132 199 / 22%);
+  background: rgb(47 79 191 / 22%);
   color: #0f172a;
 }
 
@@ -216,11 +249,13 @@ body {
  * tidak perlu diubah karena tembus pandang.
  */
 :root[data-theme="light"] {
-  --color-sky-950: #f0f9ff;
-  --color-sky-900: #e0f2fe;
-  --color-sky-400: #0284c7;
-  --color-sky-300: #0369a1;
-  --color-sky-200: #075985;
+  /* Skala navy dicermin (400<->600, 300<->700, 200<->800). Teks terendah
+     #2f4fbf: 7,0:1 di putih, 5,7:1 di #e2e8f0. */
+  --color-sky-950: #eef2fc;
+  --color-sky-900: #dce4f9;
+  --color-sky-400: #2f4fbf;
+  --color-sky-300: #10308a;
+  --color-sky-200: #0c2470;
 
   --color-blue-950: #eff6ff;
   --color-blue-900: #dbeafe;
@@ -248,13 +283,13 @@ body {
 
   --color-teal-950: #f0fdfa;
   --color-teal-900: #ccfbf1;
-  --color-teal-400: #0d9488;
+  --color-teal-400: #0f766e;
   --color-teal-300: #0f766e;
   --color-teal-200: #115e59;
 
   --color-cyan-950: #ecfeff;
   --color-cyan-900: #cffafe;
-  --color-cyan-400: #0891b2;
+  --color-cyan-400: #0e7490;
   --color-cyan-300: #0e7490;
   --color-cyan-200: #155e75;
 
@@ -285,8 +320,8 @@ body {
 
 /* Nada ujung 50/100 ikut ditukar supaya simetris dengan 900/950 di atas. */
 :root[data-theme="light"] {
-  --color-sky-100: #0c4a6e;
-  --color-sky-50: #082f49;
+  --color-sky-100: #0a1a4f;
+  --color-sky-50: #061033;
   --color-blue-100: #1e3a8a;
   --color-blue-50: #172554;
   --color-indigo-100: #312e81;
@@ -332,13 +367,13 @@ body {
   --color-slate-900: #0f172a;
   --color-slate-950: #020617;
 
-  --color-sky-50: #f0f9ff;
-  --color-sky-100: #e0f2fe;
-  --color-sky-200: #bae6fd;
-  --color-sky-300: #7dd3fc;
-  --color-sky-400: #38bdf8;
-  --color-sky-900: #0c4a6e;
-  --color-sky-950: #082f49;
+  --color-sky-50: #eef2fc;
+  --color-sky-100: #dce4f9;
+  --color-sky-200: #bccbf3;
+  --color-sky-300: #93a9ea;
+  --color-sky-400: #7b93e3;
+  --color-sky-900: #0a1a4f;
+  --color-sky-950: #061033;
 
   --color-blue-50: #eff6ff;
   --color-blue-100: #dbeafe;
@@ -511,4 +546,445 @@ body {
   --color-purple-400: #c084fc;
   --color-purple-900: #581c87;
   --color-purple-950: #3b0764;
+}
+
+/* Login: hero navy di kedua tema, hanya panel form ikut tema. Kelas semantik
+   karena utilitas slate/white dibalik blok tema terang. */
+.login-shell {
+  background:
+    radial-gradient(circle at 15% 10%, rgb(37 99 235 / 18%), transparent 32rem),
+    radial-gradient(circle at 85% 90%, rgb(246 196 83 / 8%), transparent 28rem),
+    #060b1c;
+}
+.login-frame {
+  border: 1px solid rgb(246 196 83 / 18%);
+  box-shadow: 0 40px 90px -40px rgb(0 0 0 / 80%);
+}
+.login-hero {
+  position: relative;
+  isolation: isolate;
+  color: #ffffff;
+  background: linear-gradient(140deg, #0a1a4f 0%, #10308a 48%, #0a1640 100%);
+}
+.login-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgb(246 196 83 / 9%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(246 196 83 / 9%) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: linear-gradient(
+    160deg,
+    transparent 10%,
+    #000 55%,
+    transparent 95%
+  );
+}
+.login-hero::after {
+  content: "";
+  position: absolute;
+  inset: auto auto -30% -20%;
+  z-index: -1;
+  width: 70%;
+  aspect-ratio: 1;
+  pointer-events: none;
+  background: radial-gradient(circle, rgb(246 196 83 / 22%), transparent 65%);
+}
+.login-hero .login-hero-title,
+.login-hero .login-hero-name {
+  color: #ffffff;
+}
+.login-hero .login-hero-sub {
+  color: #f6c453;
+}
+.login-panel {
+  background: #0b1430;
+  color: #e2e8f0;
+}
+.login-panel .login-heading {
+  color: #ffffff;
+}
+.login-panel .login-label {
+  color: #cbd5e1;
+}
+.login-muted {
+  color: #94a3b8;
+}
+.login-field {
+  border: 1px solid #253463;
+  background: #060c20;
+  color: #f1f5f9;
+  transition:
+    border-color 150ms,
+    box-shadow 150ms;
+}
+.login-field:focus-within {
+  border-color: #f6c453;
+  box-shadow: 0 0 0 3px rgb(246 196 83 / 20%);
+}
+.login-field input {
+  color: #f1f5f9 !important;
+}
+.login-field input::placeholder {
+  color: #8391ab !important;
+}
+.login-field-icon {
+  color: #f6c453;
+}
+.login-field-btn {
+  color: #94a3b8;
+}
+.login-field-btn:hover {
+  color: #f1f5f9;
+}
+.login-link {
+  color: #f6c453;
+}
+.login-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.login-check {
+  accent-color: #f6c453;
+}
+.login-chip {
+  border: 1px solid rgb(246 196 83 / 35%);
+  background: rgb(246 196 83 / 8%);
+  color: #e2e8f0;
+}
+.login-btn {
+  border: 1px solid rgb(246 196 83 / 45%);
+  background: linear-gradient(180deg, #2152d9, #1a3a94);
+  color: #ffffff;
+  box-shadow: 0 12px 30px -12px rgb(29 78 216 / 70%);
+}
+.login-btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, #2a5ff0, #1e44a8);
+}
+.login-btn:focus-visible,
+.login-link:focus-visible,
+.login-field-btn:focus-visible {
+  outline: 2px solid #f6c453;
+  outline-offset: 2px;
+}
+
+html[data-theme="light"] .login-shell {
+  background:
+    radial-gradient(circle at 15% 10%, rgb(37 99 235 / 10%), transparent 32rem),
+    #e9eef7;
+}
+html[data-theme="light"] .login-frame {
+  border-color: rgb(15 23 42 / 8%);
+  box-shadow: 0 40px 90px -45px rgb(15 23 42 / 45%);
+}
+html[data-theme="light"] .login-panel {
+  background: #ffffff;
+  color: #0f172a;
+}
+html[data-theme="light"] .login-panel .login-heading {
+  color: #0b1640;
+}
+html[data-theme="light"] .login-panel .login-label {
+  color: #1e293b !important;
+}
+html[data-theme="light"] .login-muted {
+  color: #475569;
+}
+html[data-theme="light"] .login-field {
+  border-color: #c3cde0;
+  background: #f3f6fc;
+}
+html[data-theme="light"] .login-field:focus-within {
+  border-color: #b45309;
+  box-shadow: 0 0 0 3px rgb(180 83 9 / 16%);
+}
+html[data-theme="light"] .login-field input {
+  color: #0f172a !important;
+}
+html[data-theme="light"] .login-field input::placeholder {
+  color: #64748b !important;
+}
+html[data-theme="light"] .login-field-icon {
+  color: #1e3a8a;
+}
+html[data-theme="light"] .login-field-btn {
+  color: #475569;
+}
+html[data-theme="light"] .login-field-btn:hover {
+  color: #0f172a;
+}
+html[data-theme="light"] .login-link {
+  color: #92400e;
+}
+html[data-theme="light"] .login-check {
+  accent-color: #1e3a8a;
+}
+html[data-theme="light"] .login-panel .login-chip {
+  border-color: #e3cf9f;
+  background: #fdf8ec;
+  color: #1e293b;
+}
+html[data-theme="light"]
+  .login-panel
+  :is(.login-btn, .login-link, .login-field-btn):focus-visible {
+  outline-color: #1e3a8a;
+}
+
+/* Sakelar (components/ui/Sakelar.tsx): warna status, sama di kedua tema.
+   Lintasan >= 3:1 di #0f172a dan #ffffff: aktif #059669, nonaktif #64748b. */
+.sakelar-wrap {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.5rem;
+}
+.sakelar {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 2.75rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 9999px;
+  background-color: #64748b;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+/* Area sentuh 44px tanpa memperbesar tampilan. */
+.sakelar::before {
+  content: "";
+  position: absolute;
+  inset: -0.625rem -0.25rem;
+}
+.sakelar[aria-checked="true"] {
+  background-color: #059669;
+}
+.sakelar:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.sakelar:focus-visible {
+  outline: 2px solid #f6c453;
+  outline-offset: 2px;
+}
+.sakelar-kenop {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1.125rem;
+  height: 1.125rem;
+  border: 1px solid rgb(15 23 42 / 12%);
+  border-radius: 9999px;
+  background-color: #ffffff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 40%);
+  transition: transform 150ms ease;
+}
+.sakelar[aria-checked="true"] .sakelar-kenop {
+  transform: translateX(1.25rem);
+}
+.sakelar-status {
+  min-width: 3.75rem;
+  text-align: right;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+.sakelar-wrap[data-aktif="true"] .sakelar-status {
+  color: #34d399;
+}
+html[data-theme="light"] .sakelar:focus-visible,
+html.light .sakelar:focus-visible {
+  outline-color: #10308a;
+}
+html[data-theme="light"] .sakelar-status,
+html.light .sakelar-status {
+  color: #475569;
+}
+html[data-theme="light"] .sakelar-wrap[data-aktif="true"] .sakelar-status,
+html.light .sakelar-wrap[data-aktif="true"] .sakelar-status {
+  color: #047857;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sakelar,
+  .sakelar-kenop {
+    transition: none;
+  }
+}
+
+/* TabBar (components/ui/TabBar.tsx, disalin ke Mobile): tab aktif navy bergaris emas. */
+.tab-bar {
+  display: flex;
+  gap: 0.25rem;
+  overflow-x: auto;
+  padding: 0.25rem;
+  border: 1px solid var(--app-border);
+  border-radius: 0.875rem;
+  background-color: var(--app-surface);
+  scrollbar-width: thin;
+}
+.tab-bar-tab {
+  display: inline-flex;
+  flex: 1 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid transparent;
+  border-radius: 0.625rem;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--app-text-muted);
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease,
+    color 150ms ease;
+}
+/* Tab tidak aktif tetap tampak sebagai tombol: garis lembut, bukan teks lepas. */
+.tab-bar-tab:not([aria-selected="true"]) {
+  border-color: rgb(148 163 184 / 22%);
+  background-color: rgb(255 255 255 / 3%);
+}
+.tab-bar-tab:hover {
+  border-color: rgb(148 163 184 / 40%);
+  background-color: rgb(255 255 255 / 6%);
+  color: var(--app-text);
+}
+html[data-theme="light"] .tab-bar-tab:not([aria-selected="true"]),
+html.light .tab-bar-tab:not([aria-selected="true"]) {
+  border-color: #c9d1e6;
+  background-color: #ffffff;
+}
+.tab-bar-tab[aria-selected="true"] {
+  border-color: rgb(246 196 83 / 40%);
+  background: linear-gradient(
+    140deg,
+    var(--app-navy) 0%,
+    var(--app-navy-strong) 100%
+  );
+  box-shadow: inset 0 -2px 0 #f6c453;
+  color: #ffffff;
+}
+/* Offset negatif: wadah overflow-x memotong cincin yang jatuh di luar tombol. */
+.tab-bar-tab:focus-visible {
+  outline: 2px solid var(--app-gold);
+  outline-offset: -2px;
+}
+html[data-theme="light"] .tab-bar-tab:not([aria-selected="true"]):hover,
+html.light .tab-bar-tab:not([aria-selected="true"]):hover {
+  border-color: #8391b5;
+  background-color: #f5f7fc;
+}
+@media (min-width: 1024px) {
+  .tab-bar[data-vertikal-lg] {
+    position: sticky;
+    top: 5rem;
+    flex-direction: column;
+  }
+  .tab-bar[data-vertikal-lg] .tab-bar-tab {
+    justify-content: flex-start;
+  }
+}
+
+.memuat-halaman {
+  background-color: var(--app-background);
+  color: var(--app-text-muted);
+}
+.memuat-halaman-putar {
+  border: 4px solid var(--app-gold-line);
+  border-top-color: transparent;
+}
+
+/* Garis netral input (border-white/*, border-slate-*) hanya ~1,3:1 di tema
+   gelap dan ~1,5:1 di tema terang (skala slate dibalik). Diganti token >= 3:1.
+   Pencocokan diawali spasi/awal kelas supaya `hover:border-*` dan
+   `focus:border-*` tidak ikut. Tidak berlapis sehingga menang atas utilitas
+   Tailwind; `:not(:focus)` membiarkan `focus:border-*` tetap berlaku. */
+:is(input:not([type="checkbox"]):not([type="radio"]), select, textarea):is(
+    [class^="border-white/"],
+    [class*=" border-white/"],
+    [class^="border-slate-"],
+    [class*=" border-slate-"]
+  ):not(:focus),
+.pilih-cari-tombol {
+  border-color: var(--app-input-border);
+}
+:is(input:not([type="checkbox"]):not([type="radio"]), select, textarea):is(
+    [class^="border-white/"],
+    [class*=" border-white/"],
+    [class^="border-slate-"],
+    [class*=" border-slate-"]
+  ):hover:not(:focus):not(:disabled) {
+  border-color: var(--app-input-border-hover);
+}
+
+/* Panah dropdown SVG berjarak tetap 0.875rem dari tepi, sama dengan Web. */
+select:not([multiple]) {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2394a3b8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 7.5 5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.875rem center;
+  background-size: 1.125rem;
+  padding-right: 2.75rem;
+}
+:root[data-theme="light"] select:not([multiple]) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23475569' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 7.5 5 5 5-5'/%3E%3C/svg%3E");
+}
+
+/* Kartu menu, kotak ikon, kartu angka (padanan `.aksi-cepat` Web). */
+.hub-row {
+  border: 1px solid var(--app-gold-line);
+  background-color: rgb(15 23 42 / 80%);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+.hub-row:hover {
+  border-color: var(--app-gold);
+  box-shadow: inset 0 0 0 1px var(--app-gold);
+}
+.hub-row:focus-visible {
+  outline: 2px solid var(--app-gold);
+  outline-offset: 2px;
+}
+/* Kotak ikon navy berikon emas: Menu, dashboard, dan tombol Scanner bilah bawah. */
+.ikon-navy {
+  border: 1px solid rgb(246 196 83 / 35%);
+  background: linear-gradient(
+    140deg,
+    var(--app-navy) 0%,
+    var(--app-navy-strong) 100%
+  );
+  color: #f6c453;
+}
+.nav-aktif {
+  color: var(--app-gold-text);
+}
+.nav-aktif-ikon {
+  background-color: rgb(246 196 83 / 15%);
+}
+.kartu-angka {
+  border: 1px solid var(--app-gold-line);
+  background-color: rgb(255 255 255 / 3%);
+}
+.kartu-angka-label {
+  color: var(--app-text-muted);
+}
+:root[data-theme="light"] .nav-aktif-ikon {
+  background-color: rgb(146 64 14 / 10%);
+}
+:root[data-theme="light"] .hub-row {
+  background-color: #ffffff;
+}
+:root[data-theme="light"] .hub-row:focus-visible {
+  outline-color: #10308a;
+}
+:root[data-theme="light"] .kartu-angka {
+  background-color: rgb(255 255 255 / 60%);
 }

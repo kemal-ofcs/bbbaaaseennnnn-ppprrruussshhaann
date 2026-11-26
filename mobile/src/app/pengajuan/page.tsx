@@ -5,6 +5,7 @@ import { Suspense, useEffect, useState } from "react";
 import { PengajuanWorkspace } from "@/components/hris/PengajuanWorkspace";
 import { PenilaianKinerja } from "@/components/hris/PenilaianKinerja";
 import { MobileAppShell } from "@/components/MobileAppShell";
+import { TabBar } from "@/components/ui/TabBar";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
 import { useAuth } from "@/lib/context/AuthContext";
 import { useHydrated } from "@/lib/hooks/useHydrated";
@@ -61,30 +62,16 @@ function HalamanPengajuan() {
           </p>
         </div>
         {isAuthenticated && allowed && bolehPengajuan && bolehPenilaian ? (
-          <div
-            className="flex flex-wrap gap-2"
-            role="tablist"
-            aria-label="Bagian pengajuan"
-          >
-            {(
-              [
-                ["pengajuan", "Cuti & Izin"],
-                ["penilaian", "Penilaian"],
-              ] as Array<[Tab, string]>
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                id={`pengajuan-tab-${id}`}
-                type="button"
-                role="tab"
-                aria-selected={tab === id}
-                onClick={() => setPilihan(id)}
-                className={`min-h-10 rounded-xl px-4 text-sm font-bold ${tab === id ? "bg-sky-500 text-white" : "bg-slate-900 text-slate-300"}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <TabBar
+            ariaLabel="Bagian pengajuan"
+            idPrefix="pengajuan"
+            value={tab}
+            onChange={setPilihan}
+            tabs={[
+              { id: "pengajuan", label: "Cuti & Izin" },
+              { id: "penilaian", label: "Penilaian" },
+            ]}
+          />
         ) : null}
         {isAuthenticated && allowed && tab === "pengajuan" && bolehPengajuan ? (
           <PengajuanWorkspace />

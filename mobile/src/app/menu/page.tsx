@@ -93,9 +93,9 @@ export default function MenuPage() {
                     id={`menu-${item.area}`}
                     href={item.href}
                     onClick={() => triggerHaptic("light")}
-                    className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-2xl border border-white/10 bg-slate-900/70 p-2 text-center transition active:scale-95"
+                    className="hub-row flex min-h-24 flex-col items-center justify-center gap-2 rounded-2xl p-2 text-center active:scale-95"
                   >
-                    <span className="grid size-10 place-items-center rounded-xl bg-sky-500/15 text-sky-300">
+                    <span className="ikon-navy grid size-10 place-items-center rounded-xl">
                       <Icon name={item.icon} className="size-5" />
                     </span>
                     <span className="text-xs font-semibold leading-tight text-slate-200">

@@ -4,7 +4,7 @@ Dokumen ini mendefinisikan kontrak resmi komunikasi sinkronisasi dua arah antara
 
 ---
 
-## 1. 90 Route Kanonik Outbox (The 90 Canonical Hyphen Routes)
+## 1. 94 Route Kanonik Outbox (The 94 Canonical Hyphen Routes)
 
 Hanya 40 pasangan `(domain, operation)` berikut yang diizinkan untuk diproduksi oleh outbox dan diproses oleh consumer backend/Turso:
 

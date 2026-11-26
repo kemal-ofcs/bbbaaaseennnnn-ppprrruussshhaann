@@ -11,6 +11,7 @@ import { AutoAlfaRunner } from "./AutoAlfaRunner";
 import { AutoFotoCleanupRunner } from "./AutoFotoCleanupRunner";
 import { AutoSyncRunner } from "./AutoSyncRunner";
 import { AutoTelegramRunner } from "./AutoTelegramRunner";
+import { AutoTutupBukuRunner } from "./AutoTutupBukuRunner";
 import { LicenseNotice } from "./license/LicenseNotice";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { MobileHeader } from "./MobileHeader";
@@ -78,6 +79,7 @@ export function MobileAppShell({
       <AutoAlfaRunner />
       <AutoSyncRunner />
       <AutoTelegramRunner />
+      <AutoTutupBukuRunner />
       <AutoFotoCleanupRunner />
       <MobileHeader />
       <LicenseNotice />

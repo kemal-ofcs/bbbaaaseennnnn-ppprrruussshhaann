@@ -360,7 +360,7 @@ export function EmployeeDetailModal({
               }}
               className={`min-w-0 flex-1 rounded-xl py-2 px-2 text-center text-xs font-bold transition-all truncate ${
                 isActive
-                  ? "bg-gradient-to-r from-sky-500 to-blue-600 text-slate-950 shadow-md shadow-sky-500/25"
+                  ? "bg-sky-700 text-on-accent shadow-md"
                   : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
               }`}
             >

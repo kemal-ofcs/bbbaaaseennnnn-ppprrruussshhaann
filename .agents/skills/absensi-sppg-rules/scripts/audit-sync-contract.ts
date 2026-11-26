@@ -63,6 +63,11 @@ const expectedRoutes = [
   "hr-division/save",
   "hr-position/save",
   "hr-contract/create",
+  // Hapus master yang tidak pernah dipakai (v47 sesi ini), lewat `delete_missing`.
+  "hr-branch/delete",
+  "hr-division/delete",
+  "hr-position/delete",
+  "hr-request-type/delete",
   // HRIS fase 2 (v37): pengajuan, keputusan, dan penyesuaian jatah.
   "hr-request-type/save",
   "hr-request/save",

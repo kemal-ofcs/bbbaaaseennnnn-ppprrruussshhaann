@@ -20,8 +20,16 @@ const filesToCopy = [
   // Isian organisasi HRIS (v36) di form karyawan: cabang, divisi, jabatan, atasan.
   "components/personnel/IsianOrganisasi.tsx",
   "components/ui/KonfirmasiData.tsx",
+  // Sakelar on/off: warna di kelas `.sakelar*` kedua `globals.css`, bukan utilitas.
+  "components/ui/Sakelar.tsx",
+  // Baris tab: dipakai komponen HRIS/Inventaris/Keuangan/Perjalanan yang ikut disalin.
+  "components/ui/TabBar.tsx",
+  // Layar tunggu sesi: dipakai halaman Payroll Mobile, gaya di `.memuat-halaman*`.
+  "components/ui/MemuatHalaman.tsx",
   // Pengirim notifikasi Telegram: berjalan di setiap sesi login, identik di kedua build.
   "components/AutoTelegramRunner.tsx",
+  // Saldo tutup buku berubah ke Telegram, sesi pemegang accounting.view.
+  "components/AutoTutupBukuRunner.tsx",
   // Masa simpan foto laporan perjalanan 90 hari, berjalan di setiap sesi login.
   "components/AutoFotoCleanupRunner.tsx",
   "lib/db.ts",

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { MobileAppShell } from "@/components/MobileAppShell";
 import { FeedbackBanner } from "@/components/ui/FeedbackBanner";
 import { Icon } from "@/components/ui/Icon";
+import { MemuatHalaman } from "@/components/ui/MemuatHalaman";
 import { Modal } from "@/components/ui/Modal";
 import { PilihCari } from "@/components/ui/PilihCari";
 import { canAccessArea, hasPermission } from "@/lib/auth/access";
@@ -271,11 +272,7 @@ Status: Estimasi Real-Time ${companyName}`;
   };
 
   if (!isHydrated || authLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-slate-950 text-slate-400">
-        Memuat otorisasi...
-      </div>
-    );
+    return <MemuatHalaman />;
   }
 
   // Parse breakdown snapshot
@@ -378,7 +375,7 @@ Status: Estimasi Real-Time ${companyName}`;
             }}
             className={`py-2 text-xs font-bold rounded-xl transition ${
               activeTab === "estimate"
-                ? "bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20"
+                ? "bg-sky-700 text-on-accent shadow-md shadow-sky-500/20"
                 : "text-slate-400 hover:text-slate-200"
             }`}
           >
@@ -392,7 +389,7 @@ Status: Estimasi Real-Time ${companyName}`;
             }}
             className={`py-2 text-xs font-bold rounded-xl transition ${
               activeTab === "archive"
-                ? "bg-sky-500 text-slate-950 shadow-md shadow-sky-500/20"
+                ? "bg-sky-700 text-on-accent shadow-md shadow-sky-500/20"
                 : "text-slate-400 hover:text-slate-200"
             }`}
           >
@@ -599,7 +596,7 @@ Status: Estimasi Real-Time ${companyName}`;
                       triggerHaptic();
                       setIsDetailModalOpen(true);
                     }}
-                    className="w-full py-3 px-4 rounded-2xl bg-sky-500 hover:bg-sky-400 active:scale-98 text-slate-950 font-black text-sm transition shadow-lg shadow-sky-500/20 flex items-center justify-center gap-2"
+                    className="w-full py-3 px-4 rounded-2xl bg-sky-700 hover:bg-sky-600 active:scale-98 text-on-accent font-black text-sm transition shadow-lg shadow-sky-500/20 flex items-center justify-center gap-2"
                   >
                     <Icon name="document" className="w-4 h-4" />
                     Lihat Rincian Slip Lengkap
@@ -880,7 +877,7 @@ Status: Estimasi Real-Time ${companyName}`;
                   type="button"
                   onClick={() => void handleShareSlip(estimateDetail)}
                   disabled={sharing}
-                  className="px-3.5 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 active:scale-95 text-slate-950 font-black text-xs transition"
+                  className="px-3.5 py-2 rounded-xl bg-sky-700 hover:bg-sky-600 active:scale-95 text-on-accent font-black text-xs transition"
                 >
                   Bagikan Slip
                 </button>

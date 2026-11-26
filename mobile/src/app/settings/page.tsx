@@ -14,6 +14,7 @@ import { ThemeSettingsCard } from "@/components/ThemeSettingsCard";
 import { TwoFactorCard } from "@/components/TwoFactorCard";
 import { Icon } from "@/components/ui/Icon";
 import { konfirmasiData } from "@/components/ui/KonfirmasiData";
+import { Sakelar } from "@/components/ui/Sakelar";
 import { hasPermission } from "@/lib/auth/access";
 import {
   calculateDistanceMeters,
@@ -599,7 +600,7 @@ export default function SettingsPage() {
         {/* Operator Profile Card */}
         <div className="rounded-3xl border border-white/15 bg-gradient-to-br from-slate-900 via-slate-900/90 to-sky-950/40 p-5 shadow-xl backdrop-blur-xl">
           <div className="flex items-center gap-3.5 mb-4">
-            <div className="grid size-14 place-items-center rounded-2xl bg-gradient-to-tr from-sky-400 to-blue-600 font-black text-xl text-slate-950 shadow-lg">
+            <div className="grid size-14 place-items-center rounded-2xl ikon-navy font-black text-xl shadow-lg">
               {user.nama_operator?.charAt(0)?.toUpperCase() || "O"}
             </div>
             <div className="flex flex-col min-w-0">
@@ -707,18 +708,14 @@ export default function SettingsPage() {
                     Matikan untuk menangguhkan penandaan Alfa di seluruh sistem.
                   </p>
                 </div>
-                <label className="relative inline-flex shrink-0 cursor-pointer items-center">
-                  <input
-                    type="checkbox"
-                    checked={autoAlfaEnabled}
-                    disabled={autoAlfaBusy || autoAlfaLoading}
-                    onChange={(e) => {
-                      void handleAutoAlfaToggle(e.target.checked);
-                    }}
-                    className="peer sr-only"
-                  />
-                  <div className="peer h-6 w-11 rounded-full bg-slate-800 after:absolute after:top-0.5 after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-slate-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-amber-400 peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none peer-disabled:opacity-50" />
-                </label>
+                <Sakelar
+                  checked={autoAlfaEnabled}
+                  disabled={autoAlfaBusy || autoAlfaLoading}
+                  onChange={(aktif) => {
+                    void handleAutoAlfaToggle(aktif);
+                  }}
+                  label="Otomasi Generate Alfa"
+                />
               </div>
             ) : (
               <p className="mt-3 rounded-2xl border border-white/10 bg-slate-950/40 p-3 text-[11px] font-semibold text-slate-500">
@@ -1011,7 +1008,7 @@ export default function SettingsPage() {
               <Link
                 href="/sync"
                 onClick={() => triggerHaptic("light")}
-                className="rounded-xl bg-sky-400 px-3.5 py-1.5 text-xs font-black text-slate-950 shadow-md hover:bg-sky-300 active:scale-95 transition"
+                className="rounded-xl bg-sky-700 px-3.5 py-1.5 text-xs font-black text-on-accent shadow-md hover:bg-sky-600 active:scale-95 transition"
               >
                 Buka →
               </Link>
@@ -1190,7 +1187,7 @@ export default function SettingsPage() {
               type="button"
               onClick={() => void handleSaveScanSecurity()}
               disabled={ipAllowlistBusy}
-              className="mt-3 w-full rounded-xl bg-sky-400 py-2.5 text-xs font-black text-slate-950 transition active:scale-95 disabled:opacity-60"
+              className="mt-3 w-full rounded-xl bg-sky-700 py-2.5 text-xs font-black text-on-accent transition active:scale-95 disabled:opacity-60"
             >
               {ipAllowlistBusy ? "Menyimpan..." : "Simpan keamanan absensi"}
             </button>
@@ -1209,20 +1206,14 @@ export default function SettingsPage() {
               </p>
             </div>
             {canManageGeofence ? (
-              <button
-                type="button"
-                onClick={handleToggleGeofence}
+              <Sakelar
+                checked={geofence.enabled}
                 disabled={geofenceLoading}
-                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                  geofence.enabled ? "bg-sky-500" : "bg-slate-700"
-                }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block size-5 transform rounded-full bg-on-accent shadow-lg ring-0 transition duration-200 ease-in-out ${
-                    geofence.enabled ? "translate-x-5" : "translate-x-0"
-                  }`}
-                />
-              </button>
+                onChange={() => {
+                  void handleToggleGeofence();
+                }}
+                label="GPS Geofencing Absensi"
+              />
             ) : (
               <span className="rounded-full border border-white/10 bg-slate-950 px-2.5 py-1 text-[10px] font-bold text-slate-500">
                 Hanya Superadmin
@@ -1307,7 +1298,7 @@ export default function SettingsPage() {
                       }}
                       className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition-all ${
                         geofence.radiusMeter === preset
-                          ? "bg-sky-400 text-slate-950 shadow-sm"
+                          ? "bg-sky-700 text-on-accent shadow-sm"
                           : "border border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]"
                       }`}
                     >
@@ -1377,7 +1368,7 @@ export default function SettingsPage() {
                   type="button"
                   disabled={geofenceBusy}
                   onClick={handleSaveGeofence}
-                  className="w-full rounded-xl bg-sky-400 py-2.5 text-xs font-black text-slate-950 shadow-md hover:bg-sky-300 active:scale-95 transition disabled:opacity-50"
+                  className="w-full rounded-xl bg-sky-700 py-2.5 text-xs font-black text-on-accent shadow-md hover:bg-sky-600 active:scale-95 transition disabled:opacity-50"
                 >
                   {geofenceBusy
                     ? "Menyimpan..."
