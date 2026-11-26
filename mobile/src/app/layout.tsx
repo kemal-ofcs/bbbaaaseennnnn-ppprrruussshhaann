@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { MobileWebViewGuard } from "@/components/MobileWebViewGuard";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { BRANDING } from "@/lib/constants/branding";
 import { AuthProvider } from "@/lib/context/AuthContext";
@@ -50,6 +51,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="bg-slate-950 text-slate-100 antialiased min-h-dvh">
+        <MobileWebViewGuard />
         <ThemeProvider>
           <AuthProvider>{children}</AuthProvider>
         </ThemeProvider>

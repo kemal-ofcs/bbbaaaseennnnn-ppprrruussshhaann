@@ -102,7 +102,7 @@ function bacaIdentifier(): string {
 const identifier = bacaIdentifier();
 let berubah = false;
 
-// ── 1. Matikan R8 pada build release ────────────────────────────────────────
+// 1. Matikan R8 pada build release
 let isiGradle = readFileSync(gradle, "utf8");
 
 // Hanya blok `release` yang disentuh: blok `debug` memang sudah false, dan
@@ -198,7 +198,7 @@ if (berubah) {
   writeFileSync(gradle, isiGradle);
 }
 
-// ── 2. Aturan -keep ─────────────────────────────────────────────────────────
+// 2. Aturan -keep ProGuard
 const aturan = [
   "-keep class app.tauri.** { *; }",
   `-keep class ${identifier}.** { *; }`,
@@ -213,7 +213,7 @@ if (hilang.length > 0) {
   berubah = true;
 }
 
-// ── 3. Izin kamera & lokasi di manifest ─────────────────────────────────────
+// 3. Izin kamera dan lokasi di manifest
 const deklarasiIzin = [
   '<uses-permission android:name="android.permission.CAMERA" />',
   '<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />',
@@ -247,7 +247,7 @@ if (izinHilang.length > 0) {
   berubah = true;
 }
 
-// ── 4. Nama aplikasi di peluncur Android ────────────────────────────────────
+// 4. Nama aplikasi di peluncur Android
 //
 // `productName` di `tauri.conf.json` hanya dibaca saat `tauri android init`
 // MEMBUAT `strings.xml`. Pada proyek Android yang sudah terlanjur ada — dan
@@ -302,7 +302,29 @@ if (existsSync(stringsXml)) {
   }
 }
 
-// ── 4b. Aktifkan WebView Debugging di MainActivity ─────────────────────────
+// 4b. Debugging WebView dan pengaman tahan-lama tautan/gambar di MainActivity
+const KONSTANTA_HIT_TEST_WAJIB = [
+  "WebView.HitTestResult.SRC_ANCHOR_TYPE",
+  "WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE",
+  "WebView.HitTestResult.IMAGE_TYPE",
+  "WebView.HitTestResult.ANCHOR_TYPE",
+] as const;
+
+function susunBlokLongClick(param: string): string {
+  return [
+    '    @Suppress("DEPRECATION")',
+    `    ${param}.setOnLongClickListener {`,
+    `      when (${param}.hitTestResult.type) {`,
+    "        WebView.HitTestResult.SRC_ANCHOR_TYPE,",
+    "        WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE,",
+    "        WebView.HitTestResult.IMAGE_TYPE,",
+    "        WebView.HitTestResult.ANCHOR_TYPE -> true",
+    "        else -> false",
+    "      }",
+    "    }",
+  ].join("\n");
+}
+
 const mainActivityPath = join(
   akarMobile,
   "src-tauri/gen/android/app/src/main/java",
@@ -311,24 +333,95 @@ const mainActivityPath = join(
 );
 
 if (existsSync(mainActivityPath)) {
-  let isiActivity = readFileSync(mainActivityPath, "utf8");
-  if (!isiActivity.includes("setWebContentsDebuggingEnabled")) {
-    if (!isiActivity.includes("import android.webkit.WebView")) {
+  const isiActivityAwal = readFileSync(mainActivityPath, "utf8");
+  let isiActivity = isiActivityAwal;
+
+  const pastikanImportWebView = () => {
+    if (isiActivity.includes("import android.webkit.WebView")) return;
+    if (isiActivity.includes("import android.os.Bundle")) {
       isiActivity = isiActivity.replace(
         "import android.os.Bundle",
         "import android.os.Bundle\nimport android.webkit.WebView",
       );
+    } else {
+      isiActivity = isiActivity.replace(
+        /^(package\s+[^\r\n]+\r?\n)/m,
+        "$1\nimport android.webkit.WebView\n",
+      );
     }
+  };
+
+  if (!isiActivity.includes("setWebContentsDebuggingEnabled")) {
+    pastikanImportWebView();
     isiActivity = isiActivity.replace(
       "super.onCreate(savedInstanceState)",
       "super.onCreate(savedInstanceState)\n    WebView.setWebContentsDebuggingEnabled(true)",
     );
+  }
+
+  // Menelan long-click hanya pada tautan dan gambar agar seleksi teks input tetap normal.
+  if (!isiActivity.includes("setOnLongClickListener")) {
+    pastikanImportWebView();
+    const cocokOnWebView =
+      /override\s+fun\s+onWebViewCreate\s*\(\s*(\w+)\s*:\s*WebView\s*\)\s*\{/.exec(
+        isiActivity,
+      );
+    if (cocokOnWebView) {
+      const param = cocokOnWebView[1] ?? "webView";
+      const blok = susunBlokLongClick(param);
+      const polaBridge = new RegExp(
+        `^[ \\t]*${param}\\.addJavascriptInterface\\([^\\r\\n]+`,
+        "m",
+      );
+      const polaSuper = new RegExp(
+        `^[ \\t]*super\\.onWebViewCreate\\(\\s*${param}\\s*\\)`,
+        "m",
+      );
+      if (polaBridge.test(isiActivity)) {
+        isiActivity = isiActivity.replace(
+          polaBridge,
+          (penuh) => `${penuh}\n${blok}`,
+        );
+      } else if (polaSuper.test(isiActivity)) {
+        isiActivity = isiActivity.replace(
+          polaSuper,
+          (penuh) => `${penuh}\n${blok}`,
+        );
+      } else {
+        isiActivity = isiActivity.replace(
+          cocokOnWebView[0],
+          () => `${cocokOnWebView[0]}\n${blok}`,
+        );
+      }
+    } else if (/\n\}\s*$/.test(isiActivity)) {
+      const bridgeAda = existsSync(
+        join(dirname(mainActivityPath), "AndroidNativeBridge.kt"),
+      );
+      const barisBridge =
+        bridgeAda && !isiActivity.includes("AndroidNativeBridge(this)")
+          ? '    webView.addJavascriptInterface(AndroidNativeBridge(this), "AndroidBridge")\n'
+          : "";
+      const metodaBaru =
+        "\n  override fun onWebViewCreate(webView: WebView) {\n" +
+        "    super.onWebViewCreate(webView)\n" +
+        barisBridge +
+        `${susunBlokLongClick("webView")}\n` +
+        "  }\n}\n";
+      isiActivity = isiActivity.replace(/\n\}\s*$/, () => metodaBaru);
+    } else {
+      keluarDenganPesan(
+        "Bentuk MainActivity.kt tidak dikenali sehingga onWebViewCreate tidak aman ditambal otomatis.",
+      );
+    }
+  }
+
+  if (isiActivity !== isiActivityAwal) {
     writeFileSync(mainActivityPath, isiActivity);
     berubah = true;
   }
 }
 
-// ── 4c. Ikon peluncur ───────────────────────────────────────────────────────
+// 4c. Ikon peluncur
 //
 // `tauri android init` memasang ikon bawaan Tauri, dan build tetap hijau
 // dengan ikon itu. Ikon produk dihasilkan `tauri icon` ke
@@ -354,7 +447,7 @@ for (const berkas of berkasIkon) {
   }
 }
 
-// ── 5. Verifikasi — inilah yang membedakan skrip ini dari sekadar menambal ──
+// 5. Verifikasi ulang seluruh berkas hasil tambalan
 const gradleAkhir = readFileSync(gradle, "utf8");
 const releaseAkhir = blokRelease.exec(gradleAkhir)?.[2] ?? "";
 const proguardAkhir = readFileSync(proguard, "utf8");
@@ -430,6 +523,37 @@ for (const berkas of berkasIkon) {
     !readFileSync(tujuan).equals(readFileSync(join(ikonSumber, berkas)))
   ) {
     gagal.push(`res/${berkas}: ikon peluncur bukan ikon produk`);
+  }
+}
+if (!existsSync(mainActivityPath)) {
+  gagal.push("MainActivity.kt: berkas tidak ditemukan");
+} else {
+  const activityAkhir = readFileSync(mainActivityPath, "utf8");
+  if (!/override\s+fun\s+onWebViewCreate\s*\(/.test(activityAkhir)) {
+    gagal.push("MainActivity.kt: `onWebViewCreate` belum terpasang");
+  }
+  if (
+    !activityAkhir.includes("setOnLongClickListener") ||
+    !activityAkhir.includes("hitTestResult.type") ||
+    !activityAkhir.includes("else -> false")
+  ) {
+    gagal.push(
+      "MainActivity.kt: pengaman `setOnLongClickListener` berbasis `hitTestResult.type` belum lengkap",
+    );
+  }
+  for (const konstanta of KONSTANTA_HIT_TEST_WAJIB) {
+    if (!activityAkhir.includes(konstanta)) {
+      gagal.push(`MainActivity.kt: konstanta long-press hilang (${konstanta})`);
+    }
+  }
+  const bridgePath = join(dirname(mainActivityPath), "AndroidNativeBridge.kt");
+  if (
+    existsSync(bridgePath) &&
+    !activityAkhir.includes("AndroidNativeBridge(this)")
+  ) {
+    gagal.push(
+      "MainActivity.kt: pendaftaran `AndroidNativeBridge(this)` hilang padahal AndroidNativeBridge.kt ada",
+    );
   }
 }
 

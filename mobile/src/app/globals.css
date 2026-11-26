@@ -51,7 +51,7 @@ html {
   min-height: 100%;
   background: var(--app-background);
   touch-action: manipulation;
-  /* Safe area handling */
+  overscroll-behavior-x: none;
   padding-top: env(safe-area-inset-top);
   padding-right: env(safe-area-inset-right);
   padding-bottom: env(safe-area-inset-bottom);
@@ -73,16 +73,32 @@ body {
   color: var(--app-text);
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  overscroll-behavior-x: none;
   user-select: none;
   -webkit-user-select: none;
 }
 
-/* Allow text selection in inputs and code */
+/* Matikan pop-up callout tautan/gambar dan seret hantu bawaan WebView. */
+html,
+body,
+a,
+img,
+button {
+  -webkit-touch-callout: none;
+}
+
+a,
+img {
+  -webkit-user-drag: none;
+}
+
+/* Pertahankan salin-tempel pada isian form serta blok kode dan token. */
 input,
 textarea,
 select,
 code,
-pre {
+pre,
+[data-selectable="true"] {
   user-select: text;
   -webkit-user-select: text;
 }
