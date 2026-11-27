@@ -427,7 +427,7 @@ Status: Estimasi Real-Time ${companyName}`;
                       setPeriodStart(range.start);
                       setPeriodEnd(range.end);
                     }}
-                    className="px-2.5 py-1 text-[11px] font-semibold bg-white/5 hover:bg-white/10 text-sky-400 rounded-lg border border-white/10"
+                    className="rounded-lg bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-sky-400 hover:bg-white/10"
                   >
                     Bulan Ini
                   </button>
@@ -439,7 +439,7 @@ Status: Estimasi Real-Time ${companyName}`;
                       setPeriodStart(range.start);
                       setPeriodEnd(range.end);
                     }}
-                    className="px-2.5 py-1 text-[11px] font-semibold bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg border border-white/10"
+                    className="rounded-lg bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-slate-300 hover:bg-white/10"
                   >
                     Bulan Lalu
                   </button>

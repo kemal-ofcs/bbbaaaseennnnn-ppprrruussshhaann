@@ -278,7 +278,7 @@ export default function AuditAbsensiMobilePage() {
                   />
                 </div>
 
-                <div className="flex gap-1.5 overflow-x-auto pb-1">
+                <div className="flex gap-1 overflow-x-auto rounded-xl bg-slate-900/60 p-1">
                   {FILTER_OPTIONS.map((option) => (
                     <button
                       key={option.value}
@@ -287,10 +287,10 @@ export default function AuditAbsensiMobilePage() {
                         triggerHaptic("light");
                         setFilter(option.value);
                       }}
-                      className={`min-h-8 shrink-0 rounded-xl border px-3 text-[11px] font-bold transition ${
+                      className={`min-h-8 shrink-0 rounded-lg px-3 text-[11px] font-bold transition ${
                         filter === option.value
-                          ? "border-sky-400/40 bg-sky-500/20 text-sky-200"
-                          : "border-slate-800 bg-slate-950 text-slate-400"
+                          ? "bg-sky-700 text-on-accent shadow-sm"
+                          : "text-slate-400 hover:bg-white/5"
                       }`}
                     >
                       {option.label}

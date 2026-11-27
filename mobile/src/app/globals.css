@@ -22,16 +22,16 @@
   --app-background-soft: #0b1329;
   --app-surface: rgba(15, 23, 42, 0.85);
   --app-surface-raised: rgba(30, 41, 59, 0.75);
-  --app-border: #86682a;
+  --app-group-bg: rgba(9, 16, 32, 0.72);
+  --app-tab-track: rgba(2, 6, 23, 0.55);
+  --app-border: rgba(148, 163, 184, 0.16);
   --app-primary: #7b93e3;
   --app-primary-strong: #2f4fbf;
-  /* Identitas navy + emas, sama dengan Web. Garis >= 3:1, teks >= 4,5:1. */
+  /* Identitas navy + emas untuk aksen terpilih, sama dengan Web. */
   --app-navy: #0a1a4f;
   --app-navy-strong: #10308a;
   --app-gold: #f6c453;
   --app-gold-line: #86682a;
-  --app-gold-line-hover: #f6c453;
-  --app-gold-divider: rgb(246 196 83 / 18%);
   --app-gold-text: #f6c453;
   --app-text: #f8fafc;
   --app-text-muted: #94a3b8;
@@ -165,13 +165,13 @@ textarea {
 :root[data-theme="light"] {
   color-scheme: light;
 
-  /* Skala slate dibalik: 950 jadi paling terang, 50 jadi paling gelap. */
+  /* Skala slate dibalik dengan kanvas teduh #eef2f7 dan kartu utama #ffffff. */
   --color-slate-950: #ffffff;
-  --color-slate-900: #f1f5f9;
+  --color-slate-900: #ffffff;
   --color-slate-800: #e2e8f0;
   --color-slate-700: #cbd5e1;
   --color-slate-600: #94a3b8;
-  /* #64748b hanya 4,34:1 di atas permukaan #f1f5f9; #5b677c 5,2:1. */
+  /* #64748b hanya 4,34:1 di atas permukaan #f1f5f9; #5b677c >= 4,6:1 di #e2e8f0. */
   --color-slate-500: #5b677c;
   --color-slate-400: #475569;
   --color-slate-300: #334155;
@@ -191,23 +191,22 @@ textarea {
   --color-amber-200: #92400e;
   --color-amber-300: #b45309;
 
-  /* Token aplikasi (dipakai html/body dan ::selection). */
-  --app-background: #f8fafc;
-  --app-background-soft: #eef2f7;
-  --app-surface: rgba(255, 255, 255, 0.92);
-  --app-surface-raised: rgba(241, 245, 249, 0.92);
-  --app-border: #a38242;
+  /* Token aplikasi (dipakai html/body, permukaan tone-on-tone, dan ::selection). */
+  --app-background: #eef2f7;
+  --app-background-soft: #e6ecf4;
+  --app-surface: #ffffff;
+  --app-surface-raised: #ffffff;
+  --app-group-bg: #e7edf5;
+  --app-tab-track: #dfe7f2;
+  --app-border: #d8e1ee;
   --app-primary: #2f4fbf;
   --app-primary-strong: #10308a;
   --app-gold: #d97706;
   --app-gold-line: #a38242;
-  --app-gold-line-hover: #86682a;
-  --app-gold-divider: rgb(163 130 66 / 28%);
   --app-gold-text: #92400e;
   --app-text: #0f172a;
   --app-text-muted: #475569;
-  /* Lebih gelap dari Web (#8391b5): isian Mobile juga duduk di slate-900/800
-     (#f1f5f9/#e2e8f0 di tema ini), dan garisnya tetap >= 3:1 di sana. */
+  /* >= 3:1 di putih (3,72:1) dan di permukaan grup #e7edf5 (3,16:1). */
   --app-input-border: #7584aa;
   --app-input-border-hover: #5b6b94;
 }
@@ -577,7 +576,7 @@ body {
     #060b1c;
 }
 .login-frame {
-  border: 1px solid var(--app-gold-line);
+  border: 1px solid rgba(148, 163, 184, 0.22);
   box-shadow: 0 40px 90px -40px rgb(0 0 0 / 80%);
 }
 .login-hero {
@@ -697,8 +696,8 @@ html[data-theme="light"] .login-shell {
     #e9eef7;
 }
 html[data-theme="light"] .login-frame {
-  border-color: var(--app-gold-line);
-  box-shadow: 0 40px 90px -45px rgb(15 23 42 / 45%);
+  border-color: var(--app-border);
+  box-shadow: 0 40px 90px -45px rgb(15 23 42 / 35%);
 }
 html[data-theme="light"] .login-panel {
   background: #ffffff;
@@ -835,16 +834,24 @@ html.light .sakelar-wrap[data-aktif="true"] .sakelar-status {
   }
 }
 
-/* TabBar (components/ui/TabBar.tsx, disalin ke Mobile): tab aktif navy bergaris emas.
-   Wadahnya tanpa latar dan garis: setiap tab sudah bergaris sendiri, jadi deretan
-   tombolnya menyatu dengan latar halaman atau kartu di bawahnya. */
+/* TabBar (components/ui/TabBar.tsx, disalin ke Mobile): rel segmen lembut tanpa
+   garis bertumpuk, identik dengan Web. */
 .tab-bar {
   display: flex;
-  gap: 0.375rem;
+  width: 100%;
+  gap: 0.25rem;
   min-width: 0;
   overflow-x: auto;
-  padding: 0.125rem 0 0.25rem;
+  padding: 0.25rem;
+  border-radius: 0.875rem;
+  background-color: var(--app-tab-track);
   scrollbar-width: thin;
+}
+@media (min-width: 640px) {
+  .tab-bar:not([data-vertikal-lg]) {
+    width: fit-content;
+    max-width: 100%;
+  }
 }
 .tab-bar-tab {
   display: inline-flex;
@@ -852,8 +859,8 @@ html.light .sakelar-wrap[data-aktif="true"] .sakelar-status {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  min-height: 2.75rem;
-  padding: 0.5rem 1rem;
+  min-height: 2.5rem;
+  padding: 0.4375rem 0.9375rem;
   border: 1px solid transparent;
   border-radius: 0.625rem;
   white-space: nowrap;
@@ -861,33 +868,38 @@ html.light .sakelar-wrap[data-aktif="true"] .sakelar-status {
   font-weight: 600;
   color: var(--app-text-muted);
   transition:
-    border-color 150ms ease,
     background-color 150ms ease,
-    color 150ms ease;
+    color 150ms ease,
+    box-shadow 150ms ease;
 }
-/* Tab tidak aktif tetap tampak sebagai tombol bergaris emas konsisten. */
 .tab-bar-tab:not([aria-selected="true"]) {
-  border-color: var(--app-gold-line);
-  background-color: rgb(255 255 255 / 3%);
+  border-color: transparent;
+  background-color: transparent;
 }
 .tab-bar-tab:not([aria-selected="true"]):hover {
-  border-color: var(--app-gold-line-hover);
-  background-color: rgb(246 196 83 / 8%);
+  background-color: rgb(255 255 255 / 6%);
   color: var(--app-text);
 }
 html[data-theme="light"] .tab-bar-tab:not([aria-selected="true"]),
 html.light .tab-bar-tab:not([aria-selected="true"]) {
-  border-color: var(--app-gold-line);
-  background-color: #ffffff;
+  border-color: transparent;
+  background-color: transparent;
+}
+html[data-theme="light"] .tab-bar-tab:not([aria-selected="true"]):hover,
+html.light .tab-bar-tab:not([aria-selected="true"]):hover {
+  background-color: rgb(255 255 255 / 78%);
+  color: var(--app-text);
 }
 .tab-bar-tab[aria-selected="true"] {
-  border-color: var(--app-gold-line-hover);
+  border-color: transparent;
   background: linear-gradient(
     140deg,
     var(--app-navy) 0%,
     var(--app-navy-strong) 100%
   );
-  box-shadow: inset 0 -2px 0 #f6c453;
+  box-shadow:
+    inset 0 -2px 0 #f6c453,
+    0 2px 6px rgb(10 26 79 / 22%);
   color: #ffffff;
 }
 /* Offset negatif: wadah overflow-x memotong cincin yang jatuh di luar tombol. */
@@ -895,17 +907,12 @@ html.light .tab-bar-tab:not([aria-selected="true"]) {
   outline: 2px solid var(--app-gold);
   outline-offset: -2px;
 }
-html[data-theme="light"] .tab-bar-tab:not([aria-selected="true"]):hover,
-html.light .tab-bar-tab:not([aria-selected="true"]):hover {
-  border-color: var(--app-gold-line-hover);
-  background-color: #faf6ee;
-  color: var(--app-text);
-}
 @media (min-width: 1024px) {
   .tab-bar[data-vertikal-lg] {
     position: sticky;
     top: 5rem;
     flex-direction: column;
+    width: 100%;
   }
   .tab-bar[data-vertikal-lg] .tab-bar-tab {
     justify-content: flex-start;
@@ -917,7 +924,7 @@ html.light .tab-bar-tab:not([aria-selected="true"]):hover {
   color: var(--app-text-muted);
 }
 .memuat-halaman-putar {
-  border: 4px solid var(--app-gold-line);
+  border: 4px solid var(--app-primary);
   border-top-color: transparent;
 }
 
@@ -928,152 +935,40 @@ html.light .tab-bar-tab:not([aria-selected="true"]):hover {
   backdrop-filter: blur(16px);
 }
 :root[data-theme="light"] .app-panel {
-  box-shadow: 0 10px 32px rgb(15 23 42 / 6%);
+  box-shadow: 0 2px 10px rgb(15 23 42 / 4%);
 }
 
-/* Kotak, sub-kotak, modal, dan tombol sekunder ber-border netral memakai garis
-   emas di kedua tema, sejalan dengan Web tanpa !important. */
-:where(
-    [class^="border-slate-9"],
-    [class*=" border-slate-9"],
-    [class^="border-slate-8"],
-    [class*=" border-slate-8"],
-    [class^="border-slate-7"],
-    [class*=" border-slate-7"],
-    [class^="border-slate-6"],
-    [class*=" border-slate-6"],
-    [class^="border-white/"],
-    [class*=" border-white/"]
-  ):where(
-    :not(
-        input,
-        select,
-        textarea,
-        .pilih-cari-tombol,
-        tr,
-        td,
-        .animate-spin,
-        .sakelar,
-        .sakelar-kenop,
-        .theme-invariant,
-        .theme-invariant *,
-        :focus,
-        [class^="border-emerald-"],
-        [class*=" border-emerald-"],
-        [class^="border-rose-"],
-        [class*=" border-rose-"],
-        [class^="border-amber-"],
-        [class*=" border-amber-"],
-        [class^="border-sky-"],
-        [class*=" border-sky-"],
-        [class^="border-cyan-"],
-        [class*=" border-cyan-"],
-        [class^="border-violet-"],
-        [class*=" border-violet-"],
-        [class^="border-red-"],
-        [class*=" border-red-"]
-      )
-  ) {
-  border-color: var(--app-gold-line);
-}
-:root:not([data-theme="light"])
-  :where(.bg-slate-800, .bg-slate-800\/90, .bg-slate-800\/80):where(
-    [class^="border-slate-"],
-    [class*=" border-slate-"],
-    [class^="border-white/"],
-    [class*=" border-white/"]
-  ):where(
-    :not(
-        input,
-        select,
-        textarea,
-        .pilih-cari-tombol,
-        .theme-invariant,
-        .theme-invariant *,
-        :focus
-      )
-  ) {
-  border-color: #8f6f2d;
+/* Permukaan tone-on-tone tema terang Mobile: kanvas #eef2f7, kartu #ffffff,
+   dan bilah filter / sub-kotak #e7edf5 tanpa !important. */
+:root[data-theme="light"] .mobile-shell {
+  background-color: var(--app-background);
 }
 :root[data-theme="light"]
-  :where(.bg-slate-800, .bg-slate-800\/90, .bg-slate-800\/80):where(
-    [class^="border-slate-"],
-    [class*=" border-slate-"],
-    [class^="border-white/"],
-    [class*=" border-white/"]
-  ):where(
-    :not(
-        input,
-        select,
-        textarea,
-        .pilih-cari-tombol,
-        .theme-invariant,
-        .theme-invariant *,
-        :focus
-      )
-  ) {
-  border-color: #9e7c3d;
-}
-:where(button, a, label, [role="button"]):where(
-    [class^="border-slate-9"],
-    [class*=" border-slate-9"],
-    [class^="border-slate-8"],
-    [class*=" border-slate-8"],
-    [class^="border-slate-7"],
-    [class*=" border-slate-7"],
-    [class^="border-slate-6"],
-    [class*=" border-slate-6"],
-    [class^="border-white/"],
-    [class*=" border-white/"]
-  ):where(
-    :not(
-        .pilih-cari-tombol,
-        .sakelar,
-        .theme-invariant,
-        .theme-invariant *,
-        :disabled,
-        :focus
-      )
-  ):hover {
-  border-color: var(--app-gold-line-hover);
-}
-:where(tr, td):where(
-    [class^="border-slate-"],
-    [class*=" border-slate-"],
-    [class^="border-white/"],
-    [class*=" border-white/"]
-  ):where(:not(.theme-invariant, .theme-invariant *)),
-:where(
-    [class^="divide-slate-"],
-    [class*=" divide-slate-"],
-    [class^="divide-white/"],
-    [class*=" divide-white/"]
-  )
-  > :not([hidden])
-  ~ :not([hidden]) {
-  border-color: var(--app-gold-divider);
-}
-:where(thead, thead tr, thead th):where(
-    [class^="border-slate-"],
-    [class*=" border-slate-"],
-    [class^="border-white/"],
-    [class*=" border-white/"]
-  ) {
-  border-bottom-color: var(--app-gold-line);
+  :where(
+    .bg-slate-900\/70,
+    .bg-slate-900\/60,
+    .bg-slate-950\/60,
+    .bg-slate-950\/50,
+    .bg-white\/\[0\.04\]
+  ):not(input):not(select):not(textarea):not(button):not(a):not(
+    .theme-invariant
+  ):not(.theme-invariant *),
+:root[data-theme="light"]
+  :where(.bg-slate-900, .bg-slate-900\/95, .bg-slate-900\/90)
+  :where(.bg-slate-950, .bg-slate-950\/60):not(input):not(select):not(
+    textarea
+  ):not(button):not(a):not(.theme-invariant):not(.theme-invariant *) {
+  background-color: var(--app-group-bg);
 }
 
 /* Garis netral input (border-white/*, border-slate-*) hanya ~1,3:1 di tema
-   gelap dan ~1,5:1 di tema terang (skala slate dibalik). Diganti token >= 3:1.
-   Pencocokan diawali spasi/awal kelas supaya `hover:border-*` dan
-   `focus:border-*` tidak ikut. Tidak berlapis sehingga menang atas utilitas
-   Tailwind; `:not(:focus)` membiarkan `focus:border-*` tetap berlaku. */
+   gelap dan ~1,5:1 di tema terang (skala slate dibalik). Diganti token >= 3:1. */
 :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea):is(
     [class^="border-white/"],
     [class*=" border-white/"],
     [class^="border-slate-"],
     [class*=" border-slate-"]
-  ):not(:focus),
-.pilih-cari-tombol {
+  ):not(:focus) {
   border-color: var(--app-input-border);
 }
 :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea):is(
@@ -1083,6 +978,35 @@ html.light .tab-bar-tab:not([aria-selected="true"]):hover {
     [class*=" border-slate-"]
   ):hover:not(:focus):not(:disabled) {
   border-color: var(--app-input-border-hover);
+}
+:root[data-theme="light"]
+  :is(
+    input:not([type="checkbox"]):not([type="radio"]):not(.bg-transparent),
+    select,
+    textarea
+  ):not(.theme-invariant):not(.theme-invariant *) {
+  background-color: #ffffff;
+}
+
+.pilih-cari-input {
+  padding-right: 2.5rem;
+}
+.pilih-cari-tombol {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: #94a3b8;
+}
+.pilih-cari-tombol:hover:not(:disabled) {
+  color: #f8fafc;
+  background-color: rgb(255 255 255 / 6%);
+}
+:root[data-theme="light"] .pilih-cari-tombol {
+  color: #475569;
+}
+:root[data-theme="light"] .pilih-cari-tombol:hover:not(:disabled) {
+  color: #0f172a;
+  background-color: rgb(15 23 42 / 5%);
 }
 
 /* Panah dropdown SVG berjarak tetap 0.875rem dari tepi, sama dengan Web. */
@@ -1100,7 +1024,7 @@ select:not([multiple]) {
 
 /* Kartu menu, kotak ikon, kartu angka (padanan `.aksi-cepat` Web). */
 .hub-row {
-  border: 1px solid var(--app-gold-line);
+  border: 1px solid var(--app-border);
   background-color: rgb(15 23 42 / 80%);
   transition:
     border-color 150ms ease,
@@ -1108,8 +1032,8 @@ select:not([multiple]) {
     transform 150ms ease;
 }
 .hub-row:hover {
-  border-color: var(--app-gold-line-hover);
-  box-shadow: inset 0 0 0 1px var(--app-gold-line-hover);
+  border-color: rgb(246 196 83 / 50%);
+  box-shadow: 0 6px 18px rgb(2 8 23 / 20%);
 }
 .hub-row:focus-visible {
   outline: 2px solid var(--app-gold);
@@ -1132,7 +1056,7 @@ select:not([multiple]) {
   background-color: rgb(246 196 83 / 15%);
 }
 .kartu-angka {
-  border: 1px solid var(--app-gold-line);
+  border: 1px solid var(--app-border);
   background-color: rgb(255 255 255 / 3%);
 }
 .kartu-angka-label {
@@ -1143,12 +1067,18 @@ select:not([multiple]) {
 }
 :root[data-theme="light"] .hub-row {
   background-color: #ffffff;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 4%);
+}
+:root[data-theme="light"] .hub-row:hover {
+  border-color: #b89650;
+  box-shadow: 0 6px 18px rgb(15 23 42 / 7%);
 }
 :root[data-theme="light"] .hub-row:focus-visible {
   outline-color: #10308a;
 }
 :root[data-theme="light"] .kartu-angka {
   background-color: #ffffff;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
 }
 /* Tema terang, sama dengan `.aksi-cepat-ikon` Web: kotak ikon navy pucat (ikon
    8,25:1), navy pekat + emas saat kartunya disentuh. Tombol Scanner bilah bawah
