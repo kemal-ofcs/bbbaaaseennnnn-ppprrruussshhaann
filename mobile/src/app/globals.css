@@ -22,7 +22,7 @@
   --app-background-soft: #0b1329;
   --app-surface: rgba(15, 23, 42, 0.85);
   --app-surface-raised: rgba(30, 41, 59, 0.75);
-  --app-border: rgba(255, 255, 255, 0.12);
+  --app-border: #86682a;
   --app-primary: #7b93e3;
   --app-primary-strong: #2f4fbf;
   /* Identitas navy + emas, sama dengan Web. Garis >= 3:1, teks >= 4,5:1. */
@@ -30,6 +30,8 @@
   --app-navy-strong: #10308a;
   --app-gold: #f6c453;
   --app-gold-line: #86682a;
+  --app-gold-line-hover: #f6c453;
+  --app-gold-divider: rgb(246 196 83 / 18%);
   --app-gold-text: #f6c453;
   --app-text: #f8fafc;
   --app-text-muted: #94a3b8;
@@ -194,11 +196,13 @@ textarea {
   --app-background-soft: #eef2f7;
   --app-surface: rgba(255, 255, 255, 0.92);
   --app-surface-raised: rgba(241, 245, 249, 0.92);
-  --app-border: rgba(15, 23, 42, 0.12);
+  --app-border: #a38242;
   --app-primary: #2f4fbf;
   --app-primary-strong: #10308a;
   --app-gold: #d97706;
-  --app-gold-line: #d97706;
+  --app-gold-line: #a38242;
+  --app-gold-line-hover: #86682a;
+  --app-gold-divider: rgb(163 130 66 / 28%);
   --app-gold-text: #92400e;
   --app-text: #0f172a;
   --app-text-muted: #475569;
@@ -573,7 +577,7 @@ body {
     #060b1c;
 }
 .login-frame {
-  border: 1px solid rgb(246 196 83 / 18%);
+  border: 1px solid var(--app-gold-line);
   box-shadow: 0 40px 90px -40px rgb(0 0 0 / 80%);
 }
 .login-hero {
@@ -693,7 +697,7 @@ html[data-theme="light"] .login-shell {
     #e9eef7;
 }
 html[data-theme="light"] .login-frame {
-  border-color: rgb(15 23 42 / 8%);
+  border-color: var(--app-gold-line);
   box-shadow: 0 40px 90px -45px rgb(15 23 42 / 45%);
 }
 html[data-theme="light"] .login-panel {
@@ -861,23 +865,23 @@ html.light .sakelar-wrap[data-aktif="true"] .sakelar-status {
     background-color 150ms ease,
     color 150ms ease;
 }
-/* Tab tidak aktif tetap tampak sebagai tombol: garis lembut, bukan teks lepas. */
+/* Tab tidak aktif tetap tampak sebagai tombol bergaris emas konsisten. */
 .tab-bar-tab:not([aria-selected="true"]) {
-  border-color: rgb(148 163 184 / 22%);
+  border-color: var(--app-gold-line);
   background-color: rgb(255 255 255 / 3%);
 }
-.tab-bar-tab:hover {
-  border-color: rgb(148 163 184 / 40%);
-  background-color: rgb(255 255 255 / 6%);
+.tab-bar-tab:not([aria-selected="true"]):hover {
+  border-color: var(--app-gold-line-hover);
+  background-color: rgb(246 196 83 / 8%);
   color: var(--app-text);
 }
 html[data-theme="light"] .tab-bar-tab:not([aria-selected="true"]),
 html.light .tab-bar-tab:not([aria-selected="true"]) {
-  border-color: #c9d1e6;
+  border-color: var(--app-gold-line);
   background-color: #ffffff;
 }
 .tab-bar-tab[aria-selected="true"] {
-  border-color: rgb(246 196 83 / 40%);
+  border-color: var(--app-gold-line-hover);
   background: linear-gradient(
     140deg,
     var(--app-navy) 0%,
@@ -893,8 +897,9 @@ html.light .tab-bar-tab:not([aria-selected="true"]) {
 }
 html[data-theme="light"] .tab-bar-tab:not([aria-selected="true"]):hover,
 html.light .tab-bar-tab:not([aria-selected="true"]):hover {
-  border-color: #8391b5;
-  background-color: #f5f7fc;
+  border-color: var(--app-gold-line-hover);
+  background-color: #faf6ee;
+  color: var(--app-text);
 }
 @media (min-width: 1024px) {
   .tab-bar[data-vertikal-lg] {
@@ -914,6 +919,147 @@ html.light .tab-bar-tab:not([aria-selected="true"]):hover {
 .memuat-halaman-putar {
   border: 4px solid var(--app-gold-line);
   border-top-color: transparent;
+}
+
+.app-panel {
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  box-shadow: 0 18px 50px rgb(2 8 23 / 24%);
+  backdrop-filter: blur(16px);
+}
+:root[data-theme="light"] .app-panel {
+  box-shadow: 0 10px 32px rgb(15 23 42 / 6%);
+}
+
+/* Kotak, sub-kotak, modal, dan tombol sekunder ber-border netral memakai garis
+   emas di kedua tema, sejalan dengan Web tanpa !important. */
+:where(
+    [class^="border-slate-9"],
+    [class*=" border-slate-9"],
+    [class^="border-slate-8"],
+    [class*=" border-slate-8"],
+    [class^="border-slate-7"],
+    [class*=" border-slate-7"],
+    [class^="border-slate-6"],
+    [class*=" border-slate-6"],
+    [class^="border-white/"],
+    [class*=" border-white/"]
+  ):where(
+    :not(
+        input,
+        select,
+        textarea,
+        .pilih-cari-tombol,
+        tr,
+        td,
+        .animate-spin,
+        .sakelar,
+        .sakelar-kenop,
+        .theme-invariant,
+        .theme-invariant *,
+        :focus,
+        [class^="border-emerald-"],
+        [class*=" border-emerald-"],
+        [class^="border-rose-"],
+        [class*=" border-rose-"],
+        [class^="border-amber-"],
+        [class*=" border-amber-"],
+        [class^="border-sky-"],
+        [class*=" border-sky-"],
+        [class^="border-cyan-"],
+        [class*=" border-cyan-"],
+        [class^="border-violet-"],
+        [class*=" border-violet-"],
+        [class^="border-red-"],
+        [class*=" border-red-"]
+      )
+  ) {
+  border-color: var(--app-gold-line);
+}
+:root:not([data-theme="light"])
+  :where(.bg-slate-800, .bg-slate-800\/90, .bg-slate-800\/80):where(
+    [class^="border-slate-"],
+    [class*=" border-slate-"],
+    [class^="border-white/"],
+    [class*=" border-white/"]
+  ):where(
+    :not(
+        input,
+        select,
+        textarea,
+        .pilih-cari-tombol,
+        .theme-invariant,
+        .theme-invariant *,
+        :focus
+      )
+  ) {
+  border-color: #8f6f2d;
+}
+:root[data-theme="light"]
+  :where(.bg-slate-800, .bg-slate-800\/90, .bg-slate-800\/80):where(
+    [class^="border-slate-"],
+    [class*=" border-slate-"],
+    [class^="border-white/"],
+    [class*=" border-white/"]
+  ):where(
+    :not(
+        input,
+        select,
+        textarea,
+        .pilih-cari-tombol,
+        .theme-invariant,
+        .theme-invariant *,
+        :focus
+      )
+  ) {
+  border-color: #9e7c3d;
+}
+:where(button, a, label, [role="button"]):where(
+    [class^="border-slate-9"],
+    [class*=" border-slate-9"],
+    [class^="border-slate-8"],
+    [class*=" border-slate-8"],
+    [class^="border-slate-7"],
+    [class*=" border-slate-7"],
+    [class^="border-slate-6"],
+    [class*=" border-slate-6"],
+    [class^="border-white/"],
+    [class*=" border-white/"]
+  ):where(
+    :not(
+        .pilih-cari-tombol,
+        .sakelar,
+        .theme-invariant,
+        .theme-invariant *,
+        :disabled,
+        :focus
+      )
+  ):hover {
+  border-color: var(--app-gold-line-hover);
+}
+:where(tr, td):where(
+    [class^="border-slate-"],
+    [class*=" border-slate-"],
+    [class^="border-white/"],
+    [class*=" border-white/"]
+  ):where(:not(.theme-invariant, .theme-invariant *)),
+:where(
+    [class^="divide-slate-"],
+    [class*=" divide-slate-"],
+    [class^="divide-white/"],
+    [class*=" divide-white/"]
+  )
+  > :not([hidden])
+  ~ :not([hidden]) {
+  border-color: var(--app-gold-divider);
+}
+:where(thead, thead tr, thead th):where(
+    [class^="border-slate-"],
+    [class*=" border-slate-"],
+    [class^="border-white/"],
+    [class*=" border-white/"]
+  ) {
+  border-bottom-color: var(--app-gold-line);
 }
 
 /* Garis netral input (border-white/*, border-slate-*) hanya ~1,3:1 di tema
@@ -962,8 +1108,8 @@ select:not([multiple]) {
     transform 150ms ease;
 }
 .hub-row:hover {
-  border-color: var(--app-gold);
-  box-shadow: inset 0 0 0 1px var(--app-gold);
+  border-color: var(--app-gold-line-hover);
+  box-shadow: inset 0 0 0 1px var(--app-gold-line-hover);
 }
 .hub-row:focus-visible {
   outline: 2px solid var(--app-gold);
@@ -1002,7 +1148,7 @@ select:not([multiple]) {
   outline-color: #10308a;
 }
 :root[data-theme="light"] .kartu-angka {
-  background-color: rgb(255 255 255 / 60%);
+  background-color: #ffffff;
 }
 /* Tema terang, sama dengan `.aksi-cepat-ikon` Web: kotak ikon navy pucat (ikon
    8,25:1), navy pekat + emas saat kartunya disentuh. Tombol Scanner bilah bawah

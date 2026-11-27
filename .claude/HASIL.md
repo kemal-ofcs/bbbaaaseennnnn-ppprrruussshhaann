@@ -1,7 +1,7 @@
 # HASIL.md — hasil `bun run check`
 
-- Waktu: 2026-11-27 06:18 WIB
-- Commit: 964e081 (+ 31 berkas berubah, belum commit)
+- Waktu: 2026-11-27 21:26 WIB
+- Commit: beaa5cb (+ 3 berkas berubah, belum commit)
 - Perintah: `bun run check` (root)
 - Exit code: 0
 - Status: **LULUS**
@@ -21,5 +21,5 @@
 Tidak ada galat.
 
 ## Catatan
-- `web-desktop`: Biome 670 berkas bersih, `tsc` bersih, seluruh tes TS lulus, `cargo test` 480 passed / 0 failed (memakai linker `rust-lld.exe` dan `run_with_context`).
-- `mobile`: Biome 490 berkas bersih, `tsc` bersih, seluruh tes TS lulus, `cargo test` 484 passed / 0 failed (memakai linker `rust-lld.exe`).
+- `web-desktop`: Biome bersih, `tsc` bersih, seluruh tes TS lulus, `cargo test` 480 passed / 0 failed.
+- `mobile`: Biome bersih (tanpa `!important` baru), `tsc` bersih, seluruh tes TS lulus, `cargo test` 484 passed / 0 failed.
