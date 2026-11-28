@@ -192,13 +192,13 @@ textarea {
   --color-amber-300: #b45309;
 
   /* Token aplikasi (dipakai html/body, permukaan tone-on-tone, dan ::selection). */
-  --app-background: #eef2f7;
-  --app-background-soft: #e6ecf4;
+  --app-background: #f1f5f9;
+  --app-background-soft: #e8eef6;
   --app-surface: #ffffff;
   --app-surface-raised: #ffffff;
-  --app-group-bg: #e7edf5;
-  --app-tab-track: #dfe7f2;
-  --app-border: #d8e1ee;
+  --app-group-bg: #e5ecf5;
+  --app-tab-track: #dae3ef;
+  --app-border: #cbd5e1;
   --app-primary: #2f4fbf;
   --app-primary-strong: #10308a;
   --app-gold: #d97706;
@@ -206,7 +206,7 @@ textarea {
   --app-gold-text: #92400e;
   --app-text: #0f172a;
   --app-text-muted: #475569;
-  /* >= 3:1 di putih (3,72:1) dan di permukaan grup #e7edf5 (3,16:1). */
+  /* >= 3:1 di putih (3,72:1) dan di permukaan grup #e5ecf5 (3,08:1). */
   --app-input-border: #7584aa;
   --app-input-border-hover: #5b6b94;
 }
@@ -938,27 +938,59 @@ html.light .tab-bar-tab:not([aria-selected="true"]):hover {
   box-shadow: 0 2px 10px rgb(15 23 42 / 4%);
 }
 
-/* Permukaan tone-on-tone tema terang Mobile: kanvas #eef2f7, kartu #ffffff,
-   dan bilah filter / sub-kotak #e7edf5 tanpa !important. */
+/* Permukaan tone-on-tone tema terang Mobile: kanvas #f1f5f9, seluruh kartu utama
+   #ffffff ber-border #cbd5e1, dan bilah filter (.app-group-bar) / sub-kotak #e5ecf5. */
+.app-group-bar {
+  background-color: var(--app-group-bg);
+  border-color: var(--app-border);
+}
 :root[data-theme="light"] .mobile-shell {
   background-color: var(--app-background);
 }
 :root[data-theme="light"]
+  :where(.border-slate-800, .border-white\/10, .border-white\/15):where(
+    :not(
+        input,
+        select,
+        textarea,
+        button,
+        a,
+        .pilih-cari-tombol,
+        .theme-invariant,
+        .theme-invariant *
+      )
+  ) {
+  border-color: var(--app-border);
+}
+:root[data-theme="light"] .app-group-bar,
+:root[data-theme="light"]
+  :is(
+    .app-panel,
+    .bg-slate-900,
+    .bg-slate-900\/95,
+    .bg-slate-900\/90,
+    .bg-slate-900\/80,
+    .bg-slate-900\/70
+  )
   :where(
-    .bg-slate-900\/70,
-    .bg-slate-900\/60,
+    .bg-slate-950,
+    .bg-slate-950\/80,
     .bg-slate-950\/60,
     .bg-slate-950\/50,
     .bg-white\/\[0\.04\]
-  ):not(input):not(select):not(textarea):not(button):not(a):not(
-    .theme-invariant
-  ):not(.theme-invariant *),
-:root[data-theme="light"]
-  :where(.bg-slate-900, .bg-slate-900\/95, .bg-slate-900\/90)
-  :where(.bg-slate-950, .bg-slate-950\/60):not(input):not(select):not(
-    textarea
-  ):not(button):not(a):not(.theme-invariant):not(.theme-invariant *) {
+  ):where(
+    :not(
+        input,
+        select,
+        textarea,
+        button,
+        a,
+        .theme-invariant,
+        .theme-invariant *
+      )
+  ) {
   background-color: var(--app-group-bg);
+  border-color: var(--app-border);
 }
 
 /* Garis netral input (border-white/*, border-slate-*) hanya ~1,3:1 di tema
