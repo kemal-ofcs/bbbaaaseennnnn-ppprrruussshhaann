@@ -1109,6 +1109,144 @@ select:not([multiple]) {
   background-color: #ffffff;
   box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
 }
+
+/* Kartu Statistik & Perlu Perhatian Dinamis (identik dengan Web, tanpa !important). */
+.stat-card {
+  border: 1px solid var(--app-border);
+  background-color: rgba(15, 23, 42, 0.85);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+.stat-card-label,
+.stat-card-value {
+  color: #94a3b8;
+}
+.stat-card-icon {
+  color: #64748b;
+}
+
+.stat-card[data-tone="sky"] {
+  border-color: rgba(123, 147, 227, 0.3);
+  border-left: 4px solid #4a68d4;
+  background-color: rgba(47, 79, 191, 0.14);
+}
+.stat-card[data-tone="sky"] .stat-card-label {
+  color: #93a9ea;
+}
+.stat-card[data-tone="sky"] .stat-card-value {
+  color: #f8fafc;
+}
+.stat-card[data-tone="sky"] .stat-card-icon {
+  color: #7b93e3;
+}
+
+.stat-card[data-tone="emerald"] {
+  border-color: rgba(16, 185, 129, 0.32);
+  border-left: 4px solid #10b981;
+  background-color: rgba(16, 185, 129, 0.12);
+}
+.stat-card[data-tone="emerald"] .stat-card-label,
+.stat-card[data-tone="emerald"] .stat-card-value {
+  color: #6ee7b7;
+}
+.stat-card[data-tone="emerald"] .stat-card-icon {
+  color: #34d399;
+}
+
+.stat-card[data-tone="amber"] {
+  border-color: rgba(245, 158, 11, 0.34);
+  border-left: 4px solid #f59e0b;
+  background-color: rgba(245, 158, 11, 0.12);
+}
+.stat-card[data-tone="amber"] .stat-card-label,
+.stat-card[data-tone="amber"] .stat-card-value {
+  color: #fcd34d;
+}
+.stat-card[data-tone="amber"] .stat-card-icon {
+  color: #fbbf24;
+}
+
+.stat-card[data-tone="rose"] {
+  border-color: rgba(244, 63, 94, 0.34);
+  border-left: 4px solid #f43f5e;
+  background-color: rgba(244, 63, 94, 0.12);
+}
+.stat-card[data-tone="rose"] .stat-card-label,
+.stat-card[data-tone="rose"] .stat-card-value {
+  color: #fda4af;
+}
+.stat-card[data-tone="rose"] .stat-card-icon {
+  color: #fb7185;
+}
+
+:root[data-theme="light"] .stat-card {
+  background-color: #ffffff;
+  border-color: var(--app-border);
+  box-shadow: 0 1px 3px rgb(15 23 42 / 5%);
+}
+:root[data-theme="light"] .stat-card-label,
+:root[data-theme="light"] .stat-card-value {
+  color: #475569;
+}
+:root[data-theme="light"] .stat-card-icon {
+  color: #64748b;
+}
+
+:root[data-theme="light"] .stat-card[data-tone="sky"] {
+  background-color: #e0e8fb;
+  border-color: #bccbf3;
+  border-left: 4px solid #10308a;
+}
+:root[data-theme="light"] .stat-card[data-tone="sky"] .stat-card-label {
+  color: #1d3a9e;
+}
+:root[data-theme="light"] .stat-card[data-tone="sky"] .stat-card-value {
+  color: #0f172a;
+}
+:root[data-theme="light"] .stat-card[data-tone="sky"] .stat-card-icon {
+  color: #2f4fbf;
+}
+
+:root[data-theme="light"] .stat-card[data-tone="emerald"] {
+  background-color: #dcfce7;
+  border-color: #86efac;
+  border-left: 4px solid #10b981;
+}
+:root[data-theme="light"] .stat-card[data-tone="emerald"] .stat-card-label,
+:root[data-theme="light"] .stat-card[data-tone="emerald"] .stat-card-value {
+  color: #166534;
+}
+:root[data-theme="light"] .stat-card[data-tone="emerald"] .stat-card-icon {
+  color: #15803d;
+}
+
+:root[data-theme="light"] .stat-card[data-tone="amber"] {
+  background-color: #fef3c7;
+  border-color: #fde68a;
+  border-left: 4px solid #f59e0b;
+}
+:root[data-theme="light"] .stat-card[data-tone="amber"] .stat-card-label,
+:root[data-theme="light"] .stat-card[data-tone="amber"] .stat-card-value {
+  color: #92400e;
+}
+:root[data-theme="light"] .stat-card[data-tone="amber"] .stat-card-icon {
+  color: #b45309;
+}
+
+:root[data-theme="light"] .stat-card[data-tone="rose"] {
+  background-color: #ffe4e6;
+  border-color: #fecdd3;
+  border-left: 4px solid #f43f5e;
+}
+:root[data-theme="light"] .stat-card[data-tone="rose"] .stat-card-label,
+:root[data-theme="light"] .stat-card[data-tone="rose"] .stat-card-value {
+  color: #9f1239;
+}
+:root[data-theme="light"] .stat-card[data-tone="rose"] .stat-card-icon {
+  color: #be123c;
+}
 /* Tema terang, sama dengan `.aksi-cepat-ikon` Web: kotak ikon navy pucat (ikon
    8,25:1), navy pekat + emas saat kartunya disentuh. Tombol Scanner bilah bawah
    dan kartu hero Scan QR memakai `ikon-navy-tetap`, jadi tetap navy pekat. */

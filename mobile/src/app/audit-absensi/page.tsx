@@ -60,32 +60,6 @@ function skorTone(skor: number) {
 
 type TileVariant = "emerald" | "amber" | "rose" | "clean";
 
-const TILE_VARIANT_STYLE: Record<
-  TileVariant,
-  { card: string; label: string; value: string }
-> = {
-  emerald: {
-    card: "border-emerald-500/30 border-l-4 border-l-emerald-500 bg-emerald-500/10",
-    label: "text-emerald-300",
-    value: "text-emerald-300",
-  },
-  amber: {
-    card: "border-amber-500/30 border-l-4 border-l-amber-500 bg-amber-500/10",
-    label: "text-amber-300",
-    value: "text-amber-300",
-  },
-  rose: {
-    card: "border-rose-500/30 border-l-4 border-l-rose-500 bg-rose-500/10",
-    label: "text-rose-300",
-    value: "text-rose-300",
-  },
-  clean: {
-    card: "border-slate-800 bg-slate-900",
-    label: "text-slate-400",
-    value: "text-slate-400",
-  },
-};
-
 function StatTile({
   label,
   value,
@@ -95,15 +69,12 @@ function StatTile({
   value: number | string;
   variant?: TileVariant;
 }) {
-  const style = TILE_VARIANT_STYLE[variant];
   return (
-    <div className={`rounded-2xl border p-3 ${style.card}`}>
-      <div
-        className={`text-[10px] font-bold uppercase tracking-wide ${style.label}`}
-      >
+    <div data-tone={variant} className="stat-card rounded-2xl p-3">
+      <div className="stat-card-label text-[10px] font-bold uppercase tracking-wide">
         {label}
       </div>
-      <div className={`mt-0.5 text-xl font-black ${style.value}`}>{value}</div>
+      <div className="stat-card-value mt-0.5 text-xl font-black">{value}</div>
     </div>
   );
 }

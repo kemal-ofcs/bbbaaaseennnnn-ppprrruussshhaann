@@ -184,22 +184,22 @@ export function DashboardInsights() {
             <SummaryTile
               label="Hari hadir"
               value={summary.hadir}
-              tone="text-emerald-400"
+              tone={summary.hadir > 0 ? "emerald" : "clean"}
             />
             <SummaryTile
               label="Kali terlambat"
               value={summary.telat}
-              tone="text-amber-400"
+              tone={summary.telat > 0 ? "amber" : "clean"}
             />
             <SummaryTile
               label="Izin / Sakit / Dispen"
               value={summary.izinSakit}
-              tone="text-blue-400"
+              tone={summary.izinSakit > 0 ? "sky" : "clean"}
             />
             <SummaryTile
               label="Alfa"
               value={summary.alfa}
-              tone="text-rose-400"
+              tone={summary.alfa > 0 ? "rose" : "clean"}
             />
           </div>
 
@@ -375,14 +375,16 @@ function SummaryTile({
 }: {
   label: string;
   value: number;
-  tone: string;
+  tone: "clean" | "sky" | "emerald" | "amber" | "rose";
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-3">
-      <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+    <div data-tone={tone} className="stat-card rounded-2xl p-3">
+      <span className="stat-card-label block text-[10px] font-bold uppercase tracking-wider">
         {label}
       </span>
-      <span className={`text-xl font-black ${tone}`}>{value}</span>
+      <span className="stat-card-value mt-0.5 block text-xl font-black">
+        {value}
+      </span>
     </div>
   );
 }

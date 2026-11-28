@@ -257,12 +257,15 @@ export default function DashboardPage() {
         {/* Statistics Grid (Hanya jika memiliki izin dashboard.view) */}
         {canViewMetrics ? (
           <div className="grid grid-cols-2 gap-3">
-            <div className="kartu-angka rounded-2xl p-4">
-              <span className="kartu-angka-label text-[11px] font-semibold uppercase tracking-wider">
+            <div
+              data-tone={(metrics?.hadirHariIni ?? 0) > 0 ? "emerald" : "clean"}
+              className="stat-card rounded-2xl p-4"
+            >
+              <span className="stat-card-label text-[11px] font-bold uppercase tracking-wider">
                 Total Hadir
               </span>
               <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-2xl font-black text-emerald-400">
+                <span className="stat-card-value text-2xl font-black">
                   {isLoading ? "--" : (metrics?.hadirHariIni ?? 0)}
                 </span>
                 <span className="text-xs text-slate-400 font-medium">
@@ -277,12 +280,17 @@ export default function DashboardPage() {
               ) : null}
             </div>
 
-            <div className="kartu-angka rounded-2xl p-4">
-              <span className="kartu-angka-label text-[11px] font-semibold uppercase tracking-wider">
+            <div
+              data-tone={
+                (metrics?.terlambatHariIni ?? 0) > 0 ? "amber" : "clean"
+              }
+              className="stat-card rounded-2xl p-4"
+            >
+              <span className="stat-card-label text-[11px] font-bold uppercase tracking-wider">
                 Terlambat
               </span>
               <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-2xl font-black text-amber-400">
+                <span className="stat-card-value text-2xl font-black">
                   {isLoading ? "--" : (metrics?.terlambatHariIni ?? 0)}
                 </span>
                 <span className="text-xs text-slate-400 font-medium">
@@ -291,12 +299,15 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="kartu-angka rounded-2xl p-4">
-              <span className="kartu-angka-label text-[11px] font-semibold uppercase tracking-wider">
+            <div
+              data-tone={(metrics?.sakitIzinHariIni ?? 0) > 0 ? "sky" : "clean"}
+              className="stat-card rounded-2xl p-4"
+            >
+              <span className="stat-card-label text-[11px] font-bold uppercase tracking-wider">
                 Izin / Sakit
               </span>
               <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-2xl font-black text-blue-400">
+                <span className="stat-card-value text-2xl font-black">
                   {isLoading ? "--" : (metrics?.sakitIzinHariIni ?? 0)}
                 </span>
                 <span className="text-xs text-slate-400 font-medium">
@@ -305,12 +316,15 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="kartu-angka rounded-2xl p-4">
-              <span className="kartu-angka-label text-[11px] font-semibold uppercase tracking-wider">
+            <div
+              data-tone={(metrics?.alfaHariIni ?? 0) > 0 ? "rose" : "clean"}
+              className="stat-card rounded-2xl p-4"
+            >
+              <span className="stat-card-label text-[11px] font-bold uppercase tracking-wider">
                 Alfa / Belum
               </span>
               <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-2xl font-black text-rose-400">
+                <span className="stat-card-value text-2xl font-black">
                   {isLoading ? "--" : (metrics?.alfaHariIni ?? 0)}
                 </span>
                 <span className="text-xs text-slate-400 font-medium">
