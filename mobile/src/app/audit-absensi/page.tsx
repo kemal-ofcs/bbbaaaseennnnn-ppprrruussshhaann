@@ -58,21 +58,52 @@ function skorTone(skor: number) {
   return "text-rose-400";
 }
 
+type TileVariant = "emerald" | "amber" | "rose" | "clean";
+
+const TILE_VARIANT_STYLE: Record<
+  TileVariant,
+  { card: string; label: string; value: string }
+> = {
+  emerald: {
+    card: "border-emerald-500/30 border-l-4 border-l-emerald-500 bg-emerald-500/10",
+    label: "text-emerald-300",
+    value: "text-emerald-300",
+  },
+  amber: {
+    card: "border-amber-500/30 border-l-4 border-l-amber-500 bg-amber-500/10",
+    label: "text-amber-300",
+    value: "text-amber-300",
+  },
+  rose: {
+    card: "border-rose-500/30 border-l-4 border-l-rose-500 bg-rose-500/10",
+    label: "text-rose-300",
+    value: "text-rose-300",
+  },
+  clean: {
+    card: "border-slate-800 bg-slate-900",
+    label: "text-slate-400",
+    value: "text-slate-400",
+  },
+};
+
 function StatTile({
   label,
   value,
-  tone = "text-white",
+  variant = "clean",
 }: {
   label: string;
   value: number | string;
-  tone?: string;
+  variant?: TileVariant;
 }) {
+  const style = TILE_VARIANT_STYLE[variant];
   return (
-    <div className="rounded-2xl border border-white/10 bg-slate-950/60 p-3">
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+    <div className={`rounded-2xl border p-3 ${style.card}`}>
+      <div
+        className={`text-[10px] font-bold uppercase tracking-wide ${style.label}`}
+      >
         {label}
       </div>
-      <div className={`mt-0.5 text-xl font-black ${tone}`}>{value}</div>
+      <div className={`mt-0.5 text-xl font-black ${style.value}`}>{value}</div>
     </div>
   );
 }
@@ -244,41 +275,46 @@ export default function AuditAbsensiMobilePage() {
                   <StatTile
                     label="Belum Scan Masuk"
                     value={ringkasan.belumScanMasuk}
-                    tone="text-rose-400"
+                    variant={ringkasan.belumScanMasuk > 0 ? "rose" : "clean"}
                   />
                   <StatTile
                     label="Belum Scan Pulang"
                     value={ringkasan.belumScanPulang}
-                    tone="text-amber-400"
+                    variant={ringkasan.belumScanPulang > 0 ? "amber" : "clean"}
                   />
                   <StatTile
                     label="Perlu Verifikasi"
                     value={ringkasan.perluVerifikasi}
-                    tone="text-amber-400"
+                    variant={ringkasan.perluVerifikasi > 0 ? "amber" : "clean"}
                   />
                   <StatTile
                     label="Scan Ditolak"
                     value={ringkasan.scanDitolak}
-                    tone="text-amber-400"
+                    variant={ringkasan.scanDitolak > 0 ? "amber" : "clean"}
                   />
                   <StatTile
                     label="Alfa"
                     value={ringkasan.alfa}
-                    tone="text-rose-400"
+                    variant={ringkasan.alfa > 0 ? "rose" : "clean"}
                   />
                   <StatTile
                     label="Hadir"
                     value={ringkasan.hadir}
-                    tone="text-emerald-400"
+                    variant={ringkasan.hadir > 0 ? "emerald" : "clean"}
                   />
-                  <StatTile label="Terlambat" value={ringkasan.terlambat} />
+                  <StatTile
+                    label="Terlambat"
+                    value={ringkasan.terlambat}
+                    variant={ringkasan.terlambat > 0 ? "amber" : "clean"}
+                  />
                   <StatTile
                     label="Jam Kerja Kurang"
                     value={ringkasan.jamKerjaKurang}
+                    variant={ringkasan.jamKerjaKurang > 0 ? "amber" : "clean"}
                   />
                 </div>
 
-                <div className="flex gap-1 overflow-x-auto rounded-xl bg-slate-900/60 p-1">
+                <div className="app-segment-track flex gap-1 overflow-x-auto rounded-xl p-1">
                   {FILTER_OPTIONS.map((option) => (
                     <button
                       key={option.value}

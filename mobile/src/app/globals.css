@@ -834,8 +834,8 @@ html.light .sakelar-wrap[data-aktif="true"] .sakelar-status {
   }
 }
 
-/* TabBar (components/ui/TabBar.tsx, disalin ke Mobile): rel segmen lembut tanpa
-   garis bertumpuk, identik dengan Web. */
+/* TabBar (components/ui/TabBar.tsx, disalin ke Mobile): rel segmen lembut Pas Lebar
+   (width: 100%), identik dengan Web. */
 .tab-bar {
   display: flex;
   width: 100%;
@@ -846,12 +846,6 @@ html.light .sakelar-wrap[data-aktif="true"] .sakelar-status {
   border-radius: 0.875rem;
   background-color: var(--app-tab-track);
   scrollbar-width: thin;
-}
-@media (min-width: 640px) {
-  .tab-bar:not([data-vertikal-lg]) {
-    width: fit-content;
-    max-width: 100%;
-  }
 }
 .tab-bar-tab {
   display: inline-flex;
@@ -943,6 +937,9 @@ html.light .tab-bar-tab:not([aria-selected="true"]):hover {
 .app-group-bar {
   background-color: var(--app-group-bg);
   border-color: var(--app-border);
+}
+.app-segment-track {
+  background-color: var(--app-tab-track);
 }
 :root[data-theme="light"] .mobile-shell {
   background-color: var(--app-background);

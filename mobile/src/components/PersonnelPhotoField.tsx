@@ -193,7 +193,7 @@ export function PersonnelPhotoField({
     : "P";
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-slate-900/60 p-3.5 shadow-sm">
+    <div className="app-group-bar flex flex-col gap-3 rounded-2xl border border-white/10 bg-slate-900/60 p-3.5">
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
           Foto Resmi Personil (ID Card)
@@ -210,7 +210,7 @@ export function PersonnelPhotoField({
       </div>
 
       <div className="flex items-center gap-3.5">
-        <div className="relative flex h-20 w-16 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-white/20 bg-slate-800 shadow-md">
+        <div className="relative flex h-20 w-16 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-sky-400/30 bg-sky-500/15">
           {isLoading ? (
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-sky-400 border-t-transparent" />
           ) : photoDataUrl ? (
@@ -221,9 +221,7 @@ export function PersonnelPhotoField({
               className="h-full w-full object-cover"
             />
           ) : (
-            <span className="text-base font-bold text-slate-400">
-              {initials}
-            </span>
+            <span className="text-base font-bold text-sky-300">{initials}</span>
           )}
 
           {isSaving ? (
